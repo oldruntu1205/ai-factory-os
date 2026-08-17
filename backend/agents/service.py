@@ -131,7 +131,9 @@ def _quotation_with_record(message: str, company_id: int, db: Session, customer_
 
 JSON 格式：
 {{"product": "产品", "quantity": 数量, "unit_price": 单价,
-  "delivery_days": 交期天数, "payment_terms": "付款方式"}}
+  "delivery_days": 交期天数, "payment_terms": "付款方式",
+  "currency": "USD", "incoterms": "FOB/CIF/EXW/DAP", "moq": 最小起订量,
+  "packaging": "包装说明", "country": "目的国代码(如 DE/US/AE)"}}
 """
     full_prompt = f"{soul}\n\n---\n\n{prompt}" if soul else prompt
     result = llm.invoke(full_prompt)
@@ -157,16 +159,44 @@ JSON 格式：
                     Customer.company_id == company_id).first()
                 if not cust:
                     return "客户不存在或不属于当前企业，未生成报价单"
+            # 外贸估算（HS Code / 汇率 / 运费 / 关税）
+            from utils.trade import (classify_hs_code, get_fx_rate,
+                                     estimate_freight, estimate_tariff)
+            hs = classify_hs_code(str(parsed.get("product", "")))
+            country = str(parsed.get("country", "")).upper() or "US"
+            currency = str(parsed.get("currency", "USD")).upper() or "USD"
+            incoterms = str(parsed.get("incoterms", "FOB")).upper() or "FOB"
+            fx = get_fx_rate("USD", currency) if currency != "USD" else {"rate": 1.0}
+            qty = int(parsed.get("quantity", 1) or 1)
+            price = float(parsed.get("unit_price", 0) or 0)
+            freight = estimate_freight(volume_cbm=max(1.0, qty * 0.005),
+                                       destination_country=country)
+            tariff = estimate_tariff(hs.get("hs_code", ""), country)
+            goods_total = qty * price
+            total_amount = goods_total
+            if incoterms in ("CIF", "DAP", "DDP"):
+                total_amount += freight["freight_usd"] * fx["rate"]
+            if incoterms == "DDP":
+                total_amount += goods_total * (tariff["tariff_pct"] / 100.0)
             quotation = Quotation(
                 quotation_no=f"QT{company_id}{uuid.uuid4().hex[:8].upper()}",
                 customer_id=customer_id,
                 customer_name=cust.name if cust else "未命名客户",
                 product=str(parsed.get("product", "")),
-                quantity=int(parsed.get("quantity", 1) or 1),
-                unit_price=float(parsed.get("unit_price", 0) or 0),
-                total_amount=float(parsed.get("quantity", 1) or 1) * float(parsed.get("unit_price", 0) or 0),
+                quantity=qty,
+                unit_price=price,
+                total_amount=round(total_amount, 2),
+                currency=currency,
                 delivery_days=int(parsed.get("delivery_days", 30) or 30),
                 payment_terms=str(parsed.get("payment_terms", "T/T 30% deposit")),
+                hs_code=hs.get("hs_code", ""),
+                incoterms=incoterms,
+                fx_rate=round(fx["rate"], 4),
+                freight_amount=round(freight["freight_usd"], 2),
+                tariff_amount=round(goods_total * (tariff["tariff_pct"] / 100.0), 2),
+                tariff_pct=tariff["tariff_pct"],
+                moq=int(parsed.get("moq", 1) or 1),
+                packaging=str(parsed.get("packaging", "Standard export carton")),
                 status="draft",
                 company_id=company_id,
             )
@@ -175,7 +205,7 @@ JSON 格式：
             if cust:
                 cust.status = "quoted"
                 db.commit()
-            content += f"\n\n[已生成报价单: {quotation.quotation_no}]"
+            content += f"\n\n[已生成报价单: {quotation.quotation_no}（{incoterms}，HS {quotation.hs_code or '待核验'}）]"
         return content
     except Exception:
         return content

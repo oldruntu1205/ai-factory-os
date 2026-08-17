@@ -43,14 +43,29 @@ def create_quotation(data: QuoteIn, db: Session = Depends(get_db),
 
 JSON 格式：
 {{"product": "产品", "quantity": 数量, "unit_price": 单价,
-  "delivery_days": 交期天数, "payment_terms": "付款方式", "currency": "USD"}}
+  "delivery_days": 交期天数, "payment_terms": "付款方式", "currency": "USD",
+  "incoterms": "FOB/CIF/EXW/DAP", "moq": 最小起订量, "packaging": "包装说明",
+  "country": "目的国代码(如 DE/US/AE，用于运费/关税估算)"}}
 """
     result = llm.invoke(prompt)
     from services.llm_parse import parse_json_output, safe_int, safe_float, safe_str
     parsed = parse_json_output(result.content.strip(), {
         "product": "待确认产品", "quantity": 1, "unit_price": 0,
         "delivery_days": 30, "payment_terms": "T/T 30% deposit", "currency": "USD",
+        "incoterms": "FOB", "moq": 1, "packaging": "Standard export carton",
+        "country": "",
     })
+
+    # 2. 外贸估算（HS Code 归类 + 汇率 + 运费/关税）
+    from utils.trade import classify_hs_code, get_fx_rate, estimate_freight, estimate_tariff
+    hs = classify_hs_code(safe_str(parsed.get("product")))
+    country = safe_str(parsed.get("country")).upper() or "US"
+    currency = safe_str(parsed.get("currency"), "USD").upper()
+    incoterms = safe_str(parsed.get("incoterms"), "FOB").upper()
+    fx = get_fx_rate("USD", currency) if currency != "USD" else {"rate": 1.0, "source": "identity"}
+    freight = estimate_freight(volume_cbm=max(1.0, safe_int(parsed.get("quantity"), 1) * 0.005),
+                               destination_country=country)
+    tariff = estimate_tariff(hs.get("hs_code", ""), country)
 
     import uuid
     quantity = safe_int(parsed.get("quantity"), 1)
@@ -65,6 +80,13 @@ JSON 格式：
             raise HTTPException(status_code=400,
                                 detail="客户不存在或不属于当前企业")
         customer_name = cust.name
+    # 总价：单价 × 数量（折算到报价币种）；CIF/DAP/DDP 计入运费/关税（估算，USD 折算）
+    goods_total = quantity * unit_price
+    total_amount = goods_total
+    if incoterms in ("CIF", "DAP", "DDP"):
+        total_amount += freight["freight_usd"] * fx["rate"]
+    if incoterms == "DDP":
+        total_amount += goods_total * (tariff["tariff_pct"] / 100.0)
     quotation = Quotation(
         quotation_no=f"QT{data.company_id}{uuid.uuid4().hex[:8].upper()}",
         customer_id=data.customer_id,
@@ -72,10 +94,19 @@ JSON 格式：
         product=safe_str(parsed.get("product")),
         quantity=quantity,
         unit_price=unit_price,
-        total_amount=quantity * unit_price,
-        currency=safe_str(parsed.get("currency"), "USD"),
+        total_amount=round(total_amount, 2),
+        currency=currency,
         delivery_days=safe_int(parsed.get("delivery_days"), 30),
         payment_terms=safe_str(parsed.get("payment_terms"), "T/T 30% deposit"),
+        # 外贸字段
+        hs_code=hs.get("hs_code", ""),
+        incoterms=incoterms,
+        fx_rate=round(fx["rate"], 4),
+        freight_amount=round(freight["freight_usd"], 2),
+        tariff_amount=round(goods_total * (tariff["tariff_pct"] / 100.0), 2),
+        tariff_pct=tariff["tariff_pct"],
+        moq=safe_int(parsed.get("moq"), 1),
+        packaging=safe_str(parsed.get("packaging"), "Standard export carton"),
         status="draft",
         company_id=data.company_id,
     )
@@ -83,7 +114,7 @@ JSON 格式：
     db.commit()
     db.refresh(quotation)
 
-    # 2. 生成 PDF
+    # 3. 生成 PDF（含外贸条款）
     try:
         q_dict = {
             "quotation_no": quotation.quotation_no,
@@ -95,6 +126,15 @@ JSON 格式：
             "currency": quotation.currency,
             "delivery_days": quotation.delivery_days,
             "payment_terms": quotation.payment_terms,
+            # 外贸字段
+            "hs_code": quotation.hs_code,
+            "incoterms": quotation.incoterms,
+            "fx_rate": quotation.fx_rate,
+            "freight_amount": quotation.freight_amount,
+            "tariff_amount": quotation.tariff_amount,
+            "tariff_pct": quotation.tariff_pct,
+            "moq": quotation.moq,
+            "packaging": quotation.packaging,
         }
         pdf_path = create_quote_pdf(q_dict)
         quotation.pdf_path = pdf_path
@@ -113,6 +153,15 @@ JSON 格式：
         "currency": quotation.currency,
         "delivery_days": quotation.delivery_days,
         "payment_terms": quotation.payment_terms,
+        # 外贸字段回显
+        "hs_code": quotation.hs_code,
+        "incoterms": quotation.incoterms,
+        "fx_rate": quotation.fx_rate,
+        "freight_amount": quotation.freight_amount,
+        "tariff_amount": quotation.tariff_amount,
+        "tariff_pct": quotation.tariff_pct,
+        "moq": quotation.moq,
+        "packaging": quotation.packaging,
         "pdf_path": quotation.pdf_path or "",
     }
 
@@ -132,6 +181,10 @@ def list_quotations(company_id: int, page: int = 1, page_size: int = 100,
             "product": q.product, "quantity": q.quantity, "unit_price": q.unit_price,
             "total_amount": q.total_amount, "currency": q.currency,
             "delivery_days": q.delivery_days, "payment_terms": q.payment_terms,
+            "hs_code": q.hs_code or "", "incoterms": q.incoterms or "FOB",
+            "fx_rate": q.fx_rate or 1.0, "freight_amount": q.freight_amount or 0.0,
+            "tariff_amount": q.tariff_amount or 0.0, "tariff_pct": q.tariff_pct or 0.0,
+            "moq": q.moq or 1, "packaging": q.packaging or "",
             "status": q.status, "created_at": q.created_at.isoformat(),
         } for q in quotes],
         "total": total, "page": page, "page_size": page_size,

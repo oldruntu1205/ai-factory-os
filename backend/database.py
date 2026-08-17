@@ -212,6 +212,27 @@ def _lightweight_migrate():
                             logger.info("迁移: conversations.msg_id 新增")
                         except Exception as e:
                             logger.debug(f"迁移跳过 conversations.msg_id: {e}")
+                # 外贸报价字段：quotations 新增列
+                _QUOTE_MIGRATIONS = [
+                    ("hs_code", "VARCHAR(20) DEFAULT ''"),
+                    ("incoterms", "VARCHAR(10) DEFAULT 'FOB'"),
+                    ("fx_rate", "FLOAT DEFAULT 1.0"),
+                    ("freight_amount", "FLOAT DEFAULT 0.0"),
+                    ("tariff_amount", "FLOAT DEFAULT 0.0"),
+                    ("tariff_pct", "FLOAT DEFAULT 0.0"),
+                    ("moq", "INTEGER DEFAULT 1"),
+                    ("packaging", "VARCHAR(200) DEFAULT ''"),
+                ]
+                if "quotations" in tables:
+                    existing = {c["name"] for c in inspector.get_columns("quotations")}
+                    for col, sqltype in _QUOTE_MIGRATIONS:
+                        if col not in existing:
+                            try:
+                                conn.execute(text(
+                                    f"ALTER TABLE quotations ADD COLUMN {col} {sqltype}"))
+                                logger.info(f"迁移: quotations.{col} 新增")
+                            except Exception as e:
+                                logger.debug(f"迁移跳过 quotations.{col}: {e}")
             # ---------- PostgreSQL：幂等 ADD COLUMN IF NOT EXISTS ----------
             if is_postgres:
                 _PG_ALL_COLS = []
@@ -234,6 +255,15 @@ def _lightweight_migrate():
                     ("agent_skills", "quarantine_reason", "TEXT DEFAULT ''"),
                     # 渠道消息幂等：conversations.msg_id
                     ("conversations", "msg_id", "VARCHAR(100)"),
+                    # 外贸报价字段
+                    ("quotations", "hs_code", "VARCHAR(20) DEFAULT ''"),
+                    ("quotations", "incoterms", "VARCHAR(10) DEFAULT 'FOB'"),
+                    ("quotations", "fx_rate", "DOUBLE PRECISION DEFAULT 1.0"),
+                    ("quotations", "freight_amount", "DOUBLE PRECISION DEFAULT 0.0"),
+                    ("quotations", "tariff_amount", "DOUBLE PRECISION DEFAULT 0.0"),
+                    ("quotations", "tariff_pct", "DOUBLE PRECISION DEFAULT 0.0"),
+                    ("quotations", "moq", "INTEGER DEFAULT 1"),
+                    ("quotations", "packaging", "VARCHAR(200) DEFAULT ''"),
                 ]
                 for tbl, col, sqltype in _PG_ALL_COLS:
                     if tbl in tables:

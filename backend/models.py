@@ -239,6 +239,15 @@ class Quotation(Base):
     currency = Column(String(10), default="USD")
     delivery_days = Column(Integer, default=30)
     payment_terms = Column(String(100), default="T/T 30% deposit")
+    # 外贸报价字段（出口型制造业 AI 应用）
+    hs_code = Column(String(20), default="")          # HS Code 归类（6 位）
+    incoterms = Column(String(10), default="FOB")     # FOB/CIF/EXW/DAP...
+    fx_rate = Column(Float, default=1.0)              # 本币→报价币种汇率
+    freight_amount = Column(Float, default=0.0)       # 海运费（USD，CIF/DAP 场景计入）
+    tariff_amount = Column(Float, default=0.0)        # 关税（USD，DDP 场景计入）
+    tariff_pct = Column(Float, default=0.0)           # 适用关税率 %
+    moq = Column(Integer, default=1)                  # 最小起订量
+    packaging = Column(String(200), default="")       # 包装说明
     status = Column(String(50), default="draft")          # draft/sent/accepted/rejected
     pdf_path = Column(String(500), default="")
     company_id = Column(Integer, index=True)

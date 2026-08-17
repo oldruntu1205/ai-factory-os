@@ -97,6 +97,8 @@ export default function Quotations() {
               <th>数量</th>
               <th>单价</th>
               <th>总额</th>
+              <th>条款/HS</th>
+              <th>运费/关税</th>
               <th>交期</th>
               <th>状态</th>
               <th>操作</th>
@@ -113,6 +115,14 @@ export default function Quotations() {
                   <td>{q.quantity}</td>
                   <td>{q.currency} {q.unit_price?.toLocaleString?.() ?? q.unit_price}</td>
                   <td style={{ fontWeight: 600 }}>{q.currency} {q.total_amount?.toLocaleString?.() ?? q.total_amount}</td>
+                  <td style={{ fontSize: 12 }}>
+                    <span className="badge" style={{ background: 'rgba(77,139,255,0.12)' }}>{q.incoterms || 'FOB'}</span>
+                    {q.hs_code && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>HS {q.hs_code}</div>}
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {q.freight_amount > 0 ? `运 $${q.freight_amount?.toLocaleString?.() ?? q.freight_amount}` : '—'}
+                    {q.tariff_pct > 0 ? ` / 税 ${q.tariff_pct}%` : ''}
+                  </td>
                   <td>{q.delivery_days}天</td>
                   <td><span className={`badge ${cls}`}>{label}</span></td>
                   <td>
