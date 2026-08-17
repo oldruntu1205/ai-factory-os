@@ -52,8 +52,15 @@ def chat(data: ChatIn, db: Session = Depends(get_db),
             raise HTTPException(status_code=404, detail="AI 员工不存在")
         if agent.status != "active":
             raise HTTPException(status_code=400, detail="该 AI 员工已停用")
+        # P2 优化：主聊天路径注入 ToolCenter，让生产/质量/工艺多步 Agent 可取实时数据
+        tools = None
+        try:
+            from hermes.runtime import get_runtime
+            tools = get_runtime().tool_center
+        except Exception:
+            pass
         answer = execute_specialized(agent, data.message, data.company_id,
-                                     db, data.customer_id)
+                                     db, data.customer_id, tools=tools)
         role_label = agent.role_label
     else:
         answer = execute_agent(data.message, data.company_id, data.customer_id)

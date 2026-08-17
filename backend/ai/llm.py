@@ -179,7 +179,9 @@ def vision_invoke(prompt_text: str, image_paths: list) -> str:
     gateway = (cfg or {}).get("gateway") or (LLM_GATEWAY or "deepseek")
     gateway = gateway.lower()
     keys = (cfg or {}).get("keys") or {}
-    api_key = keys.get(gateway) or LLM_API_KEY
+    # P2 修复：全局 LLM_API_KEY 仅回退默认网关（与 _get_llm 一致，防 key 误投第三方）
+    is_default_gateway = gateway == (LLM_GATEWAY or "deepseek").lower()
+    api_key = keys.get(gateway) or (LLM_API_KEY if is_default_gateway else "")
     if not api_key:
         return "⚠️ 当前未配置支持图片识别的模型 API Key，无法解析图片。请上传 DXF/PDF/文本类图纸，或在「平台设置-模型设置」中配置 OpenAI（gpt-4o）后重试。"
 

@@ -43,7 +43,11 @@ if not SECRET_KEY:
         if not SECRET_KEY:
             SECRET_KEY = _secrets.token_hex(32)
             _key_file.write_text(SECRET_KEY)
-    except Exception:
+    except Exception as e:
+        # P2 安全提示：无法持久化密钥时告警（否则重启换 key，已加密的集成/渠道凭据将不可解）
+        import warnings
+        warnings.warn(f"无法持久化 SECRET_KEY 到 {_key_file}（{e}），"
+                      "重启后已加密凭据将不可解密，请检查目录可写或配置 SECRET_KEY 环境变量")
         SECRET_KEY = SECRET_KEY or _secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "7"))

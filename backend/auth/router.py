@@ -27,6 +27,10 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 60
 _login_attempts: dict = defaultdict(list)
+# 注册限流：按 IP 10 次/小时（P2：防批量注册/邮箱枚举）
+REGISTER_MAX_ATTEMPTS = 10
+REGISTER_WINDOW_SECONDS = 3600
+_register_attempts: dict = defaultdict(list)
 
 
 def _login_rate_limited(key: str) -> bool:
@@ -34,6 +38,16 @@ def _login_rate_limited(key: str) -> bool:
     lst = _login_attempts[key]
     lst[:] = [t for t in lst if now - t < LOGIN_WINDOW_SECONDS]
     if len(lst) >= LOGIN_MAX_ATTEMPTS:
+        return True
+    lst.append(now)
+    return False
+
+
+def _register_rate_limited(ip: str) -> bool:
+    now = time.time()
+    lst = _register_attempts[ip]
+    lst[:] = [t for t in lst if now - t < REGISTER_WINDOW_SECONDS]
+    if len(lst) >= REGISTER_MAX_ATTEMPTS:
         return True
     lst.append(now)
     return False
@@ -52,8 +66,12 @@ class LoginIn(BaseModel):
 
 
 @router.post("/register")
-def register(data: RegisterIn, db: Session = Depends(get_db)):
-    """企业注册：创建企业 + 管理员账号（密码策略校验）"""
+def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
+    """企业注册：创建企业 + 管理员账号（密码策略校验 + IP 限流）"""
+    # P2 安全修复：注册 IP 限流（10 次/小时，防批量注册与邮箱枚举）
+    ip = request.client.host if request.client else "unknown"
+    if _register_rate_limited(ip):
+        raise HTTPException(status_code=429, detail="注册过于频繁，请稍后再试")
     # 安全修复：密码至少 8 位且含字母数字；企业名限长
     if len(data.password) < 8 or not re.search(r"[A-Za-z]", data.password) \
             or not re.search(r"\d", data.password):

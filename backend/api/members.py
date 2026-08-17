@@ -155,6 +155,13 @@ def set_role(member_id: int, data: RoleIn, db: Session = Depends(get_db),
         User.id == member_id, User.company_id == data.company_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="成员不存在")
+    # P2 安全修复：企业至少保留一名管理员（不能把唯一 admin 降级）
+    if data.role == "staff" and member.role == "admin":
+        admins = db.query(User).filter(
+            User.company_id == data.company_id,
+            User.role == "admin", User.status == "active").count()
+        if admins <= 1:
+            raise HTTPException(status_code=400, detail="企业至少保留一名管理员")
     member.role = data.role
     db.commit()
     log_action(data.company_id, "member_role", f"成员 {member.email} 角色改为 {data.role}",
@@ -201,6 +208,13 @@ def remove_member(member_id: int, data: RemoveIn = None,
         User.id == member_id, User.company_id == company_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="成员不存在")
+    # P2 安全修复：企业至少保留一名管理员（不能移除唯一 admin）
+    if member.role == "admin":
+        admins = db.query(User).filter(
+            User.company_id == company_id,
+            User.role == "admin", User.status == "active").count()
+        if admins <= 1:
+            raise HTTPException(status_code=400, detail="企业至少保留一名管理员")
     email = member.email
     db.delete(member)
     db.commit()

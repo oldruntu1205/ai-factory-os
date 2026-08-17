@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from database import get_db, SessionLocal
 from models import AgentPackage, CompanyPackageInstall, AIAgent, Company
 from auth.deps import get_current_user, require_company
+from api.company import require_verified
 from constants.industries import INDUSTRY_NAME_BY_CODE
 
 logger = logging.getLogger(__name__)
@@ -186,8 +187,9 @@ def _tool_permission_of(tool_name: str) -> str:
 @router.post("/install")
 def install_package(data: InstallIn, db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
-    """安装包到企业（第24章）：一键部署整套行业 AI 员工"""
+    """安装包到企业（第24章）：一键部署整套行业 AI 员工（需企业已认证）"""
     require_company(data.company_id, current)
+    require_verified(current.get("license_verified", False))
     p = db.query(AgentPackage).filter(AgentPackage.id == data.package_id).first()
     if not p or p.status != "published":
         raise HTTPException(status_code=404, detail="包不存在或未发布")

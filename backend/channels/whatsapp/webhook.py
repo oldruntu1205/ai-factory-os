@@ -28,13 +28,15 @@ logger = logging.getLogger(__name__)
 
 @router.get("/webhook")
 async def verify(request: Request):
-    """Meta Cloud API 的 webhook 验证握手（安全：未配置 verify_token 时 fail-closed）"""
+    """Meta Cloud API 的 webhook 验证握手（安全：未配置 verify_token 时 fail-closed；
+    P2 修复：challenge 原文返回，不强制 int（Meta challenge 可为非数字字符串））"""
     if not WHATSAPP_VERIFY_TOKEN:
         raise HTTPException(status_code=503,
                             detail="未配置 WHATSAPP_VERIFY_TOKEN，拒绝握手（请在生产环境配置）")
     params = request.query_params
     if params.get("hub.verify_token") == WHATSAPP_VERIFY_TOKEN:
-        return int(params.get("hub.challenge", "0"))
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(str(params.get("hub.challenge", "")))
     raise HTTPException(status_code=403, detail="verify token mismatch")
 
 

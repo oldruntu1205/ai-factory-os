@@ -67,17 +67,20 @@ async def receive(request: Request):
         raise HTTPException(status_code=403, detail="签名校验失败")
 
     # 解析 XML（企业微信明文模式返回 XML；JSON 模式兼容处理）
+    msg_id = ""
     try:
         if body_text.strip().startswith("<"):
             root = ET.fromstring(body_text)
             content = root.findtext("Content", "") or ""
             from_user = root.findtext("FromUserName", "")
             msg_type = root.findtext("MsgType", "text")
+            msg_id = root.findtext("MsgId", "") or ""
         else:
             data = json.loads(body_text)
             content = data.get("Content") or data.get("content") or ""
             from_user = data.get("FromUserName") or data.get("from") or ""
             msg_type = data.get("MsgType", "text")
+            msg_id = data.get("MsgId") or data.get("msgId") or ""
     except Exception:
         raise HTTPException(status_code=400, detail="无法解析企微消息")
 
@@ -93,16 +96,61 @@ async def receive(request: Request):
         logger.warning("企微消息来自未绑定企业的用户 %s，拒绝处理", from_user)
         return {"status": "ok", "handled": False, "reason": "unbound_user"}
 
+    # P2 幂等：企微至少一次投递，同一 MsgId 重复到达直接跳过（防重复 AI/回复）
+    if msg_id and _wecom_msg_seen(company_id, msg_id):
+        return {"status": "ok", "handled": True, "duplicate": True}
+
     try:
         # 同步 LLM 调用放到线程池，避免阻塞事件循环
         answer = await asyncio.to_thread(execute_agent, content, company_id)
         # 通过应用消息回复客户（使用企业级配置）
         from channels.wecom.app import send_app_text
         send_app_text(from_user, answer, company_id=company_id)
+        # 入库（含 msg_id 供幂等）
+        _save_wecom_conversation(company_id, from_user, content, answer, msg_id)
         return {"status": "ok", "handled": True, "answer": answer}
     except Exception as e:
         logger.error("企微消息处理失败: %s", e)
         return {"status": "ok", "handled": False, "error": "internal"}
+
+
+def _wecom_msg_seen(company_id: int, msg_id: str) -> bool:
+    """企微消息幂等检查（Conversation.msg_id 查重）"""
+    try:
+        from database import SessionLocal
+        from models import Conversation
+        db = SessionLocal()
+        try:
+            return db.query(Conversation.id).filter(
+                Conversation.msg_id == msg_id,
+                Conversation.company_id == company_id).first() is not None
+        finally:
+            db.close()
+    except Exception:
+        return False
+
+
+def _save_wecom_conversation(company_id: int, user: str, question: str,
+                             answer: str, msg_id: str = "") -> None:
+    """企微往来消息入库（channel=wecom，记录 msg_id 供幂等）"""
+    try:
+        from database import SessionLocal
+        from models import Conversation
+        db = SessionLocal()
+        try:
+            db.add(Conversation(
+                company_id=company_id,
+                session_id=f"wecom:{user}",
+                user_message=question,
+                agent_answer=answer,
+                channel="wecom",
+                msg_id=msg_id or None,
+            ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass  # 入库失败不影响回复
 
 
 @router.post("/robot/send")

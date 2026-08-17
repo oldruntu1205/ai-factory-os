@@ -161,10 +161,13 @@ class RBACSystem:
             raise PermissionError(
                 f"Agent [{agent_name}] 未声明 Tool [{tool_name}]，拒绝调用")
 
-        # 2) Tool 权限点校验
+        # 2) Tool 权限点校验（P2 安全修复：未注册 Tool 默认拒绝，fail-closed）
         from hermes.tool.tools import BUILTIN_TOOLS
         tool = BUILTIN_TOOLS.get(tool_name)
-        if tool and tool.permissions:
+        if tool is None:
+            logger.warning("RBAC: 未注册 Tool [%s] 被调用，拒绝（fail-closed）", tool_name)
+            raise PermissionError(f"Tool [{tool_name}] 未注册，拒绝调用")
+        if tool.permissions:
             granted = self._tenant_permissions.get(tenant_id, set(self._default_permissions))
             for perm in tool.permissions:
                 if perm not in granted:

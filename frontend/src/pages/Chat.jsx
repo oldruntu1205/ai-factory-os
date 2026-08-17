@@ -37,17 +37,20 @@ export default function Chat() {
       .then(({ data }) => setAgents(data.agents))
   }, [])
 
-  // 恢复会话历史：拉取企业最近对话，过滤当前 session 重建消息（修复：此前刷新即丢上下文）
+  // 恢复会话历史：拉取企业最近对话，按当前对话对象过滤并重建消息（修复：此前刷新即丢上下文/串话）
   useEffect(() => {
     if (!companyId || historyLoaded) return
-    api.get('/agent/conversations', { params: { company_id: companyId, page_size: 50 } })
+    api.get('/agent/conversations', { params: { company_id: companyId, page_size: 100 } })
       .then(({ data }) => {
-        const convs = data.conversations || []
-        if (convs.length) {
-          const sid = sessionId || convs[0].session_id
+        const all = data.conversations || []
+        // 排除图纸对话（drawing_chat），按当前 agent_id 过滤（未选则取全部 web 会话）
+        const web = all.filter((c) => c.channel !== 'drawing_chat' &&
+          (!agentId || String(c.agent_id) === String(agentId)))
+        if (web.length) {
+          const sid = sessionId || web[0].session_id
           setSessionId(sid)
           const msgs = []
-          convs.filter((c) => c.session_id === sid).reverse().forEach((c) => {
+          web.filter((c) => c.session_id === sid).reverse().forEach((c) => {
             if (c.user_message) msgs.push({ role: 'user', content: c.user_message })
             if (c.agent_answer) msgs.push({ role: 'assistant', content: c.agent_answer })
           })

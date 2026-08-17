@@ -25,12 +25,13 @@ _SECRET_KEYS = {"wecom_secret", "wecom_token", "wecom_bot_secret", "whatsapp_tok
 
 
 def get_company_config(company_id: int, channel: str) -> dict:
-    """读取企业级渠道配置（未存则空 dict）"""
+    """读取企业级渠道配置（未存则空 dict；敏感键解密返回明文供发送/回调使用）"""
     if not company_id:
         return {}
     try:
         from database import SessionLocal
         from models import ChannelConfig
+        from utils.crypto import decrypt_secret
         db = SessionLocal()
         try:
             row = db.query(ChannelConfig).filter(
@@ -38,7 +39,10 @@ def get_company_config(company_id: int, channel: str) -> dict:
                 ChannelConfig.channel == channel).first()
             if not row or not row.config_json:
                 return {}
-            return json.loads(row.config_json)
+            raw = json.loads(row.config_json)
+            # 敏感键解密（兼容旧明文：decrypt_secret 对无 enc: 前缀返回原值）
+            return {k: (decrypt_secret(v) if k in _SECRET_KEYS else v)
+                    for k, v in raw.items()}
         finally:
             db.close()
     except Exception as e:
@@ -47,10 +51,15 @@ def get_company_config(company_id: int, channel: str) -> dict:
 
 
 def save_company_config(company_id: int, channel: str, config: dict) -> dict:
-    """保存/覆盖企业级渠道配置（只保留该渠道允许的键）"""
+    """保存/覆盖企业级渠道配置（只保留该渠道允许的键；安全修复：敏感键加密落库）"""
+    from utils.crypto import encrypt_secret
     allowed = CHANNEL_KEYS.get(channel, [])
-    clean = {k: (str(v).strip() if v is not None else "")
-             for k, v in config.items() if k in allowed}
+    clean = {}
+    for k, v in config.items():
+        if k not in allowed:
+            continue
+        s = str(v).strip() if v is not None else ""
+        clean[k] = encrypt_secret(s) if (k in _SECRET_KEYS and s) else s
     try:
         from database import SessionLocal
         from models import ChannelConfig
