@@ -361,7 +361,7 @@
   display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 52px; align-items: center;
 }
 .af-about-text {
-  transform: translateY(-80px);
+  transform: translateY(-70px);   /* 标题+文字内容整体下移 10px（原 -80px） */
 }
 .af-about-text p {
   color: var(--af-ink-2); font-size: 16px; margin-bottom: 18px;
