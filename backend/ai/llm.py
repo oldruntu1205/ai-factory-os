@@ -70,7 +70,11 @@ class SimpleMessage:
 
 
 def _resolve_route() -> tuple:
-    """按 gateway 配置解析 (base_url, model)，优先使用后台运行时覆盖配置"""
+    """按 gateway 配置解析 (base_url, model)，优先使用后台运行时覆盖配置。
+
+    安全/正确性修复：全局 env（LLM_BASE_URL/LLM_MODEL）仅回退到**默认网关**，
+    切换网关时使用 GATEWAY_ROUTES 内置默认，避免把 deepseek 的 base_url/model 发到别家。
+    """
     cfg = _config_override
     gateway = (cfg or {}).get("gateway") or (LLM_GATEWAY or "deepseek")
     gateway = gateway.lower()
@@ -78,6 +82,7 @@ def _resolve_route() -> tuple:
     keys = (cfg or {}).get("keys") or {}
     base_urls = (cfg or {}).get("base_urls") or {}
     models = (cfg or {}).get("models") or {}
+    is_default_gateway = gateway == (LLM_GATEWAY or "deepseek").lower()
 
     # Fireworks 专用配置优先
     if gateway == "fireworks":
@@ -88,8 +93,8 @@ def _resolve_route() -> tuple:
 
     if gateway in GATEWAY_ROUTES:
         base_url, model = GATEWAY_ROUTES[gateway]
-        return (base_urls.get(gateway) or LLM_BASE_URL or base_url,
-                models.get(gateway) or LLM_MODEL or model)
+        return (base_urls.get(gateway) or (LLM_BASE_URL if is_default_gateway else "") or base_url,
+                models.get(gateway) or (LLM_MODEL if is_default_gateway else "") or model)
 
     return (LLM_BASE_URL, LLM_MODEL)
 
@@ -103,11 +108,13 @@ def _get_llm():
     gateway = (cfg or {}).get("gateway") or (LLM_GATEWAY or "deepseek")
     gateway = gateway.lower()
     keys = (cfg or {}).get("keys") or {}
+    is_default_gateway = gateway == (LLM_GATEWAY or "deepseek").lower()
 
     if gateway == "fireworks":
         api_key = keys.get("fireworks") or FIREWORKS_API_KEY
     else:
-        api_key = keys.get(gateway) or LLM_API_KEY
+        # 修复：全局 LLM_API_KEY 仅回退默认网关，切网关用 override 的按网关 key
+        api_key = keys.get(gateway) or (LLM_API_KEY if is_default_gateway else "")
 
     if not api_key:
         if not LLM_FALLBACK:
@@ -119,14 +126,17 @@ def _get_llm():
     base_url, model = _resolve_route()
     try:
         from langchain_openai import ChatOpenAI
+        # 可靠性加固：超时 + 重试（此前默认 600s 无重试，请求可挂死线程）
         _llm = ChatOpenAI(
             model=model,
             api_key=api_key,
             base_url=base_url,
             temperature=0.3,
             max_tokens=2048,
+            timeout=int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
+            max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
         )
-        logger.info(f"LLM Gateway: [{LLM_GATEWAY or 'deepseek'}] model={model} base={base_url}")
+        logger.info(f"LLM Gateway: [{gateway}] model={model} base={base_url}")
     except Exception:
         if not LLM_FALLBACK:
             raise
@@ -179,6 +189,8 @@ def vision_invoke(prompt_text: str, image_paths: list) -> str:
         llm = ChatOpenAI(
             model=model, api_key=api_key, base_url=base_url,
             temperature=0.3, max_tokens=2048,
+            timeout=int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
+            max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
         )
     except Exception:
         if not LLM_FALLBACK:

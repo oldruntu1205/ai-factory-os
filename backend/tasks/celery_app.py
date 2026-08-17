@@ -6,6 +6,8 @@ tasks/celery_app.py —— Celery 任务调度（V2.1 第九章）
 - 每日跟进任务 daily_follow
 - 客户发现任务 scheduled_discovery
 """
+import os
+
 from celery import Celery
 
 from config import REDIS_URL
@@ -23,6 +25,13 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Asia/Shanghai",
     enable_utc=True,
+    # 可靠性加固：broker 未就绪重试、邮件任务晚确认（防 worker 崩溃丢任务）、
+    # 软/硬超时（防 LLM 任务无限挂起）、结果过期
+    broker_connection_retry_on_startup=True,
+    task_acks_late=True,
+    task_soft_time_limit=int(os.getenv("CELERY_SOFT_TIME_LIMIT", "300")),
+    task_time_limit=int(os.getenv("CELERY_TIME_LIMIT", "600")),
+    result_expires=86400,
     beat_schedule={
         # 邮件跟进序列（新机制，含追踪像素/退订，D0/D3/D7/D14）
         "email-follow-up-sequence": {

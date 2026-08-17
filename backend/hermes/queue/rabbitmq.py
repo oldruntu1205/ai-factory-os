@@ -12,6 +12,7 @@ hermes/queue/rabbitmq.py —— RabbitMQ 企业版消息队列（第7章）
 """
 import json
 import logging
+import os
 import threading
 from typing import Callable, Dict, Optional
 
@@ -54,7 +55,11 @@ class RabbitMQAdapter:
             if self._channel is not None and self._channel.is_open:
                 return self._channel
             import pika
+            # 可靠性加固：显式连接超时/重试（此前无参数，broker 不可达时 BlockingConnection 可挂死）
             params = pika.URLParameters(self.url)
+            params.connection_attempts = int(os.getenv("RABBITMQ_CONNECTION_ATTEMPTS", "3"))
+            params.retry_delay = int(os.getenv("RABBITMQ_RETRY_DELAY", "2"))
+            params.socket_timeout = int(os.getenv("RABBITMQ_SOCKET_TIMEOUT", "5"))
             self._connection = pika.BlockingConnection(params)
             ch = self._connection.channel()
             ch.confirm_delivery()   # 发布确认（可靠投递）

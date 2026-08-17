@@ -63,8 +63,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 FIREWORKS_API_KEY = os.getenv("FIREWORKS_API_KEY", "")
 FIREWORKS_MODEL = os.getenv("FIREWORKS_MODEL",
                            "accounts/fireworks/models/llama-v3p1-70b-instruct")
-# 未配置 API Key 时使用内置 MockLLM，保证全链路可运行
-LLM_FALLBACK = True
+# 未配置 API Key 时是否降级 MockLLM（生产建议 LLM_FALLBACK=0，防止输出伪造报价/排产数据）
+LLM_FALLBACK = os.getenv("LLM_FALLBACK", "1").lower() in ("1", "true", "yes", "on")
 
 # ---------- Qdrant 向量库 ----------
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")

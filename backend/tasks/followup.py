@@ -45,15 +45,19 @@ def daily_follow():
             for lead in leads:
                 if not lead.email:
                     continue
-                content = create_email(
-                    company=f"{lead.company_name} ({lead.country})",
-                    product="laboratory glassware",
-                    extra=f"跟进阶段: Day {day}",
-                )
-                result = send_email(lead.email, content, FOLLOWUP_SUBJECTS[day])
-                if result["status"] in ("sent", "simulated"):
-                    lead.followup_day = FOLLOWUP_NEXT.get(day, 0)
-                    sent += 1
+                # 修复：单条失败不中断整批（此前异常直接跳出循环，其余线索漏发）
+                try:
+                    content = create_email(
+                        company=f"{lead.company_name} ({lead.country})",
+                        product="laboratory glassware",
+                        extra=f"跟进阶段: Day {day}",
+                    )
+                    result = send_email(lead.email, content, FOLLOWUP_SUBJECTS[day])
+                    if result["status"] in ("sent", "simulated"):
+                        lead.followup_day = FOLLOWUP_NEXT.get(day, 0)
+                        sent += 1
+                except Exception as e:
+                    logger.error(f"跟进失败 lead={lead.id}: {e}")
         db.commit()
         logger.info(f"daily_follow: {sent} 封跟进邮件")
         return {"sent": sent}

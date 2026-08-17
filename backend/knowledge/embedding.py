@@ -67,10 +67,14 @@ def create_embedding(texts: list) -> list:
             _active_dim = len(vecs[0])
             return vecs
         except Exception:
+            # 修复：单次推理失败仅本次降级（不永久粘性），下次继续尝试真实模型；
+            # 仅模型加载失败（_load_model）才置 _use_fallback
             if not EMBEDDING_FALLBACK:
                 raise
-            _use_fallback = True
-            logger.warning("Embedding 推理失败，降级为本地哈希向量")
+            logger.warning("Embedding 单次推理失败，本次降级为本地哈希向量（下次将重试真实模型）")
+            vecs = [_hash_vector(t) for t in texts]
+            _active_dim = len(vecs[0]) if vecs else EMBEDDING_DIM
+            return vecs
 
     vecs = [_hash_vector(t) for t in texts]
     _active_dim = len(vecs[0]) if vecs else EMBEDDING_DIM
