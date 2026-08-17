@@ -123,9 +123,9 @@ async def robot_send(data: dict, current: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="当前企业未配置企微机器人，无法推送")
 
     if msgtype == "text":
-        result = send_robot_text(content)
+        result = send_robot_text(content, company_id=current.get("company_id"))
     else:
-        result = send_robot_markdown(content)
+        result = send_robot_markdown(content, company_id=current.get("company_id"))
     return result
 
 

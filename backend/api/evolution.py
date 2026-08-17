@@ -283,6 +283,7 @@ def get_scheduler_status(current: dict = Depends(get_current_user)):
 
 @router.post("/scheduler/trigger")
 def trigger_scheduler(current: dict = Depends(get_current_user)):
-    """手动触发一轮「全企业周期自进化」（等同于调度器跑一次；仅产出 pending 候选）。"""
+    """手动触发一轮「全企业周期自进化」（仅管理员；仅产出 pending 候选）。"""
+    _require_admin(current)
     from hermes.evolution.scheduler import get_scheduler
     return get_scheduler().run_once()

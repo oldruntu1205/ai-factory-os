@@ -17,6 +17,7 @@ import socket
 import ssl
 import urllib.request
 import urllib.parse
+import urllib.error
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -141,8 +142,24 @@ def _is_unsafe_host(host: str) -> bool:
             or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
 
 
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """SSRF 防护：重定向每一跳都重新校验协议白名单与私网地址（防 302 跳转绕过）"""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            parts = urllib.parse.urlparse(newurl)
+            if parts.scheme not in ("http", "https") or _is_unsafe_host(parts.hostname or ""):
+                raise urllib.error.HTTPError(
+                    newurl, code, "重定向目标不安全（SSRF 防护已拦截）", headers, fp)
+        except urllib.error.HTTPError:
+            raise
+        except Exception:
+            raise urllib.error.HTTPError(newurl, code, "重定向目标解析失败", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _test_connection(cfg: IntegrationConfig):
-    """轻量级连接探测（SSRF 防护 + TLS 校验），返回 (ok, message)"""
+    """轻量级连接探测（SSRF 防护 + TLS 校验 + 重定向复检），返回 (ok, message)"""
     if not cfg.endpoint:
         return False, "未配置访问地址"
     try:
@@ -156,9 +173,10 @@ def _test_connection(cfg: IntegrationConfig):
             return False, "目标地址指向私网/保留地址，已拒绝（防 SSRF）"
         req = urllib.request.Request(
             cfg.endpoint, headers=_build_headers(cfg), method="GET")
-        # 3) 恢复 TLS 证书校验（此前 check_hostname=False + CERT_NONE 可被中间人截获）
+        # 3) 恢复 TLS 证书校验 + 重定向每跳复检（防中间人/302 绕过）
         ctx = ssl.create_default_context()
-        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+        opener = urllib.request.build_opener(_SafeRedirectHandler)
+        with opener.open(req, timeout=5, context=ctx) as resp:
             return True, f"连接成功（HTTP {resp.status}）"
     except Exception as e:  # noqa: BLE001
         # 错误分类（不透传内部细节）

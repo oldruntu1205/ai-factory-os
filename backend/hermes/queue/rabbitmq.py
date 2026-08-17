@@ -90,39 +90,40 @@ class RabbitMQAdapter:
 
     # ---------- 任务队列（direct + 死信 + 优先级）----------
 
-    def declare_task_queue(self, task_name: str, priority: bool = True,
+    def declare_task_queue(self, task_name: str = "default", priority: bool = True,
                            max_retry: int = 3) -> str:
         """
-        声明任务队列：
-        - 绑定到任务交换机（routing_key = task_name）
+        声明统一任务队列（修复：此前按任务名声明 hermes.task.{name}，worker 无法预知
+        消费哪些队列导致任务永不消费；现固定为 hermes.task，任务名仅作为消息字段）：
+        - 绑定到任务交换机（routing_key = "task"）
         - 绑定死信交换机（任务失败 N 次后转入 hermes.dead）
         - 支持优先级（x-max-priority=10）
         """
         ch = self._get_channel()
-        queue = f"{QUEUE_PREFIX}.task.{task_name}"
+        queue = f"{QUEUE_PREFIX}.task"
         args = {"x-dead-letter-exchange": EXCHANGE_DEAD,
-                "x-dead-letter-routing-key": f"dead.{task_name}",
+                "x-dead-letter-routing-key": "dead",
                 "x-message-ttl": 7 * 24 * 3600 * 1000}   # 7 天 TTL
         if priority:
             args["x-max-priority"] = 10
         ch.queue_declare(queue=queue, durable=True, arguments=args)
         ch.queue_bind(exchange=self.exchange_tasks, queue=queue,
-                      routing_key=task_name)
+                      routing_key="task")
 
         # 死信队列
-        dead_queue = f"{QUEUE_PREFIX}.dead.{task_name}"
+        dead_queue = f"{QUEUE_PREFIX}.dead"
         ch.queue_declare(queue=dead_queue, durable=True)
         ch.queue_bind(exchange=EXCHANGE_DEAD, queue=dead_queue,
-                      routing_key=f"dead.{task_name}")
+                      routing_key="dead")
         return queue
 
     def publish_task(self, task_name: str, payload: dict,
                      priority: int = 5, retry_count: int = 0,
                      task_id: str = None) -> dict:
-        """发布任务（direct 路由，支持优先级与重试计数）"""
+        """发布任务（direct 路由到统一队列，支持优先级与重试计数）"""
         import uuid
         ch = self._get_channel()
-        self.declare_task_queue(task_name)
+        self.declare_task_queue()
         message = {
             "task": task_name,
             "task_id": task_id or uuid.uuid4().hex[:16],
@@ -139,7 +140,7 @@ class RabbitMQAdapter:
         }
         ch.basic_publish(
             exchange=self.exchange_tasks,
-            routing_key=task_name,
+            routing_key="task",
             body=json.dumps(message, ensure_ascii=False).encode(),
             properties=__import__("pika").BasicProperties(**props),
         )
@@ -147,19 +148,20 @@ class RabbitMQAdapter:
         return {"task_id": message["task_id"], "task": task_name, "status": "queued",
                 "transport": "rabbitmq"}
 
-    def consume_task(self, task_name: str, handler: Callable,
+    def consume_task(self, task_name: str = "default", handler: Callable = None,
                      prefetch: int = 10, auto_ack: bool = False):
-        """消费任务队列（阻塞式，用于 Worker 进程）"""
+        """消费统一任务队列（阻塞式，用于 Worker 进程）"""
         ch = self._get_channel()
-        queue = self.declare_task_queue(task_name)
+        queue = self.declare_task_queue()
         ch.basic_qos(prefetch_count=prefetch)
 
         def _callback(ch_, method, properties, body):
             try:
                 message = json.loads(body.decode())
-                result = handler(message.get("payload", {}))
+                # 传完整消息（含 task 字段），handler 按需解包 payload
+                result = handler(message)
                 ch_.basic_ack(delivery_tag=method.delivery_tag)
-                logger.info(f"RabbitMQ: 任务 [{task_name}] 完成 -> {str(result)[:80]}")
+                logger.info(f"RabbitMQ: 任务 [{message.get('task')}] 完成 -> {str(result)[:80]}")
             except Exception as e:
                 retry = int((properties.headers or {}).get("retry_count", 0))
                 if retry < 2:   # 重试 2 次后进死信
@@ -167,13 +169,14 @@ class RabbitMQAdapter:
                                    requeue=False)
                     # 重新发布（retry+1）
                     message = json.loads(body.decode())
-                    self.publish_task(task_name, message.get("payload", {}),
+                    self.publish_task(message.get("task", "default"),
+                                      message.get("payload", {}),
                                       priority=message.get("priority", 5),
                                       retry_count=retry + 1)
                 else:
                     ch_.basic_nack(delivery_tag=method.delivery_tag,
                                    requeue=False)
-                logger.error(f"RabbitMQ: 任务 [{task_name}] 失败(重试{retry}): {e}")
+                logger.error(f"RabbitMQ: 任务失败(重试{retry}): {e}")
 
         ch.basic_consume(queue=queue, on_message_callback=_callback,
                          auto_ack=auto_ack)

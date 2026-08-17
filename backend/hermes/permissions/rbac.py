@@ -34,7 +34,17 @@ class RBACSystem:
     - Agent 只能调用 manifest.tools 中列出的 Tool
     - Tool 的 permissions 必须被租户启用
     - 租户可通过 grant_permission / revoke_permission 微调
+    - Agent 白名单语义（安全修复）：未显式授权前默认放行（兼容旧版）；
+      首次 allow_agent 时并入平台默认 Agent 名单，避免"全放行"翻转为"仅白名单"
+      导致内置 Agent 全部被拒的功能回归。
     """
+
+    # 平台内置 Agent 名单（main.py 启动注册；首次授权时并入白名单，保证安装商城包后
+    # 内置 AI 员工仍可用）
+    DEFAULT_AGENT_NAMES = {
+        "customer_agent", "sales_agent", "quotation_agent",
+        "production_agent", "quality_agent", "ceo_agent", "process_agent",
+    }
 
     def __init__(self):
         # tenant_id -> set(permission)
@@ -63,7 +73,11 @@ class RBACSystem:
         self._tenant_permissions.get(tenant_id, set()).discard(permission)
 
     def allow_agent(self, tenant_id: int, agent_name: str) -> None:
-        self._tenant_agents.setdefault(tenant_id, set()).add(agent_name)
+        allowed = self._tenant_agents.setdefault(tenant_id, set())
+        # 安全修复：首次授权时并入平台默认 Agent 名单（防"全放行→仅白名单"翻转）
+        if not allowed:
+            allowed.update(self.DEFAULT_AGENT_NAMES)
+        allowed.add(agent_name)
 
     def deny_agent(self, tenant_id: int, agent_name: str) -> None:
         self._tenant_agents.get(tenant_id, set()).discard(agent_name)

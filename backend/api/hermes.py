@@ -34,6 +34,13 @@ def _require_admin(current: dict) -> None:
         raise HTTPException(status_code=403, detail="需要管理员权限")
 
 
+# 平台内置 Agent 名（main.py 启动注册；禁止企业覆盖注册，防全局 manifest 被篡改影响所有租户）
+_BUILTIN_AGENT_NAMES = {
+    "customer_agent", "sales_agent", "quotation_agent",
+    "production_agent", "quality_agent", "ceo_agent", "process_agent",
+}
+
+
 # ============ 请求模型 ============
 
 class AgentRegisterIn(BaseModel):
@@ -80,6 +87,9 @@ def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_us
     _require_admin(current)
     if data.name in BUILTIN_TOOLS or not data.name:
         raise HTTPException(status_code=400, detail="Agent 名称不合法")
+    # 安全修复：平台内置 Agent 名禁止企业覆盖注册（防全局 manifest 被篡改，影响所有租户）
+    if data.name in _BUILTIN_AGENT_NAMES:
+        raise HTTPException(status_code=400, detail="内置 Agent 名不可覆盖注册，请使用自定义名称")
     # 声明的工具必须在已注册工具白名单内（防止声明未知/任意工具）
     invalid_tools = [t for t in data.tools if t not in BUILTIN_TOOLS]
     if invalid_tools:

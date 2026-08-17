@@ -23,9 +23,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("hermes-worker")
 
 
-def _default_handler(payload: dict) -> dict:
-    """默认 handler：记录任务内容（业务 handler 注册后由具体实现接管）"""
-    logger.info("执行任务 payload=%s", str(payload)[:200])
+def _default_handler(message) -> dict:
+    """默认 handler：解包 RabbitMQ 完整消息（含 task 字段）或 redis/memory 的 payload"""
+    payload = message.get("payload", message) if isinstance(message, dict) else message
+    task = message.get("task", "?") if isinstance(message, dict) else "?"
+    logger.info("执行任务 task=%s payload=%s", task, str(payload)[:200])
     return {"status": "done", "note": "默认 handler（未注册业务逻辑）"}
 
 
@@ -42,14 +44,11 @@ def main():
     queue.register_worker("__default__", _default_handler)
 
     if queue._mode == "rabbitmq":
-        logger.info("RabbitMQ 模式：阻塞消费 hermes.tasks（Ctrl+C 退出）")
+        logger.info("RabbitMQ 模式：阻塞消费 hermes.task（Ctrl+C 退出）")
         try:
             from hermes.queue.rabbitmq import RabbitMQAdapter
             adapter = queue._rabbit or RabbitMQAdapter(url=__import__("config", fromlist=["RABBITMQ_URL"]).RABBITMQ_URL)
-            adapter.consume_task(
-                task_name="*",
-                handler=lambda payload: _default_handler(payload),
-            )
+            adapter.consume_task(handler=_default_handler)
         except KeyboardInterrupt:
             logger.info("Worker 退出（Ctrl+C）")
         except Exception as e:

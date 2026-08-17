@@ -306,13 +306,14 @@ def run_due_follow_ups(company_id: int = None) -> dict:
             # 修复：允许第 4 封（step=3 -> email4）；step=4 表示序列已完成
             if step >= len(SEQUENCE_INTERVALS):
                 continue
-            # 修复：到期时间以序列起点（created_at）锚定 INTERVALS（D0/D3/D7/D14），
-            # 不再按相邻间隔累计（此前 D0→D4→D11 逐封漂移）
+            # 修复：到期时间以序列起点（created_at）锚定 INTERVALS（D0/D3/D7/D14）。
+            # 下标用 SEQUENCE_INTERVALS[step]（step=1→3、2→7、3→14）；
+            # 此前 [step+1] 错位且 step=3 时越界（IndexError），导致第 4 封永不发送。
             start = lead.created_at or now
             if step == 0:
                 due = timedelta(0)  # 首封立即
             else:
-                due = timedelta(days=SEQUENCE_INTERVALS[step + 1])
+                due = timedelta(days=SEQUENCE_INTERVALS[step])
             if now - start >= due:
                 try:
                     r = send_follow_up(lead.id, lead.company_id, step=step + 1,

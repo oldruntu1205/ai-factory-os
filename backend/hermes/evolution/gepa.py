@@ -299,41 +299,51 @@ class GEPAEngine:
         return [(improved, "[GEPA] 增强容错与日志：统一返回结构，便于上层稳定解析")]
 
     def _test_tool_code(self, src: str, tool_name: str) -> tuple:
-        """验证候选 Tool 源码：语法编译 + 危险模式静态检查（安全策略：不执行 LLM 生成的代码）。
+        """验证候选 Tool 源码：AST 安全校验（安全策略：不执行 LLM 生成的代码）。
 
         安全说明：Python 无法对任意代码做可靠沙箱执行（空 namespace 仍会注入 __builtins__），
         因此这里改为静态验证：
-        1) compile() 校验语法；
-        2) 检查危险模式（os/subprocess/文件/网络/动态执行等）；
+        1) ast.parse 校验语法；
+        2) AST 节点遍历检查危险调用/导入/属性（防空白/别名变体绕过子串匹配）；
         3) 不执行候选函数，仅返回静态验证结论——候选仍只生成 .patch.md 提案，由人工 review。
         """
+        import ast
         try:
-            # 1) 语法验证
-            compile(src, "<tool_code>", "exec")
-
-            # 2) 危险模式静态检查（禁止 LLM 生成代码触碰 IO/子进程/网络/文件/动态执行）
-            dangerous = [
-                "__import__", "import os", "import subprocess", "import sys",
-                "import socket", "open(", "eval(", "exec(", "compile(",
-                "os.system", "os.popen", "shutil", "pathlib", "requests.",
-                "urllib", "pickle", "ctypes", "builtins", "__builtins__",
-            ]
-            hits = [d for d in dangerous if d in src]
-            if hits:
-                return False, {"passed": False, "score": 0.0,
-                               "error": "包含危险模式（静态检查拦截）: " + ", ".join(hits)}
-
-            fn_match = re.search(r"def\s+(\w+)\s*\(", src)
-            if not fn_match:
-                return False, {"passed": False, "error": "未找到函数定义"}
-
-            # 3) 不执行代码：静态验证通过即视为可生成提案（运行时行为需人工 review）
-            return True, {
-                "passed": True, "score": 1.0, "baseline_score": 1.0,
-                "new_output": "[静态验证通过，未执行（安全策略）]",
-                "note": "候选代码未经运行时执行，应用前请人工 review",
-            }
+            tree = ast.parse(src)
         except SyntaxError as e:
             return False, {"passed": False, "score": 0.0, "error": f"语法错误: {e}"}
+
+        # 2) AST 危险模式检查（基于语法树，`open ('x')`、`import  os` 等空白变体无法绕过）
+        dangerous_calls = {"open", "eval", "exec", "compile", "input", "__import__"}
+        dangerous_modules = {"os", "subprocess", "socket", "shutil", "sys",
+                             "pickle", "ctypes", "pathlib", "builtins", "requests"}
+        dangerous_attrs = {"system", "popen", "remove", "unlink", "rmdir",
+                           "makedirs", "walk", "listdir", "glob", "exec_"}
+        try:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                        and node.func.id in dangerous_calls:
+                    return False, {"passed": False, "score": 0.0,
+                                   "error": f"包含危险调用: {node.func.id}()"}
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    bad = [a.name.split(".")[0] for a in node.names
+                           if a.name.split(".")[0] in dangerous_modules]
+                    if bad:
+                        return False, {"passed": False, "score": 0.0,
+                                       "error": f"包含危险模块导入: {', '.join(bad)}"}
+                if isinstance(node, ast.Attribute) and node.attr in dangerous_attrs:
+                    return False, {"passed": False, "score": 0.0,
+                                   "error": f"包含危险属性访问: .{node.attr}"}
         except Exception as e:
-            return False, {"passed": False, "score": 0.0, "error": str(e)[:300]}
+            return False, {"passed": False, "score": 0.0, "error": f"安全检查异常: {e}"}
+
+        fn_match = re.search(r"def\s+(\w+)\s*\(", src)
+        if not fn_match:
+            return False, {"passed": False, "error": "未找到函数定义"}
+
+        # 3) 不执行代码：静态验证通过即视为可生成提案（运行时行为需人工 review）
+        return True, {
+            "passed": True, "score": 1.0, "baseline_score": 1.0,
+            "new_output": "[静态验证通过，未执行（安全策略）]",
+            "note": "候选代码未经运行时执行，应用前请人工 review",
+        }

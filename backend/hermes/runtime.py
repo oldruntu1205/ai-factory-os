@@ -52,6 +52,12 @@ class HermesRuntime:
         # 惰性清理过期会话，防止 _running 无限增长
         self._evict_stale_sessions()
 
+        # 安全修复：复用已存在的 session 时校验归属（防跨租户会话劫持/覆盖）
+        if session_id and session_id in self._running:
+            existing = self._running[session_id]
+            if int(existing.get("company_id", -1)) != int(company_id):
+                raise ValueError("会话已存在且不属于当前企业，拒绝复用")
+
         session_id = session_id or uuid.uuid4().hex
         ctx = {
             "session_id": session_id,

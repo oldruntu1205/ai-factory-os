@@ -3,8 +3,9 @@ api/company.py —— 企业设置（基本信息 + 认证 + 安全）
 
 - GET  /company/settings           读取企业基本信息 + 认证状态
 - PUT  /company/settings           更新企业名称/地址/电话/联系人/邮箱
-- POST /company/license/upload      上传营业执照照片（自动审核：演示版通过）
-- POST /company/license/approve    审核通过（管理端演示用）
+- POST /company/license/upload      上传营业执照照片（等待平台审核）
+- GET  /company/license/download    下载本企业营业执照（鉴权）
+- POST /company/license/approve     平台超管审核（企业管理员不可自审）
 - DELETE /company/license           清除已上传的营业执照
 - PUT  /company/password            修改管理员密码（安全设置）
 - GET  /company/audit-logs          操作日志列表（安全审计）
@@ -12,6 +13,7 @@ api/company.py —— 企业设置（基本信息 + 认证 + 安全）
 注：营业执照图片按 company_id 隔离保存在 uploads/licenses/。
 """
 import os
+import time as _time
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
@@ -32,6 +34,10 @@ router = APIRouter(prefix="/company", tags=["企业设置"])
 
 LICENSE_DIR = os.path.join(BASE_DIR, "uploads", "licenses")
 os.makedirs(LICENSE_DIR, exist_ok=True)
+
+# SMS 频控与验证码防暴力（进程内；多 worker 部署建议换 Redis）
+_sms_send_log: dict = {}     # (company:mobile) -> last_send_time
+_sms_verify_fails: dict = {}  # (company:mobile:purpose) -> 连续失败次数
 
 
 class CompanyUpdate(BaseModel):
@@ -226,8 +232,9 @@ def _schedule_auto_approve(company_id: int, delay: int = 1):
 def approve_license(company_id: int, approve: bool = True,
                     reject_reason: str = "", db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
-    """管理端审核：通过或拒绝（仅管理员，修复：此前普通成员可自审）"""
-    require_admin(current["role"])
+    """平台超管审核营业执照：通过或拒绝（安全修复：仅平台超管可审，企业管理员不可自审）"""
+    if current["role"] != "platform_admin":
+        raise HTTPException(status_code=403, detail="仅平台超管可审核营业执照")
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     c = db.query(Company).filter(Company.id == company_id).first()
@@ -362,6 +369,12 @@ def sms_send(data: SmsSendIn, db: Session = Depends(get_db),
     if data.purpose not in ("verify_mobile", "change_password"):
         raise HTTPException(status_code=400, detail="未知的验证码用途")
 
+    # 安全修复：发送频控（同企业+手机号 60 秒内仅一次，防短信轰炸/费用滥用）
+    _send_key = f"{data.company_id}:{data.mobile}"
+    if _time.time() - _sms_send_log.get(_send_key, 0) < 60:
+        raise HTTPException(status_code=429, detail="发送过于频繁，请 1 分钟后再试")
+    _sms_send_log[_send_key] = _time.time()
+
     from datetime import timedelta
     code = generate_code()
     # 失效旧的同用途验证码
@@ -392,7 +405,7 @@ def sms_send(data: SmsSendIn, db: Session = Depends(get_db),
 @router.post("/sms/verify")
 def sms_verify(data: SmsVerifyIn, db: Session = Depends(get_db),
                current: dict = Depends(get_current_user)):
-    """校验手机验证码"""
+    """校验手机验证码（安全修复：失败 5 次作废验证码，防暴力尝试）"""
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     if not _validate_mobile(data.mobile):
@@ -410,8 +423,17 @@ def sms_verify(data: SmsVerifyIn, db: Session = Depends(get_db),
     if record.expires_at and datetime.utcnow() > record.expires_at:
         raise HTTPException(status_code=400, detail="验证码已过期，请重新获取")
     if record.code != data.code.strip():
+        # 失败计数：连续 5 次错误即作废该验证码
+        _fail_key = f"{data.company_id}:{data.mobile}:{data.purpose}"
+        n = _sms_verify_fails.get(_fail_key, 0) + 1
+        _sms_verify_fails[_fail_key] = n
+        if n >= 5:
+            record.used = True
+            db.commit()
+            raise HTTPException(status_code=400, detail="尝试次数过多，验证码已失效，请重新获取")
         raise HTTPException(status_code=400, detail="验证码不正确")
 
+    _sms_verify_fails.pop(f"{data.company_id}:{data.mobile}:{data.purpose}", None)
     record.used = True
     # 自动写入企业 mobile
     c = db.query(Company).filter(Company.id == data.company_id).first()
