@@ -86,6 +86,20 @@ class User(Base):
     company = relationship("Company", back_populates="users")
 
 
+class HermesRbacSetting(Base):
+    """Hermes RBAC 租户设置（内存 RBAC 的持久化副本，重启不丢）
+
+    仅记录企业显式配置过的权限点/Agent 白名单；无记录的企业回退默认策略。
+    """
+    __tablename__ = "hermes_rbac_settings"
+
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, unique=True, index=True, nullable=False)
+    allowed_agents = Column(JSON, default=list)   # Agent 白名单（空 = 默认放行语义）
+    permissions = Column(JSON, default=list)       # 权限点集合（空 = 全拒绝，fail-closed）
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class AIAgent(Base):
     """AI 员工"""
     __tablename__ = "ai_agents"

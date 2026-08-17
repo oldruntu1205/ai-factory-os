@@ -63,6 +63,20 @@ def create_agent(data: AgentIn, db: Session = Depends(get_db),
     db.commit()
     db.refresh(agent)
 
+    # 安全修复（P2 #3）：创建后同步 Hermes RBAC Agent 白名单（业务 AIAgent 与 Hermes
+    # manifest 对齐，防止未来 Hermes 路径校验时被白名单拒绝）
+    try:
+        from hermes.runtime import get_runtime
+        _role_manifest = {"customer": "customer_agent", "sales": "sales_agent",
+                          "quotation": "quotation_agent", "production": "production_agent",
+                          "quality": "quality_agent", "ceo": "ceo_agent",
+                          "process": "process_agent", "purchasing": "purchasing_agent"}
+        manifest_name = _role_manifest.get(data.role)
+        if manifest_name:
+            get_runtime().permission_system.allow_agent(data.company_id, manifest_name)
+    except Exception:
+        pass  # runtime 未初始化（纯 DB 测试场景）不阻塞创建
+
     return {"message": "create success", "agent": {
         "id": agent.id, "name": agent.name, "role": agent.role,
         "role_label": agent.role_label, "description": agent.description,

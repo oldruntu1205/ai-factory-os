@@ -58,34 +58,92 @@ class RBACSystem:
             "erp:read", "mes:read",
         }
 
+    # ---------- 持久化（P2 #4：RBAC 落库，重启不丢）----------
+
+    def _db_load(self, tenant_id: int) -> bool:
+        """从 DB 加载租户设置（懒加载；无记录返回 False，走默认策略）"""
+        try:
+            from database import SessionLocal
+            from models import HermesRbacSetting
+            db = SessionLocal()
+            try:
+                row = db.query(HermesRbacSetting).filter(
+                    HermesRbacSetting.company_id == tenant_id).first()
+                if row:
+                    self._tenant_permissions[tenant_id] = set(row.permissions or [])
+                    self._tenant_agents[tenant_id] = set(row.allowed_agents or [])
+                    return True
+            finally:
+                db.close()
+        except Exception as e:
+            logger.debug("RBAC 加载失败 tenant=%s: %s", tenant_id, e)
+        return False
+
+    def _db_persist(self, tenant_id: int) -> None:
+        """把租户设置写回 DB（仅持久化显式配置过的租户）"""
+        try:
+            from database import SessionLocal
+            from models import HermesRbacSetting
+            db = SessionLocal()
+            try:
+                row = db.query(HermesRbacSetting).filter(
+                    HermesRbacSetting.company_id == tenant_id).first()
+                if not row:
+                    row = HermesRbacSetting(company_id=tenant_id)
+                    db.add(row)
+                row.permissions = sorted(self._tenant_permissions.get(tenant_id, set()))
+                row.allowed_agents = sorted(self._tenant_agents.get(tenant_id, set()))
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning("RBAC 持久化失败 tenant=%s: %s", tenant_id, e)
+
+    def _ensure_loaded(self, tenant_id: int) -> None:
+        """懒加载：租户设置尚未在内存时从 DB 载入（每个租户仅首次查询一次）"""
+        if tenant_id not in self._tenant_permissions and tenant_id not in self._tenant_agents:
+            self._db_load(tenant_id)
+
     # ---------- 租户配置 ----------
 
     def init_tenant(self, tenant_id: int, agent_names: List[str] = None,
                     permissions: List[str] = None) -> None:
-        """初始化租户权限（注册企业时调用）"""
+        """初始化租户权限（注册企业时调用）——优先恢复 DB 持久化配置"""
+        self._ensure_loaded(tenant_id)
         self._tenant_permissions.setdefault(tenant_id, set(self._default_permissions))
-        self._tenant_agents.setdefault(tenant_id, set(agent_names or []))
+        if agent_names is not None:
+            self._tenant_agents.setdefault(tenant_id, set(agent_names))
+        self._db_persist(tenant_id)
 
     def grant_permission(self, tenant_id: int, permission: str) -> None:
+        self._ensure_loaded(tenant_id)
         self._tenant_permissions.setdefault(tenant_id, set(self._default_permissions)).add(permission)
+        self._db_persist(tenant_id)
 
     def revoke_permission(self, tenant_id: int, permission: str) -> None:
-        self._tenant_permissions.get(tenant_id, set()).discard(permission)
+        self._ensure_loaded(tenant_id)
+        self._tenant_permissions.setdefault(tenant_id, set(self._default_permissions)).discard(permission)
+        self._db_persist(tenant_id)
 
     def allow_agent(self, tenant_id: int, agent_name: str) -> None:
+        self._ensure_loaded(tenant_id)
         allowed = self._tenant_agents.setdefault(tenant_id, set())
         # 安全修复：首次授权时并入平台默认 Agent 名单（防"全放行→仅白名单"翻转）
         if not allowed:
             allowed.update(self.DEFAULT_AGENT_NAMES)
         allowed.add(agent_name)
+        self._db_persist(tenant_id)
 
     def deny_agent(self, tenant_id: int, agent_name: str) -> None:
-        self._tenant_agents.get(tenant_id, set()).discard(agent_name)
+        self._ensure_loaded(tenant_id)
+        self._tenant_agents.setdefault(tenant_id, set()).discard(agent_name)
+        self._db_persist(tenant_id)
 
     # ---------- 校验 ----------
 
     def assert_agent_allowed(self, tenant_id: int, agent_name: str) -> None:
         """企业是否有权运行该 Agent"""
+        self._ensure_loaded(tenant_id)
         allowed = self._tenant_agents.get(tenant_id, set())
         if not allowed:
             return  # 未配置限制时默认放行（兼容旧版）
@@ -94,6 +152,7 @@ class RBACSystem:
 
     def assert_tool_allowed(self, tenant_id: int, agent_name: str, tool_name: str) -> None:
         """Agent 是否被允许调用该 Tool（双重校验：manifest 声明 + 租户权限）"""
+        self._ensure_loaded(tenant_id)
         # 1) Agent manifest 声明校验
         from hermes.runtime import get_runtime
         registry = get_runtime().agent_registry
@@ -117,6 +176,7 @@ class RBACSystem:
 
         未配置租户回退默认权限集；权限点缺失即拒绝（fail-closed）。
         """
+        self._ensure_loaded(tenant_id)
         granted = self._tenant_permissions.get(tenant_id, set(self._default_permissions))
         if permission not in granted:
             raise PermissionError(
