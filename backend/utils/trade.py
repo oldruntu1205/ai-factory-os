@@ -166,6 +166,21 @@ def estimate_tariff(hs_code: str = "", destination_country: str = "US") -> dict:
     return {"tariff_pct": pct, "basis": f"HS{hs2 or '?'}→{region}", "source": "rule-estimate"}
 
 
+# ---------- 原材料价格（第5项：汇率/原材料风险助手） ----------
+# 演示价格数据（生产可接 LME / 行业资讯 API）；trend_pct 为近期变动方向
+_COMMODITY_PRICES = {
+    "glass(borosilicate)": {"price": 3.2, "unit": "USD/kg", "trend_pct": 1.2},
+    "copper": {"price": 9.8, "unit": "USD/kg", "trend_pct": -0.5},
+    "aluminum": {"price": 2.6, "unit": "USD/kg", "trend_pct": 0.8},
+    "plastic(PP)": {"price": 1.1, "unit": "USD/kg", "trend_pct": -0.3},
+}
+
+
+def get_commodity_prices() -> dict:
+    """原材料价格快照（演示数据，生产接真实行情源）"""
+    return {k: {**v, "source": "demo"} for k, v in _COMMODITY_PRICES.items()}
+
+
 # ---------- 国家 → 沟通语言映射（多语种全链路 第2项） ----------
 COUNTRY_LANGUAGES = {
     # 欧洲

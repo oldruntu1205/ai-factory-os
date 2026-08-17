@@ -106,6 +106,9 @@ def import_leads(data: ImportIn, db: Session = Depends(get_db),
     for item in items:
         parsed = parse_inquiry(item.requirement) if item.requirement else {}
         country = (parsed.get("country") or item.country or "").upper()
+        # 出口合规快速筛查（示例规则，需人工核验）
+        from utils.compliance import check_lead_compliance
+        compliance = check_lead_compliance(item.company_name, country, item.contact)
         lead = Lead(
             company_name=item.company_name or parsed.get("product") or "未命名客户",
             website=item.website or "",
@@ -120,6 +123,7 @@ def import_leads(data: ImportIn, db: Session = Depends(get_db),
                 **parsed,
                 "contact": item.contact or "", "phone": item.phone or "",
                 "raw_inquiry": (item.requirement or "")[:1000],
+                "compliance": compliance,
             },
             track_id=uuid.uuid4().hex[:16],
             company_id=data.company_id,
@@ -182,6 +186,10 @@ def list_leads(company_id: int, grade: str = None, status: str = None,
         "follow_up_step": l.follow_up_step, "variant": l.variant,
         "opened": l.opened, "open_count": l.open_count,
         "converted": l.converted, "created_at": l.created_at.isoformat(),
+        # 出口合规筛查状态（示例规则；flagged 需人工核验）
+        "compliance_status": ((l.enriched or {}).get("compliance") or {}).get("status", ""),
+        "compliance_reasons": ((l.enriched or {}).get("compliance") or {}).get("reasons", []),
+        "cert_hint": ((l.enriched or {}).get("compliance") or {}).get("cert_hint", ""),
     } for l in leads]}
 
 

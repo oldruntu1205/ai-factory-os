@@ -39,11 +39,22 @@ def build_daily_report(db: Session, company_id: int) -> str:
         "AI对话量": conversations,
     }
 
+    # 出口市场风险（第5项：汇率/原材料/运费）——出口型制造业经营关键变量
+    try:
+        from utils.trade import get_fx_rate, get_commodity_prices
+        fx_cny = get_fx_rate("USD", "CNY")
+        commodities = get_commodity_prices()
+        summary["美元兑人民币"] = f"{fx_cny['rate']:.2f}（{fx_cny['source']}）"
+        summary["原材料价格"] = ", ".join(
+            f"{name}: {v['trend_pct']:+}%" for name, v in commodities.items())
+    except Exception:
+        pass  # 市场数据获取失败不阻塞日报
+
     llm = get_llm()
     soul = read_soul(company_id, "ceo_agent")
     prompt = f"""
-你是企业 CEO 的经营分析助手。
-根据今日企业数据生成经营日报：
+你是企业 CEO 的经营分析助手（面向出口型制造业）。
+根据今日企业数据与市场数据生成经营日报：
 
 {summary}
 
@@ -51,8 +62,9 @@ def build_daily_report(db: Session, company_id: int) -> str:
 销售情况
 生产情况
 质量情况
+市场风险（结合汇率/原材料价格趋势，说明对出口毛利的影响）
 风险提示
-明日建议
+明日建议（含采购/锁汇/报价调整的具体建议）
 """
     full_prompt = f"{soul}\n\n---\n\n{prompt}" if soul else prompt
     result = llm.invoke(full_prompt)

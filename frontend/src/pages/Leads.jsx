@@ -261,7 +261,7 @@ export default function Leads() {
           <thead>
             <tr>
               <th>公司</th><th>国家</th><th>行业</th><th>邮箱</th>
-              <th>评分</th><th>状态</th><th>跟进</th><th>打开</th><th>操作</th>
+              <th>合规</th><th>评分</th><th>状态</th><th>跟进</th><th>打开</th><th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -277,6 +277,19 @@ export default function Leads() {
                   <td>{l.country}</td>
                   <td>{l.industry}</td>
                   <td style={{ fontSize: 12 }}>{l.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                  <td>
+                    {l.compliance_status === 'flagged' ? (
+                      <span className="badge alert-error" style={{ fontSize: 11 }}
+                        title={(l.compliance_reasons || []).join('\n') || '合规风险，需人工核验'}>
+                        ⚠️ 合规风险
+                      </span>
+                    ) : (
+                      <span className="badge" style={{ fontSize: 11, background: 'var(--bg-subtle)' }}>正常</span>
+                    )}
+                    {l.cert_hint && (
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }} title="认证要求提示">{l.cert_hint}</div>
+                    )}
+                  </td>
                   <td>
                     <span className={`badge ${GRADE_CLASS[l.grade]}`}>{l.grade}</span>
                     <span style={{ marginLeft: 6, fontWeight: 700 }}>{l.score}</span>
