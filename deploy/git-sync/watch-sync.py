@@ -18,9 +18,11 @@
   GIT_SYNC_DEBOUNCE  防抖秒数，合并连击保存（默认 8）
   GIT_SYNC_POLL      轮询间隔秒数（watchdog 不可用时的回退，默认 5）
   GIT_SYNC_LOG       日志文件路径（默认 <repo>/watch-sync.log）
+  GIT_SYNC_PID       进程 PID 文件路径（默认 <repo>/watch-sync.pid）
 
-说明：PID 文件由启动器 start-watch.sh 独占管理（bash 用 MSYS PID 做 kill），
-      本脚本不再写 PID，避免 os.getpid()（Windows 原生 PID）与 bash 不匹配。
+说明：PID 由本脚本以 os.getpid()（Windows 原生 PID）写入，启动器 start-watch.sh
+      用 tasklist/taskkill 管理，避免 MSYS PID 与原生 PID 不一致导致的误判。
+      启动时带单实例互斥：已有存活守护时拒绝重复启动。
 """
 import os
 import sys
@@ -47,6 +49,40 @@ SCOPE = [s.strip() for s in os.environ.get("GIT_SYNC_SCOPE", "backend").split(",
 DEBOUNCE = float(os.environ.get("GIT_SYNC_DEBOUNCE", "8"))
 POLL = float(os.environ.get("GIT_SYNC_POLL", "5"))
 LOG_FILE = os.environ.get("GIT_SYNC_LOG", os.path.join(REPO_ROOT, "watch-sync.log"))
+PID_FILE = os.environ.get("GIT_SYNC_PID", os.path.join(REPO_ROOT, "watch-sync.pid"))
+
+
+def _pid_alive(pid):
+    """判断进程是否存活。Windows 用 tasklist，Unix 用 kill(pid,0)。"""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        rc = subprocess.run(
+            ["tasklist", "/FI", "PID eq %d" % pid],
+            capture_output=True, text=True, timeout=10,
+        )
+        return str(pid) in (rc.stdout or "")
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def write_pid():
+    try:
+        with open(PID_FILE, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
+
+
+def clear_pid():
+    try:
+        if os.path.exists(PID_FILE):
+            os.remove(PID_FILE)
+    except OSError:
+        pass
 
 
 def setup_logging():
@@ -126,6 +162,19 @@ def commit_and_push():
 
 def main():
     setup_logging()
+
+    # 单实例互斥：已有存活守护时拒绝重复启动
+    if os.path.exists(PID_FILE):
+        try:
+            with open(PID_FILE, encoding="utf-8") as f:
+                old = int((f.read().strip() or "0"))
+            if _pid_alive(old):
+                logging.error("已有监听守护运行中 (PID %s)，本次启动取消", old)
+                return
+        except (ValueError, OSError):
+            pass
+    write_pid()
+
     mode = "watchdog(事件驱动)" if WATCHDOG else f"轮询(每{POLL}s)"
     logging.info("监听守护启动 | 仓库=%s | 范围=%s | 防抖=%ss | 模式=%s",
                  REPO_ROOT, ",".join(SCOPE), DEBOUNCE, mode)
@@ -183,6 +232,7 @@ def main():
                 logging.error("轮询异常: %s", e)
             time.sleep(POLL)
 
+    clear_pid()
     logging.info("监听守护已退出")
 
 

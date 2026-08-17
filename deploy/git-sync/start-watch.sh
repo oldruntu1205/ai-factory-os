@@ -47,8 +47,48 @@ if ! PY="$(find_python)"; then
 fi
 echo "  使用解释器: $PY"
 
+# 判断 PID 是否存活：Windows 用 tasklist，Unix 用 kill -0
+pid_alive() {
+  [ -n "${1:-}" ] || return 1
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      tasklist -FI "PID eq $1" 2>/dev/null | grep -qi "$1" ;;
+    *)
+      kill -0 "$1" 2>/dev/null ;;
+  esac
+}
+
 is_running() {
-  [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+  [ -f "$PIDFILE" ] || return 1
+  local pid
+  pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+  [ -n "$pid" ] && pid_alive "$pid"
+}
+
+do_kill() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) taskkill -F -PID "$1" >/dev/null 2>&1 ;;
+    *) kill "$1" 2>/dev/null ;;
+  esac
+}
+
+launch() {
+  echo "启动监听守护 → 日志: $LOGFILE"
+  nohup "$PY" "$WATCHER" >> "$LOGFILE" 2>&1 &
+  # 等待守护写入原生 PID 并存活（最多 4s）
+  for _ in $(seq 1 4); do
+    sleep 1
+    if is_running; then break; fi
+  done
+  if is_running; then
+    echo "已启动 PID $(cat "$PIDFILE")"
+    echo "停止： bash deploy/git-sync/start-watch.sh stop"
+  else
+    echo "❌ 启动失败（未检测到存活进程），最近日志："
+    tail -n 8 "$LOGFILE" 2>/dev/null || true
+    rm -f "$PIDFILE"
+    exit 1
+  fi
 }
 
 case "${1:-start}" in
@@ -57,27 +97,20 @@ case "${1:-start}" in
       echo "已在运行 (PID $(cat "$PIDFILE"))"
       exit 0
     fi
-    echo "启动监听守护 → 日志: $LOGFILE"
-    nohup "$PY" "$WATCHER" >> "$LOGFILE" 2>&1 &
-    echo $! > "$PIDFILE"
-    echo "已启动 PID $!"
-    echo "停止： bash deploy/git-sync/start-watch.sh stop"
+    launch
     ;;
   stop)
     if is_running; then
-      kill "$(cat "$PIDFILE")" 2>/dev/null && echo "已停止"
-      rm -f "$PIDFILE"
+      do_kill "$(cat "$PIDFILE")" && echo "已停止"
     else
       echo "未运行"
-      rm -f "$PIDFILE"
     fi
+    rm -f "$PIDFILE"
     ;;
   restart)
-    if is_running; then kill "$(cat "$PIDFILE")" 2>/dev/null; rm -f "$PIDFILE"; fi
+    if is_running; then do_kill "$(cat "$PIDFILE")"; rm -f "$PIDFILE"; fi
     sleep 1
-    nohup "$PY" "$WATCHER" >> "$LOGFILE" 2>&1 &
-    echo $! > "$PIDFILE"
-    echo "已重启 PID $!"
+    launch
     ;;
   status)
     if is_running; then echo "运行中 (PID $(cat "$PIDFILE"))"; else echo "未运行"; fi
