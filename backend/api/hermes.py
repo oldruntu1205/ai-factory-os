@@ -187,6 +187,7 @@ def set_soul(name: str, data: SoulIn, company_id: int,
              current: dict = Depends(get_current_user)):
     """写入企业级 Soul（写进 hermes/registry/souls/company_{id}/{agent}.md）"""
     require_company(company_id, current)
+    _require_admin(current)
     if len(data.content) > 50000:
         raise HTTPException(status_code=400, detail="Soul 内容不能超过 50000 字符")
     result = write_soul(company_id, name, data.content)
@@ -198,6 +199,7 @@ def delete_soul(name: str, company_id: int,
                 current: dict = Depends(get_current_user)):
     """清除企业定制 Soul（恢复默认）。若指纹变化，会一并隔离该 Agent 旧版本技能。"""
     require_company(company_id, current)
+    _require_admin(current)
     res = reset_soul(company_id, name)
     if res.get("reset"):
         msg = "soul reset to default"

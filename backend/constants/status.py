@@ -14,16 +14,18 @@ AGENT_STATUS = {"active", "disabled"}
 CUSTOMER_STATUS = {"new", "following", "quoted", "won", "lost"}
 
 # 线索状态（AI 自主销售）
-LEAD_STATUS = {"discovered", "contacted", "replied", "qualified", "won", "lost"}
+# 安全/正确性修复：补齐 paused/unsubscribed（生产代码实际写入，此前漂移导致校验误拒）
+LEAD_STATUS = {"discovered", "contacted", "replied", "qualified", "won", "lost",
+               "paused", "unsubscribed"}
 
 # 报价单状态
 QUOTATION_STATUS = {"draft", "sent", "accepted", "rejected"}
 
-# 文档状态（知识库）
-DOCUMENT_STATUS = {"parsed", "vectorized", "failed"}
+# 文档状态（知识库）——补齐 uploaded（models 默认值，此前漂移）
+DOCUMENT_STATUS = {"uploaded", "parsed", "vectorized", "failed"}
 
 # 账单状态（计费）
-BILL_STATUS = {"unpaid", "paid", "cancelled"}
+BILL_STATUS = {"unpaid", "paid", "cancelled", "refunded"}
 
 # 成员状态
 MEMBER_STATUS = {"active", "disabled"}

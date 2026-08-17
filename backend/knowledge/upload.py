@@ -28,8 +28,10 @@ def save_file(file: UploadFile, company_id: int) -> str:
     safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}{ext}"
     path = os.path.join(company_dir, safe_name)
 
-    content = file.file.read()
-    if len(content) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+    # 安全修复：限长读取（> max_bytes+1 即超限），避免超大文件先整读吃满内存
+    max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    content = file.file.read(max_bytes + 1)
+    if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"文件超过 {MAX_UPLOAD_SIZE_MB}MB 限制")
 
     with open(path, "wb") as f:

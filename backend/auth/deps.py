@@ -23,7 +23,13 @@ def get_current_user(
     except JWTError:
         raise HTTPException(status_code=401, detail="令牌无效或已过期")
 
-    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    # 安全修复：畸形 sub（非数字/缺失）应返回 401 而非 500
+    try:
+        user_id = int(payload["sub"])
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(status_code=401, detail="令牌无效或已过期")
+
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="用户不存在")
     if getattr(user, "status", "active") == "disabled":

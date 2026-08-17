@@ -226,7 +226,8 @@ def _schedule_auto_approve(company_id: int, delay: int = 1):
 def approve_license(company_id: int, approve: bool = True,
                     reject_reason: str = "", db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
-    """管理端审核（演示用）：通过或拒绝"""
+    """管理端审核：通过或拒绝（仅管理员，修复：此前普通成员可自审）"""
+    require_admin(current["role"])
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     c = db.query(Company).filter(Company.id == company_id).first()
@@ -242,13 +243,17 @@ def approve_license(company_id: int, approve: bool = True,
         c.license_verified = False
         c.license_reject_reason = reject_reason
     db.commit()
+    log_action(company_id, "license_approve",
+               f"{'通过' if approve else '拒绝'}营业执照审核（{reject_reason[:100]}）",
+               current.get("user_id", 0), current.get("email", ""))
     return {"message": "审核完成", "license_status": c.license_status}
 
 
 @router.delete("/license")
 def delete_license(company_id: int, db: Session = Depends(get_db),
                    current: dict = Depends(get_current_user)):
-    """清除已上传的营业执照（重新提交）"""
+    """清除已上传的营业执照（重新提交，仅管理员）"""
+    require_admin(current["role"])
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     c = db.query(Company).filter(Company.id == company_id).first()
@@ -304,7 +309,7 @@ def change_password(data: PasswordChange, request: Request,
                     db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
     """修改管理员密码（校验旧密码）"""
-    require_admin(current.get("role", "admin"))
+    require_admin(current["role"])
     user = db.query(User).filter(User.id == current["user_id"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -330,7 +335,7 @@ def change_password(data: PasswordChange, request: Request,
 def get_audit_logs(company_id: int, db: Session = Depends(get_db),
                    current: dict = Depends(get_current_user)):
     """企业操作日志（安全审计）"""
-    require_admin(current.get("role", "admin"))
+    require_admin(current["role"])
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权查看")
     return {"logs": list_audit_logs(db, company_id)}

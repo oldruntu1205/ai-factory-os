@@ -25,8 +25,9 @@ router = APIRouter(prefix="/cms", tags=["官网内容管理"])
 SITE_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "site")
 os.makedirs(SITE_UPLOAD_DIR, exist_ok=True)
 
+# 安全修复：禁用 SVG（存储型 XSS 风险）；仅允许位图（上传时经 PIL 重绘校验）
 _ALLOWED_IMAGE_TYPES = {
-    "image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml",
+    "image/png", "image/jpeg", "image/jpg", "image/webp",
 }
 
 
@@ -318,7 +319,7 @@ async def upload_site_image(file: UploadFile = File(...),
     _require_platform(current)
     content_type = (file.content_type or "").lower()
     if content_type not in _ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="仅支持 PNG / JPG / WEBP / SVG 图片")
+        raise HTTPException(status_code=400, detail="仅支持 PNG / JPG / WEBP 图片（SVG 已禁用，防存储型 XSS）")
 
     ext = content_type.split("/")[-1]
     if ext == "jpeg":
@@ -326,9 +327,17 @@ async def upload_site_image(file: UploadFile = File(...),
     filename = f"{uuid.uuid4().hex}.{ext}"
     save_path = os.path.join(SITE_UPLOAD_DIR, filename)
 
+    # 安全修复：上传大小限制（10MB），限长读取避免内存耗尽
+    max_bytes = int(os.getenv("CMS_MAX_UPLOAD_MB", "10")) * 1024 * 1024
+    original = await file.read(max_bytes + 1)
+    if len(original) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"图片过大，最大 {max_bytes // (1024*1024)}MB")
+
     max_width = int(os.getenv("CMS_MAX_IMAGE_WIDTH", "1920"))
-    original = await file.read()
-    final_size = _resize_and_save(original, ext, save_path, max_width)
+    try:
+        final_size = _resize_and_save(original, ext, save_path, max_width)
+    except Exception:
+        raise HTTPException(status_code=400, detail="无效的图片文件（解码失败）")
 
     return {
         "url": f"/static/site/{filename}",

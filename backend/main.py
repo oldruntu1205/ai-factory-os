@@ -507,11 +507,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS（允许前端跨域）
+# CORS（安全修复：不再使用 '*' + credentials；按环境配置白名单，生产设 APP_ALLOW_ORIGINS）
+_allow_origins = [o.strip() for o in os.getenv("APP_ALLOW_ORIGINS", "").split(",") if o.strip()]
+if not _allow_origins:
+    _allow_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

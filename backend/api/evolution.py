@@ -26,6 +26,12 @@ from hermes.evolution import store, extractor, service
 router = APIRouter(prefix="/hermes/evolution", tags=["Hermes 自进化"])
 
 
+def _require_admin(current: dict) -> None:
+    """进化写操作（审批/删除/触发）仅允许企业管理员/平台超管（staff 无权改 AI 治理）"""
+    if current["role"] not in ("admin", "platform_admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+
 # ============ 请求模型 ============
 
 class ToolOverrideIn(BaseModel):
@@ -136,6 +142,7 @@ def skill_detail(company_id: int, skill_id: int,
 def delete_skill(company_id: int, skill_id: int,
                  current: dict = Depends(get_current_user)):
     require_company(company_id, current)
+    _require_admin(current)
     ok = store.delete_skill(company_id, skill_id)
     return {"deleted": ok}
 
@@ -145,6 +152,7 @@ def restore_skill(company_id: int, skill_id: int,
                   current: dict = Depends(get_current_user)):
     """人工恢复被隔离的技能（方案4：解除 quarantine，重新参与匹配/注入）。"""
     require_company(company_id, current)
+    _require_admin(current)
     ok = store.unquarantine_skill(company_id, skill_id)
     if not ok:
         raise HTTPException(status_code=404, detail="技能不存在")
@@ -156,6 +164,7 @@ def run_extraction(company_id: int, agent_name: str = None,
                    current: dict = Depends(get_current_user)):
     """手动回放近期轨迹触发技能提取（自动提取也在每次 /hermes/execute 后运行）。"""
     require_company(company_id, current)
+    _require_admin(current)
     traces = store.list_traces(company_id, agent_name=agent_name, limit=500)
     created = 0
     for t in traces:
@@ -182,6 +191,7 @@ def get_overrides(company_id: int, current: dict = Depends(get_current_user)):
 def put_override(data: ToolOverrideIn, company_id: int,
                  current: dict = Depends(get_current_user)):
     require_company(company_id, current)
+    _require_admin(current)
     if len(data.description) > 500:
         raise HTTPException(status_code=400, detail="Tool 描述不超过 500 字符（GEPA 体积护栏）")
     rec = store.set_tool_override(company_id, data.tool_name, data.description)
@@ -193,6 +203,7 @@ def put_override(data: ToolOverrideIn, company_id: int,
 def del_override(company_id: int, tool_name: str,
                  current: dict = Depends(get_current_user)):
     require_company(company_id, current)
+    _require_admin(current)
     ok = store.delete_tool_override(company_id, tool_name)
     return {"deleted": ok}
 
@@ -204,6 +215,7 @@ def run_evolution(data: RunEvolutionIn, company_id: int,
                   current: dict = Depends(get_current_user)):
     """触发一次 GEPA 进化：read→mutate→evaluate→select，产出 pending 候选。"""
     require_company(company_id, current)
+    _require_admin(current)
     return service.run_evolution(
         company_id, data.agent_name, data.target_type,
         target_key=data.target_key, n_variants=data.n_variants)
@@ -222,6 +234,7 @@ def approve_candidate(company_id: int, candidate_id: int,
                       current: dict = Depends(get_current_user)):
     """人工审批通过：写回运行态（Soul 文件 / Tool 覆盖 / 技能），这是 Human-in-the-loop 门。"""
     require_company(company_id, current)
+    _require_admin(current)
     operator_id = current.get("user_id") if isinstance(current, dict) else None
     return service.approve_candidate(company_id, candidate_id, operator_id=operator_id)
 
@@ -230,6 +243,7 @@ def approve_candidate(company_id: int, candidate_id: int,
 def reject_candidate(company_id: int, candidate_id: int,
                      current: dict = Depends(get_current_user)):
     require_company(company_id, current)
+    _require_admin(current)
     operator_id = current.get("user_id") if isinstance(current, dict) else None
     return service.reject_candidate(company_id, candidate_id, operator_id=operator_id)
 
@@ -239,6 +253,7 @@ def curate(company_id: int, dry_run: bool = True, agent_name: str = None,
            current: dict = Depends(get_current_user)):
     """技能管家：dry_run=True 给剪枝建议；dry_run=False 执行物理剪枝。"""
     require_company(company_id, current)
+    _require_admin(current)
     return service.curate(company_id, agent_name=agent_name, dry_run=dry_run)
 
 
@@ -250,6 +265,7 @@ def auto_run(company_id: int, agent_name: str = None, lookback_days: int = 30,
     注意：循环全自动，但每个候选仍为 pending，必须人工 approve 才写回运行态。
     """
     require_company(company_id, current)
+    _require_admin(current)
     operator_id = current.get("user_id") if isinstance(current, dict) else None
     return service.auto_evolve_cycle(
         company_id, agent_name=agent_name, operator_id=operator_id,

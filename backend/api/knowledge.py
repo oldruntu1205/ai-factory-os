@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from database import get_db
@@ -32,15 +32,13 @@ from knowledge.hybrid import (
 
 router = APIRouter(prefix="/knowledge", tags=["企业知识库"])
 
-# 单文件上传上限（防止超大/畸形 DXF/PDF 撑爆内存或长时间阻塞）
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-
 
 class SearchIn(BaseModel):
     question: str
     company_id: int
-    limit: int = 5
-    score_threshold: Optional[float] = None
+    # 安全修复：limit 约束 1-20（此前无上限可被滥用拖垮检索）
+    limit: int = Field(5, ge=1, le=20)
+    score_threshold: Optional[float] = Field(None, ge=-1.0, le=1.0)
 
 
 @router.post("/upload")
@@ -56,14 +54,6 @@ def upload(
 
     path = save_file(file, company_id)
     size = os.path.getsize(path)
-    if size > MAX_UPLOAD_BYTES:
-        doc = Document(filename=file.filename, path=path,
-                       file_type=os.path.splitext(file.filename or "")[1].lstrip("."),
-                       size=size, status="failed", company_id=company_id)
-        db.add(doc)
-        db.commit()
-        return {"status": "warning", "message": f"文件过大（>{MAX_UPLOAD_BYTES // 1024 // 1024}MB），已拒绝",
-                "doc_id": doc.id}
 
     doc = Document(
         filename=file.filename,

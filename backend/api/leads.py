@@ -18,7 +18,7 @@ api/leads.py —— V2.1 AI 自主销售线索 API（升级版）
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import base64
 
 from database import get_db
@@ -43,7 +43,8 @@ class DiscoverIn(BaseModel):
     keywords: str = "laboratory glassware"
     countries: list[str] = []
     industries: list[str] = []
-    limit: int = 20
+    # 安全修复：limit 夹取 1-50（此前无上限可触发海量 LLM 调用）
+    limit: int = Field(20, ge=1, le=50)
 
 
 class FollowIn(BaseModel):

@@ -147,6 +147,8 @@ def discover_leads(company_id: int, keywords: str = "laboratory glassware",
         seed = abs(hash(keywords or "seed")) % 100000
         prov = provider or MockProvider(seed=seed)
         samples = prov.generate(keywords, countries, industries, limit)
+        # 性能修复：批量 add + 末尾统一 commit（此前逐条 commit，量大时慢且部分失败留半批）
+        pending = []
         for s in samples:
             lead = Lead(
                 company_name=s["company_name"],
@@ -164,7 +166,9 @@ def discover_leads(company_id: int, keywords: str = "laboratory glassware",
             )
             score_lead(lead)  # LLM 评分（失败回退规则）
             db.add(lead)
-            db.commit()
+            pending.append(lead)
+        db.commit()
+        for lead in pending:
             db.refresh(lead)
             created.append({
                 "id": lead.id, "company_name": lead.company_name,

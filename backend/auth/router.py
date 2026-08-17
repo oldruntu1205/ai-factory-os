@@ -7,6 +7,7 @@ auth/router.py —— 注册 / 登录接口（第九、十章）
 - 登录限流（IP+账号，5 次/分钟）防暴力破解
 - 登录失败统一文案（消除用户枚举）
 """
+import re
 import time
 from collections import defaultdict
 
@@ -52,7 +53,13 @@ class LoginIn(BaseModel):
 
 @router.post("/register")
 def register(data: RegisterIn, db: Session = Depends(get_db)):
-    """企业注册：创建企业 + 管理员账号"""
+    """企业注册：创建企业 + 管理员账号（密码策略校验）"""
+    # 安全修复：密码至少 8 位且含字母数字；企业名限长
+    if len(data.password) < 8 or not re.search(r"[A-Za-z]", data.password) \
+            or not re.search(r"\d", data.password):
+        raise HTTPException(status_code=400, detail="密码至少 8 位且包含字母和数字")
+    if not data.company.strip() or len(data.company) > 100:
+        raise HTTPException(status_code=400, detail="企业名称不合法（1-100 字符）")
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="该邮箱已注册")
 
