@@ -27,9 +27,14 @@ def customer_agent(question: str, company_id: int, score_threshold: float = None
 
     # Soul 作为系统提示（人设/语气/边界）—— 企业可自定义
     soul = read_soul(company_id, "customer_agent")
+    # 多语种：检测客户提问语言，用同语言回答（出口场景客户多为外语）
+    from utils.i18n import detect_language, LANGUAGE_NAMES
+    lang = detect_language(question)
+    lang_name = LANGUAGE_NAMES.get(lang, "English")
     prompt = f"""你是企业 AI 客服。
 只能根据以下企业资料回答，不能编造资料中没有的信息。
 如果资料中没有答案，请礼貌地说明并建议联系人工客服。
+用{lang_name}回答客户问题（客户用什么语言提问，就用什么语言回答）。
 
 企业资料：
 {context}

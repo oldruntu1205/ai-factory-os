@@ -143,20 +143,29 @@ def subject_for(step: int, language: str, product: str, company: str, variant: s
 
 def build_sequence(company: str, product: str, extra: str = "",
                    language: str = "zh", variant: str = "A") -> dict:
-    """生成跟进序列（4 封邮件），language: zh / en；variant: A / B"""
-    language = (language or "zh").lower()
-    templates = _EN_TEMPLATES if language == "en" else _ZH_TEMPLATES
+    """生成跟进序列（4 封邮件），language: zh / en / de / es / ar ...（多语种）；variant: A / B"""
+    from utils.i18n import LANGUAGE_NAMES
+    language = (language or "en").lower()
+    templates = _ZH_TEMPLATES if language == "zh" else _EN_TEMPLATES
 
     try:
         llm = get_llm()
         vhint = ("Variant B (A/B test): use a short, curiosity-driven subject under 50 chars, "
                  "lead with a bold claim, max 70 words per email.") if variant == "B" else \
                 ("Variant A: professional, relationship-focused, standard structure.")
-        if language == "en":
+        if language == "zh":
+            prompt = f"""你是一名外贸销售邮件写作专家（中文）。
+为 {company} 的 {product} 生成 4 封邮件（中文）：首封/ D+3 / D+7 / D+14。
+{vhint}
+额外信息：{extra}
+输出 JSON：{{"email1":"...","email2":"...","email3":"...","email4":"..."}}"""
+        else:
+            lang_name = LANGUAGE_NAMES.get(language, "English")
             prompt = f"""You are a professional international trade (B2B) sales email copywriter.
-Write a 4-email follow-up sequence to {company} about our {product}.
+Write a 4-email follow-up sequence in {lang_name} to {company} about our {product}.
 Email steps: Day0 introduction, Day3 follow-up, Day7, Day14 final notice.
 {vhint}
+Write the email body in {lang_name} (subject line may keep English keywords).
 CRITICAL format per email:
   Subject: <subject line>
   Dear Sir/Madam,
@@ -165,12 +174,6 @@ CRITICAL format per email:
   Best regards, [Your Name] / [Your Company]
 Extra context: {extra}
 Return ONLY valid JSON: {{"email1":"...","email2":"...","email3":"...","email4":"..."}}"""
-        else:
-            prompt = f"""你是一名外贸销售邮件写作专家（中文）。
-为 {company} 的 {product} 生成 4 封邮件（中文）：首封/ D+3 / D+7 / D+14。
-{vhint}
-额外信息：{extra}
-输出 JSON：{{"email1":"...","email2":"...","email3":"...","email4":"..."}}"""
         result = llm.invoke(prompt)
         m = re.search(r"\{.*\}", result.content, re.S)
         if m:
@@ -323,8 +326,11 @@ def run_due_follow_ups(company_id: int = None) -> dict:
                     due = timedelta(days=SEQUENCE_INTERVALS[step])
                 if now - start >= due:
                     try:
+                        # 多语种：按线索国家路由沟通语言（替代硬编码 en）
+                        from utils.trade import COUNTRY_LANGUAGES
+                        lang = COUNTRY_LANGUAGES.get((lead.country or "").upper(), "en")
                         r = send_follow_up(lead.id, lead.company_id, step=step + 1,
-                                           language="en", variant=lead.variant or "A",
+                                           language=lang, variant=lead.variant or "A",
                                            track_id=lead.track_id or "")
                         sent.append({"lead": lead.id, "email": lead.email, **r})
                     except Exception as e:
