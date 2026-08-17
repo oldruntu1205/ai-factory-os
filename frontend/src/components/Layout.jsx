@@ -67,7 +67,7 @@ const PLATFORM_GROUPS = [
       { to: '/admin/llm', label: '模型设置', icon: '🧠' },
       { to: '/admin/site', label: '官网内容', icon: '🌐' },
       { to: '/admin/integrations', label: '对接管理', icon: '🔌' },
-      { to: '/hermes', label: 'Hermes Runtime', icon: '⚙️' },
+      { to: '/hermes', label: 'Agent中台', icon: '⚙️' },
     ],
   },
 ]

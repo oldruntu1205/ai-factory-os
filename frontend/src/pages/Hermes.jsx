@@ -95,7 +95,7 @@ export default function Hermes() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h1 style={{ fontSize: 22 }}>Hermes Agent Runtime</h1>
+        <h1 style={{ fontSize: 22 }}>Agent中台（Hermes Runtime）</h1>
         <button className="btn btn-primary" onClick={() => setShowRegister(!showRegister)}>
           {showRegister ? '取消' : '+ 注册 Agent'}
         </button>
