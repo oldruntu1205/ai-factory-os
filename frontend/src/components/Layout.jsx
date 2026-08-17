@@ -20,7 +20,7 @@ const NAV_GROUPS = [
       { to: '/knowledge', label: '知识库', icon: '📚' },
       { to: '/crm', label: '客户CRM', icon: '👥' },
       { to: '/quotations', label: '报价单', icon: '📄' },
-      { to: '/leads', label: 'AI自主销售', icon: '🎯' },
+      { to: '/leads', label: 'AI获客', icon: '🎯' },
       { to: '/systems', label: '业务系统数据', icon: '🗂️' },
       {
         label: '渠道中心', icon: '📡',

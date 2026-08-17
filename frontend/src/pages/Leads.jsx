@@ -149,7 +149,7 @@ export default function Leads() {
 
   return (
     <div>
-      <PageHeader title="AI 自主销售（全自动获客）">
+      <PageHeader title="AI 获客（全自动获客）">
         <button className="btn btn-sm" style={{ fontSize: 13 }} onClick={() => setShowImport(true)}>📥 导入真实询盘</button>
         <button className="btn btn-primary btn-sm" onClick={runSequence}>🤖 运行自动跟进</button>
         <button className="btn btn-sm" onClick={load}>刷新</button>
