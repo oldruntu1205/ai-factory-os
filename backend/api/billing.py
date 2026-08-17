@@ -24,6 +24,12 @@ router = APIRouter(prefix="/billing", tags=["计费系统"])
 from constants.plans import PLANS, PLAN_DAYS
 
 
+def _require_admin_billing(current: dict) -> None:
+    """计费操作（升级/支付）仅允许企业管理员/平台超管"""
+    if current["role"] not in ("admin", "platform_admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+
 class UpgradeIn(BaseModel):
     company_id: int
     plan: str
@@ -107,7 +113,8 @@ def list_invoices(company_id: int, db: Session = Depends(get_db),
 @router.post("/upgrade")
 def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
             current: dict = Depends(get_current_user)):
-    """升级套餐（演示版直接生效 + 生成账单）"""
+    """升级套餐（仅管理员；演示版直接生效 + 生成账单）"""
+    _require_admin_billing(current)
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     if data.plan not in PLANS:
@@ -144,6 +151,15 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
     db.add(bill)
     db.commit()
 
+    # 审计日志
+    try:
+        from utils.audit import log_action
+        log_action(data.company_id, "billing.upgrade",
+                   f"套餐 {old_plan} -> {data.plan}（账单 {bill.bill_no}）",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+
     return {"message": f"套餐已从 {old_plan} 升级为 {data.plan}",
             "bill_no": bill.bill_no, "amount": bill.amount,
             "currency": bill.currency}
@@ -152,11 +168,24 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
 @router.post("/pay")
 def pay(bill_no: str, db: Session = Depends(get_db),
         current: dict = Depends(get_current_user)):
-    """模拟支付账单"""
+    """模拟支付账单（仅管理员）"""
+    _require_admin_billing(current)
     bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
     if not bill or bill.company_id != current["company_id"]:
         raise HTTPException(status_code=404, detail="账单不存在")
+    if bill.status == "paid":
+        raise HTTPException(status_code=400, detail="账单已支付，请勿重复操作")
     bill.status = "paid"
     bill.paid_at = datetime.utcnow()
     db.commit()
+
+    # 审计日志
+    try:
+        from utils.audit import log_action
+        log_action(bill.company_id, "billing.pay",
+                   f"支付账单 {bill.bill_no}（{bill.plan}）",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+
     return {"message": "支付成功", "bill_no": bill.bill_no, "status": bill.status}

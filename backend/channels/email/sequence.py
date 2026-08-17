@@ -249,11 +249,13 @@ def send_follow_up(lead_id: int, company_id: int, step: int = 1,
         tid = track_id or lead.track_id or ""
         final_body, is_html = _inject_tracking(body, tid, language)
 
-        result = send_email(lead.email, final_body, subject=subject,
-                            html=is_html, company_id=company_id, attachments=atts)
+        # 修复：空邮箱判断前置（此前先调 send_email 再判断，真实 SMTP 下空收件人直接报错）
         if not lead.email:
             result = {"status": "simulated", "note": "无邮箱，生成内容待人工触达",
                       "subject": subject}
+        else:
+            result = send_email(lead.email, final_body, subject=subject,
+                                html=is_html, company_id=company_id, attachments=atts)
 
         # 记录跟进进度
         lead.follow_up_step = step
@@ -269,14 +271,23 @@ def send_follow_up(lead_id: int, company_id: int, step: int = 1,
         db.close()
 
 
-def run_due_follow_ups() -> dict:
-    """扫描所有线索，对到期的发下一封跟进（Celery beat 每日调用 / 手动触发）"""
+def run_due_follow_ups(company_id: int = None) -> dict:
+    """扫描线索，对到期的发下一封跟进。
+
+    company_id 为空时扫描全部企业（供 Celery 定时任务使用）；
+    由企业 API 手动触发时传 company_id，实现租户隔离（修复跨企业发信副作用）。
+    """
     from database import SessionLocal
     from models import Lead
     db = SessionLocal()
     sent = []
     try:
-        leads = db.query(Lead).filter(Lead.company_id.isnot(None)).all()
+        query = db.query(Lead)
+        if company_id is not None:
+            query = query.filter(Lead.company_id == company_id)
+        else:
+            query = query.filter(Lead.company_id.isnot(None))
+        leads = query.all()
         now = datetime.utcnow()
         for lead in leads:
             if lead.status in _STOP_STATUSES:
@@ -285,10 +296,14 @@ def run_due_follow_ups() -> dict:
             if step >= MAX_STEP:
                 continue
             last_at = lead.follow_up_at or lead.created_at or now
-            if step >= len(SEQUENCE_INTERVALS) - 1:
-                continue
-            due_days = SEQUENCE_INTERVALS[step + 1] - SEQUENCE_INTERVALS[step]
-            if now - last_at >= timedelta(days=due_days):
+            # 修复：首封（step=0 -> 1）应立即发送（此前按间隔推算出要等 D+3 才发首封）
+            if step == 0:
+                due = timedelta(0)
+            else:
+                if step >= len(SEQUENCE_INTERVALS) - 1:
+                    continue
+                due = timedelta(days=SEQUENCE_INTERVALS[step + 1] - SEQUENCE_INTERVALS[step])
+            if now - last_at >= due:
                 try:
                     r = send_follow_up(lead.id, lead.company_id, step=step + 1,
                                        language="en", variant=lead.variant or "A",

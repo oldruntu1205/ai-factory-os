@@ -219,6 +219,10 @@ def install_package(data: InstallIn, db: Session = Depends(get_db),
             AIAgent.role == agent.get("role"),
             AIAgent.company_id == data.company_id).first()
         if exists:
+            # 修复：卸载后重装时，复用已存在但被停用的 AI 员工并恢复启用
+            if exists.status != "active":
+                exists.status = "active"
+                db.commit()
             created_agents.append({"id": exists.id, "name": exists.name, "role": exists.role})
             continue
         new_agent = AIAgent(
@@ -280,6 +284,11 @@ def uninstall_package(data: InstallIn, db: Session = Depends(get_db),
         for agent in (p.agents or []):
             manifest_name = role_map.get(agent.get("role"), f"{agent.get('role', 'custom')}_agent")
             runtime.permission_system.deny_agent(data.company_id, manifest_name)
+        # 修复：卸载时回收安装时授予的工具权限点（此前只 deny_agent 不回收权限）
+        for tool in (p.tools or []):
+            tool_perm = _tool_permission_of(tool)
+            if tool_perm:
+                runtime.permission_system.revoke_permission(data.company_id, tool_perm)
 
     install.status = "uninstalled"
     if p and p.install_count > 0:

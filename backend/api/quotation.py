@@ -55,12 +55,20 @@ JSON 格式：
     import uuid
     quantity = safe_int(parsed.get("quantity"), 1)
     unit_price = safe_float(parsed.get("unit_price"), 0)
+    # 客户归属校验：customer_id 必须存在且属于当前企业（防跨租户引用/悬空 500）
+    customer_name = data.customer_name
+    if data.customer_id:
+        cust = db.query(Customer).filter(
+            Customer.id == data.customer_id,
+            Customer.company_id == data.company_id).first()
+        if not cust:
+            raise HTTPException(status_code=400,
+                                detail="客户不存在或不属于当前企业")
+        customer_name = cust.name
     quotation = Quotation(
         quotation_no=f"QT{data.company_id}{uuid.uuid4().hex[:8].upper()}",
         customer_id=data.customer_id,
-        customer_name=data.customer_name or (
-            db.query(Customer).filter(Customer.id == data.customer_id).first().name
-            if data.customer_id else "未命名客户"),
+        customer_name=customer_name or "未命名客户",
         product=safe_str(parsed.get("product")),
         quantity=quantity,
         unit_price=unit_price,

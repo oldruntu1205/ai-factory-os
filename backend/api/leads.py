@@ -182,9 +182,10 @@ def send_sequence(lead_id: int, data: SendSeqIn, db: Session = Depends(get_db),
 # ---------------- 手动触发自动跟进 ----------------
 @router.post("/run-sequence")
 def run_sequence(data: CompanyIn, current: dict = Depends(get_current_user)):
+    """手动触发本企业自动跟进（修复：此前会触发全平台所有企业发信）"""
     require_company(data.company_id, current)
     require_verified(current.get("license_verified", False))
-    result = run_due_follow_ups()
+    result = run_due_follow_ups(company_id=data.company_id)
     return result
 
 

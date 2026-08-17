@@ -23,6 +23,8 @@ FOLLOWUP_SUBJECTS = {
     7: "Special Quotation for Your Laboratory",
     14: "Final Opportunity - Partnership",
 }
+# 修复：跟进节奏推进表（1 -> 3 -> 7 -> 14 -> 0=序列完成，避免 day=14 后每日重复发第 14 封）
+FOLLOWUP_NEXT = {1: 3, 3: 7, 7: 14, 14: 0}
 
 
 def _get_pending_leads(db, day: int):
@@ -50,7 +52,7 @@ def daily_follow():
                 )
                 result = send_email(lead.email, content, FOLLOWUP_SUBJECTS[day])
                 if result["status"] in ("sent", "simulated"):
-                    lead.followup_day = min(day + 1, 14)
+                    lead.followup_day = FOLLOWUP_NEXT.get(day, 0)
                     sent += 1
         db.commit()
         logger.info(f"daily_follow: {sent} 封跟进邮件")

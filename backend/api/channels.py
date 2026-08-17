@@ -122,7 +122,10 @@ def email_followup(data: FollowUpIn, current: dict = Depends(get_current_user)):
 
 @router.post("/email/bounce")
 def email_bounce(data: dict, current: dict = Depends(get_current_user)):
-    """标记退信（模拟：真实环境由 SMTP 回执/MX 检测触发）"""
+    """标记退信（模拟：真实环境由 SMTP 回执/MX 检测触发）
+
+    修复：仅能标记**当前企业**的邮件日志（此前无 company_id 过滤可跨租户改状态）。
+    """
     from database import SessionLocal
     from models import EmailLog
     recipient = (data or {}).get("recipient", "")
@@ -130,7 +133,9 @@ def email_bounce(data: dict, current: dict = Depends(get_current_user)):
         return {"error": "recipient 必填"}
     db = SessionLocal()
     try:
-        logs = db.query(EmailLog).filter(EmailLog.recipient == recipient).all()
+        logs = db.query(EmailLog).filter(
+            EmailLog.recipient == recipient,
+            EmailLog.company_id == current["company_id"]).all()
         for log in logs:
             log.status = "bounced"
         db.commit()
