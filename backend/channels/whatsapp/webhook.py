@@ -33,9 +33,15 @@ async def verify(request: Request):
 
 
 async def _check_signature(request: Request, raw: bytes):
-    """Meta webhook 签名校验：X-Hub-Signature-256 = sha256(app_secret, raw_body)"""
+    """Meta webhook 签名校验：X-Hub-Signature-256 = sha256(app_secret, raw_body)
+
+    安全策略：未配置 WHATSAPP_APP_SECRET 时拒绝处理（fail-closed），
+    防止伪造消息触发 AI 与发送。配置后强制校验 HMAC。
+    """
     if not WHATSAPP_APP_SECRET:
-        return  # 未配置 app secret，跳过（本地演示）
+        raise HTTPException(
+            status_code=503,
+            detail="未配置 WHATSAPP_APP_SECRET，无法验证 webhook 签名，已拒绝处理（请在生产环境配置）")
     signature = request.headers.get("X-Hub-Signature-256", "")
     if not signature.startswith("sha256="):
         raise HTTPException(status_code=401, detail="缺少签名")

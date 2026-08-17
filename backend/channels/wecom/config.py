@@ -15,6 +15,7 @@ WECOM_ROBOT_KEY=xxxx         群机器人 Webhook key（可选）
 """
 import os
 import hashlib
+import hmac
 import time
 
 # ---------- 自建应用 ----------
@@ -44,9 +45,8 @@ def is_robot_configured() -> bool:
     return bool(WECOM_ROBOT_KEY)
 
 
-def sign_callback(msg_signature: str = "", timestamp: str = "", nonce: str = "",
-                  echostr: str = "") -> str:
-    """企业微信回调签名（sha1，字典序拼接）"""
+def sign_callback(timestamp: str = "", nonce: str = "", echostr: str = "") -> str:
+    """企业微信回调签名（sha1，字典序拼接 token+timestamp+nonce+echostr）"""
     items = sorted([WECOM_TOKEN, timestamp, nonce, echostr])
     s = "".join(items)
     return hashlib.sha1(s.encode()).hexdigest()
@@ -56,6 +56,15 @@ def verify_callback(signature: str, timestamp: str, nonce: str, echostr: str = "
     """校验回调签名（恒定时间比较防时序攻击）"""
     if not WECOM_TOKEN:
         return False
-    calc = sign_callback("", timestamp, nonce, echostr)
-    return hashlib.sha256(calc.encode()).hexdigest() == \
-        hashlib.sha256(signature.encode()).hexdigest()
+    calc = sign_callback(timestamp, nonce, echostr)
+    return hmac.compare_digest(calc, signature)
+
+
+def verify_post_signature(signature: str, timestamp: str, nonce: str, body: str) -> bool:
+    """校验 POST 回调签名：sha1(sorted(token, timestamp, nonce, body))（明文模式）"""
+    if not WECOM_TOKEN:
+        return False
+    items = sorted([WECOM_TOKEN, timestamp, nonce, body])
+    s = "".join(items)
+    calc = hashlib.sha1(s.encode()).hexdigest()
+    return hmac.compare_digest(calc, signature)

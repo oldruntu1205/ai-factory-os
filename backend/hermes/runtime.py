@@ -11,6 +11,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# 运行中会话默认有效期（秒）：超过即视为过期，防止 _running 无限增长
+SESSION_TTL_SECONDS = 3600
+
 
 class HermesRuntime:
     """
@@ -46,7 +49,10 @@ class HermesRuntime:
         if self.permission_system:
             self.permission_system.assert_agent_allowed(tenant_id, agent_name)
 
-        session_id = session_id or uuid.uuid4().hex[:16]
+        # 惰性清理过期会话，防止 _running 无限增长
+        self._evict_stale_sessions()
+
+        session_id = session_id or uuid.uuid4().hex
         ctx = {
             "session_id": session_id,
             "agent_name": agent_name,
@@ -133,6 +139,25 @@ class HermesRuntime:
     def stop_agent(self, session_id: str) -> None:
         """结束 Agent 会话"""
         self._running.pop(session_id, None)
+
+    def _evict_stale_sessions(self) -> None:
+        """清理超过 SESSION_TTL_SECONDS 的过期会话（惰性：仅在新会话启动时触发）"""
+        now = time.time()
+        expired = [sid for sid, ctx in self._running.items()
+                   if now - ctx.get("started_at", 0) > SESSION_TTL_SECONDS]
+        for sid in expired:
+            self._running.pop(sid, None)
+        if expired:
+            logger.info("Hermes: 清理 %d 个过期会话", len(expired))
+
+    def assert_session_owner(self, session_id: str, company_id: int) -> dict:
+        """校验会话存在且归属于指定企业，返回会话上下文（防跨租户借用会话）"""
+        ctx = self._running.get(session_id)
+        if not ctx:
+            raise ValueError("会话不存在或已结束")
+        if int(ctx.get("company_id", -1)) != int(company_id):
+            raise ValueError("会话不属于当前企业")
+        return ctx
 
     # ---------- 工具调度 ----------
 

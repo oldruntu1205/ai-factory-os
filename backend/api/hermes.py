@@ -28,6 +28,12 @@ from api.company import require_verified
 router = APIRouter(prefix="/hermes", tags=["Hermes Runtime"])
 
 
+def _require_admin(current: dict) -> None:
+    """Hermes 运维类操作仅允许企业管理员/平台超管"""
+    if current["role"] not in ("admin", "platform_admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+
 # ============ 请求模型 ============
 
 class AgentRegisterIn(BaseModel):
@@ -69,9 +75,17 @@ class PermissionIn(BaseModel):
 
 @router.post("/agent/register")
 def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_user)):
-    """注册 Agent（第5章）：动态加载 AI 员工"""
+    """注册 Agent（第5章）：动态加载 AI 员工（仅管理员）"""
+    # 仅企业管理员/平台超管可注册 Agent（防止任意用户声明敏感工具）
+    _require_admin(current)
     if data.name in BUILTIN_TOOLS or not data.name:
         raise HTTPException(status_code=400, detail="Agent 名称不合法")
+    # 声明的工具必须在已注册工具白名单内（防止声明未知/任意工具）
+    invalid_tools = [t for t in data.tools if t not in BUILTIN_TOOLS]
+    if invalid_tools:
+        raise HTTPException(
+            status_code=400,
+            detail=f"工具不在白名单内: {', '.join(invalid_tools)}")
     manifest = AgentManifest(
         name=data.name,
         version=data.version,
@@ -233,7 +247,12 @@ def list_tools(current: dict = Depends(get_current_user)):
 
 @router.post("/tool/call")
 def call_tool(data: ToolCallIn, current: dict = Depends(get_current_user)):
-    """Agent 调用 Tool（Tool Router + Permission Check）"""
+    """Agent 调用 Tool（Tool Router + Permission Check，校验会话归属当前企业）"""
+    # 跨租户防护：会话必须属于当前登录企业
+    try:
+        get_runtime().assert_session_owner(data.session_id, current["company_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     try:
         result = get_runtime().call_tool(
             session_id=data.session_id,
@@ -252,14 +271,16 @@ def call_tool(data: ToolCallIn, current: dict = Depends(get_current_user)):
 
 @router.post("/task/enqueue")
 def enqueue_task(data: TaskIn, current: dict = Depends(get_current_user)):
-    """异步任务入队（第7章）：如每日扫描客户"""
+    """异步任务入队（第7章）：如每日扫描客户（仅管理员）"""
+    _require_admin(current)
     result = get_runtime().dispatch(data.task_name, data.payload)
     return result
 
 
 @router.post("/task/process")
 def process_task(current: dict = Depends(get_current_user)):
-    """同步处理一条队列任务（演示用；生产用 Celery Worker）"""
+    """同步处理一条队列任务（仅管理员；生产用 Celery Worker）"""
+    _require_admin(current)
     result = get_runtime().queue.process_once()
     return result
 
@@ -268,7 +289,8 @@ def process_task(current: dict = Depends(get_current_user)):
 
 @router.post("/permissions")
 def manage_permissions(data: PermissionIn, current: dict = Depends(get_current_user)):
-    """租户权限管理（第8章 RBAC）"""
+    """租户权限管理（第8章 RBAC，仅管理员）"""
+    _require_admin(current)
     require_company(data.company_id, current)
     perm_sys = get_runtime().permission_system
     if data.action == "grant":
@@ -288,6 +310,11 @@ def manage_permissions(data: PermissionIn, current: dict = Depends(get_current_u
 
 @router.get("/memory/short")
 def short_memory(session_id: str, current: dict = Depends(get_current_user)):
-    """短期记忆（第9章）：当前对话上下文"""
+    """短期记忆（第9章）：当前对话上下文（校验会话归属当前企业）"""
+    # 跨租户防护：会话必须属于当前登录企业
+    try:
+        get_runtime().assert_session_owner(session_id, current["company_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     memory = get_runtime().memory_system.load_short_term_memory(session_id, limit=20)
     return {"session_id": session_id, "entries": memory, "count": len(memory)}

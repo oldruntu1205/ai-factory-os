@@ -299,37 +299,41 @@ class GEPAEngine:
         return [(improved, "[GEPA] 增强容错与日志：统一返回结构，便于上层稳定解析")]
 
     def _test_tool_code(self, src: str, tool_name: str) -> tuple:
-        """在隔离 namespace 里 exec 候选源码并跑测试样例（走 demo 分支，不触外部系统）。"""
+        """验证候选 Tool 源码：语法编译 + 危险模式静态检查（安全策略：不执行 LLM 生成的代码）。
+
+        安全说明：Python 无法对任意代码做可靠沙箱执行（空 namespace 仍会注入 __builtins__），
+        因此这里改为静态验证：
+        1) compile() 校验语法；
+        2) 检查危险模式（os/subprocess/文件/网络/动态执行等）；
+        3) 不执行候选函数，仅返回静态验证结论——候选仍只生成 .patch.md 提案，由人工 review。
+        """
         try:
+            # 1) 语法验证
+            compile(src, "<tool_code>", "exec")
+
+            # 2) 危险模式静态检查（禁止 LLM 生成代码触碰 IO/子进程/网络/文件/动态执行）
+            dangerous = [
+                "__import__", "import os", "import subprocess", "import sys",
+                "import socket", "open(", "eval(", "exec(", "compile(",
+                "os.system", "os.popen", "shutil", "pathlib", "requests.",
+                "urllib", "pickle", "ctypes", "builtins", "__builtins__",
+            ]
+            hits = [d for d in dangerous if d in src]
+            if hits:
+                return False, {"passed": False, "score": 0.0,
+                               "error": "包含危险模式（静态检查拦截）: " + ", ".join(hits)}
+
             fn_match = re.search(r"def\s+(\w+)\s*\(", src)
             if not fn_match:
                 return False, {"passed": False, "error": "未找到函数定义"}
-            fn_name = fn_match.group(1)
-            ns: dict = {}
-            exec(src, ns)
-            fn = ns.get(fn_name)
-            if not callable(fn):
-                return False, {"passed": False, "error": "执行后未得到可调用函数"}
 
-            sample = {"product_id": "P1", "order_id": "O1",
-                      "erp_url": "", "mes_url": "", "token": ""}
-            new_out = fn(params=sample, company_id=1)
-            old_impl = __import__("hermes.tool.tools", fromlist=["BUILTIN_TOOLS"]) \
-                .BUILTIN_TOOLS[tool_name]._func
-            old_out = old_impl(params=sample, company_id=1)
-
-            def _keys(d):
-                return set(d.keys()) if isinstance(d, dict) else set()
-
-            passed = isinstance(new_out, dict) and isinstance(old_out, dict) \
-                and len(_keys(new_out) & _keys(old_out)) > 0
-            score = 1.0 if passed else 0.0
-            report = {
-                "passed": passed, "score": score, "baseline_score": 1.0,
-                "old_keys": sorted(_keys(old_out)),
-                "new_keys": sorted(_keys(new_out)),
-                "new_output": str(new_out)[:200],
+            # 3) 不执行代码：静态验证通过即视为可生成提案（运行时行为需人工 review）
+            return True, {
+                "passed": True, "score": 1.0, "baseline_score": 1.0,
+                "new_output": "[静态验证通过，未执行（安全策略）]",
+                "note": "候选代码未经运行时执行，应用前请人工 review",
             }
-            return passed, report
+        except SyntaxError as e:
+            return False, {"passed": False, "score": 0.0, "error": f"语法错误: {e}"}
         except Exception as e:
             return False, {"passed": False, "score": 0.0, "error": str(e)[:300]}

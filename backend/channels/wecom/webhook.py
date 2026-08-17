@@ -9,10 +9,12 @@ channels/wecom/webhook.py —— 企业微信回调接口
 import json
 import xml.etree.ElementTree as ET
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 
 from agents.service import execute_agent
-from channels.wecom.config import (verify_callback, WECOM_TOKEN,
+from auth.deps import get_current_user
+from channels.wecom.config import (verify_callback, verify_post_signature,
+                                   WECOM_TOKEN,
                                    is_app_configured, is_robot_configured)
 from channels.wecom.robot import send_robot_markdown, send_robot_text
 
@@ -29,8 +31,9 @@ async def verify(request: Request):
     echostr = q.get("echostr", "")
 
     if not WECOM_TOKEN:
-        # 未配置：演示模式直接回显，便于本地联调
-        return {"echostr": echostr}
+        # 安全策略：未配置回调 Token 时拒绝握手（fail-closed），防止公网暴露被绕过
+        raise HTTPException(status_code=503,
+                            detail="未配置 WECOM_TOKEN，无法验证回调签名（请在生产环境配置）")
 
     if not verify_callback(signature, timestamp, nonce, echostr):
         raise HTTPException(status_code=403, detail="签名校验失败")
@@ -43,17 +46,25 @@ async def receive(request: Request):
     if not is_app_configured():
         raise HTTPException(status_code=503, detail="企微应用未配置（WECOM_CORP_ID/AGENT_ID/SECRET）")
 
+    # 安全策略：POST 回调同样强制验签（防伪造客户消息/借用应用消息发信）
+    q = request.query_params
+    signature = q.get("msg_signature", "")
+    timestamp = q.get("timestamp", "")
+    nonce = q.get("nonce", "")
     body = await request.body()
-    text = body.decode("utf-8", errors="ignore")
+    body_text = body.decode("utf-8", errors="ignore")
+    if not verify_post_signature(signature, timestamp, nonce, body_text):
+        raise HTTPException(status_code=403, detail="签名校验失败")
+
     # 解析 XML（企业微信明文模式返回 XML；JSON 模式兼容处理）
     try:
-        if text.strip().startswith("<"):
-            root = ET.fromstring(text)
+        if body_text.strip().startswith("<"):
+            root = ET.fromstring(body_text)
             content = root.findtext("Content", "") or ""
             from_user = root.findtext("FromUserName", "")
             msg_type = root.findtext("MsgType", "text")
         else:
-            data = json.loads(text)
+            data = json.loads(body_text)
             content = data.get("Content") or data.get("content") or ""
             from_user = data.get("FromUserName") or data.get("from") or ""
             msg_type = data.get("MsgType", "text")
@@ -75,8 +86,8 @@ async def receive(request: Request):
 
 
 @router.post("/robot/send")
-async def robot_send(data: dict):
-    """向企微群推送消息（AI 日报 / 报价单）"""
+async def robot_send(data: dict, current: dict = Depends(get_current_user)):
+    """向企微群推送消息（AI 日报 / 报价单）——仅登录用户可调用"""
     content = (data or {}).get("content", "")
     msgtype = (data or {}).get("msgtype", "markdown")
     if not content:
