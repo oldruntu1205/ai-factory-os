@@ -21,7 +21,6 @@ export default function Billing() {
   const [invoices, setInvoices] = useState([])
   const [installed, setInstalled] = useState([])
   const [msg, setMsg] = useState('')
-  const [invInfo, setInvInfo] = useState(null)
   const [invReqs, setInvReqs] = useState([])
   const [payAccount, setPayAccount] = useState(null)
   const [payAccountDemo, setPayAccountDemo] = useState(true)
@@ -55,11 +54,7 @@ export default function Billing() {
 
   const loadInvoice = async () => {
     try {
-      const [info, reqs] = await Promise.all([
-        api.get('/billing/invoice-info', { params: { company_id: companyId } }),
-        api.get('/billing/invoice-requests', { params: { company_id: companyId } }),
-      ])
-      setInvInfo(info.data.info)
+      const reqs = await api.get('/billing/invoice-requests', { params: { company_id: companyId } })
       setInvReqs(reqs.data.requests || [])
     } catch (e) { /* 忽略 */ }
   }
@@ -125,21 +120,6 @@ export default function Billing() {
     }
   }
 
-  const saveInvoiceInfo = async () => {
-    if (!invInfo.invoice_title || !invInfo.invoice_tax_no) {
-      setMsg('❌ 请填写发票抬头与纳税人识别号')
-      return
-    }
-    try {
-      const { data } = await api.put('/billing/invoice-info', invInfo,
-        { params: { company_id: companyId } })
-      setMsg(`✅ ${data.message}`)
-      loadInvoice()
-    } catch (e) {
-      setMsg(`❌ ${e.response?.data?.detail || '保存失败'}`)
-    }
-  }
-
   const applyInvoice = async (billNo) => {
     if (!window.confirm('对该已支付账单提交开票申请？（开票类别：服务费）')) return
     try {
@@ -147,7 +127,12 @@ export default function Billing() {
       setMsg(`✅ ${data.message}`)
       loadInvoice()
     } catch (e) {
-      setMsg(`❌ ${e.response?.data?.detail || '申请失败'}`)
+      const detail = e.response?.data?.detail || '申请失败'
+      if (detail.includes('开票信息')) {
+        setMsg(`❌ ${detail}，请先到「企业设置 → 开票信息」填写`)
+      } else {
+        setMsg(`❌ ${detail}`)
+      }
     }
   }
 
@@ -401,55 +386,14 @@ export default function Billing() {
         </table>
       </div>
 
-      {/* 开票信息（类别：服务费） */}
+      {/* 开票信息入口提示（开票资料维护已统一收敛到「企业设置 → 开票信息」） */}
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 6 }}>开票信息</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-          开票类别：<b>服务费</b>（SaaS 订阅服务）。填写企业开票信息后，可对已支付账单提交开票申请；电子发票开具后发送至企业邮箱。
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.8, marginBottom: 0 }}>
+          开票类别：<b>服务费</b>（SaaS 订阅服务）。开票资料请在
+          <a href="/settings?tab=invoice" style={{ color: 'var(--primary)', fontWeight: 600 }}> 企业设置 → 开票信息 </a>
+          中维护；填写后可对已支付账单提交开票申请，电子发票开具后可在下方申请记录中下载。
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          <div className="form-group">
-            <label>发票抬头（企业全称）*</label>
-            <input value={invInfo?.invoice_title || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_title: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>纳税人识别号 *</label>
-            <input value={invInfo?.invoice_tax_no || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_tax_no: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>开户银行</label>
-            <input value={invInfo?.invoice_bank || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_bank: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>银行账号</label>
-            <input value={invInfo?.invoice_bank_account || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_bank_account: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>注册地址</label>
-            <input value={invInfo?.invoice_address || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_address: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>注册电话</label>
-            <input value={invInfo?.invoice_phone || ''}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_phone: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>发票类型</label>
-            <select value={invInfo?.invoice_type || 'normal'}
-              onChange={(e) => setInvInfo({ ...invInfo, invoice_type: e.target.value })}>
-              <option value="normal">电子普通发票</option>
-              <option value="special">电子专票（需一般纳税人）</option>
-            </select>
-          </div>
-        </div>
-        <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={saveInvoiceInfo}>
-          保存开票信息
-        </button>
       </div>
 
       {/* 开票申请记录 */}

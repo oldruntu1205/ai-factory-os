@@ -452,7 +452,7 @@ def create_invoice_request(data: InvoiceRequestIn, db: Session = Depends(get_db)
     c = db.query(Company).filter(Company.id == bill.company_id).first()
     if not c or not (c.invoice_title and c.invoice_tax_no):
         raise HTTPException(status_code=400,
-                            detail="请先在「开票信息」中填写发票抬头与税号")
+                            detail="开票信息未填写，请先到「企业设置 → 开票信息」维护发票抬头与税号")
 
     req = InvoiceRequest(
         req_no=f"INV{uuid.uuid4().hex[:10].upper()}",
