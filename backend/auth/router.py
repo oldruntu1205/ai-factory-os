@@ -2,8 +2,15 @@
 auth/router.py —— 注册 / 登录接口（第九、十章）
 
 注册时自动创建企业（多租户），第一个注册用户即企业管理员。
+
+安全加固（2026-08）：
+- 登录限流（IP+账号，5 次/分钟）防暴力破解
+- 登录失败统一文案（消除用户枚举）
 """
-from fastapi import APIRouter, Depends, HTTPException
+import time
+from collections import defaultdict
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
@@ -14,6 +21,21 @@ from auth.jwt import create_token
 from auth.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["认证"])
+
+# 登录限流：按 (IP, 邮箱) 5 次/分钟（进程内实现；多 worker 部署建议换 Redis）
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 60
+_login_attempts: dict = defaultdict(list)
+
+
+def _login_rate_limited(key: str) -> bool:
+    now = time.time()
+    lst = _login_attempts[key]
+    lst[:] = [t for t in lst if now - t < LOGIN_WINDOW_SECONDS]
+    if len(lst) >= LOGIN_MAX_ATTEMPTS:
+        return True
+    lst.append(now)
+    return False
 
 
 class RegisterIn(BaseModel):
@@ -65,14 +87,16 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(data: LoginIn, db: Session = Depends(get_db)):
-    """企业管理员登录"""
-    user = db.query(User).filter(User.email == data.email).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="user not found")
+def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
+    """企业管理员登录（限流 + 统一错误文案防枚举）"""
+    ip = request.client.host if request.client else "unknown"
+    if _login_rate_limited(f"{ip}:{data.email.lower()}"):
+        raise HTTPException(status_code=429, detail="尝试次数过多，请 1 分钟后再试")
 
-    if not verify_password(data.password, user.password):
-        raise HTTPException(status_code=401, detail="password error")
+    user = db.query(User).filter(User.email == data.email).first()
+    # 统一文案：不区分"用户不存在"/"密码错误"，消除用户枚举
+    if not user or not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="邮箱或密码错误")
 
     token = create_token(user.id, user.company_id, user.role)
     # 安全审计：登录成功日志

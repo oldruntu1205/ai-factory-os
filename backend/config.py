@@ -83,7 +83,8 @@ EMBEDDING_FALLBACK = True
 # ---------- 外部渠道（第五阶段）----------
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
-WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "verify_token")
+# 安全修复：移除硬编码默认 'verify_token'（未配置时 webhook 握手 fail-closed）
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")   # Meta App Secret（webhook 签名校验）
 
 # ---------- 企业微信渠道 ----------

@@ -113,7 +113,7 @@ def list_invoices(company_id: int, db: Session = Depends(get_db),
 @router.post("/upgrade")
 def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
             current: dict = Depends(get_current_user)):
-    """升级套餐（仅管理员；演示版直接生效 + 生成账单）"""
+    """升级套餐（仅管理员）：生成待支付账单，支付成功后生效（修复：不再未支付即生效）"""
     _require_admin_billing(current)
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
@@ -124,20 +124,15 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
     if not c:
         raise HTTPException(status_code=404, detail="企业不存在")
 
-    old_plan = c.plan
     plan = PLANS[data.plan]
-    c.plan = data.plan
-    c.max_agents = plan["max_agents"]
-    c.max_conversations = plan["max_conversations"]
+    # 存在未支付账单时拒绝重复下单，引导先完成支付
+    pending = db.query(Bill).filter(
+        Bill.company_id == data.company_id, Bill.status == "unpaid").first()
+    if pending:
+        raise HTTPException(status_code=400,
+                            detail=f"存在待支付账单 {pending.bill_no}，请先完成支付")
 
-    # 设置套餐时间范围（升级时按计划时长计算到期）
-    plan_days = PLAN_DAYS.get(data.plan, 365)
-    c.plan_started_at = datetime.utcnow()
-    c.plan_expires_at = datetime.utcnow() + timedelta(days=plan_days)
-
-    db.commit()
-
-    # 生成账单
+    # 生成待支付账单（套餐暂不变更）
     bill = Bill(
         bill_no=f"BILL{uuid.uuid4().hex[:10].upper()}",
         company_id=data.company_id,
@@ -146,7 +141,7 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
         currency=plan["currency"],
         status="unpaid",
         period_start=datetime.utcnow(),
-        period_end=datetime.utcnow() + timedelta(days=30),
+        period_end=datetime.utcnow() + timedelta(days=PLAN_DAYS.get(data.plan, 365)),
     )
     db.add(bill)
     db.commit()
@@ -155,20 +150,20 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
     try:
         from utils.audit import log_action
         log_action(data.company_id, "billing.upgrade",
-                   f"套餐 {old_plan} -> {data.plan}（账单 {bill.bill_no}）",
+                   f"生成 {data.plan} 套餐账单 {bill.bill_no}（待支付）",
                    current.get("user_id", 0), current.get("email", ""))
     except Exception:
         pass
 
-    return {"message": f"套餐已从 {old_plan} 升级为 {data.plan}",
+    return {"message": f"已生成 {data.plan} 套餐账单，请完成支付后生效",
             "bill_no": bill.bill_no, "amount": bill.amount,
-            "currency": bill.currency}
+            "currency": bill.currency, "status": "unpaid"}
 
 
 @router.post("/pay")
 def pay(bill_no: str, db: Session = Depends(get_db),
         current: dict = Depends(get_current_user)):
-    """模拟支付账单（仅管理员）"""
+    """模拟支付账单：支付成功后应用套餐（配额与到期时间增量叠加）"""
     _require_admin_billing(current)
     bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
     if not bill or bill.company_id != current["company_id"]:
@@ -177,15 +172,32 @@ def pay(bill_no: str, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="账单已支付，请勿重复操作")
     bill.status = "paid"
     bill.paid_at = datetime.utcnow()
+
+    # 应用套餐：配额 + 到期时间按增量叠加（max(expires, now) + plan_days，防无限续期）
+    applied_plan = None
+    c = db.query(Company).filter(Company.id == bill.company_id).first()
+    if c and bill.plan in PLANS:
+        plan = PLANS[bill.plan]
+        c.plan = bill.plan
+        c.max_agents = plan["max_agents"]
+        c.max_conversations = plan["max_conversations"]
+        plan_days = PLAN_DAYS.get(bill.plan, 365)
+        base = c.plan_expires_at if (c.plan_expires_at and c.plan_expires_at > datetime.utcnow()) \
+            else datetime.utcnow()
+        if not c.plan_started_at:
+            c.plan_started_at = datetime.utcnow()
+        c.plan_expires_at = base + timedelta(days=plan_days)
+        applied_plan = bill.plan
     db.commit()
 
     # 审计日志
     try:
         from utils.audit import log_action
         log_action(bill.company_id, "billing.pay",
-                   f"支付账单 {bill.bill_no}（{bill.plan}）",
+                   f"支付账单 {bill.bill_no}（{bill.plan}）并生效",
                    current.get("user_id", 0), current.get("email", ""))
     except Exception:
         pass
 
-    return {"message": "支付成功", "bill_no": bill.bill_no, "status": bill.status}
+    return {"message": "支付成功，套餐已生效", "bill_no": bill.bill_no,
+            "plan": applied_plan or bill.plan, "status": bill.status}
