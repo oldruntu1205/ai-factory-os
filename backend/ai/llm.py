@@ -143,6 +143,73 @@ def is_mock() -> bool:
     return _use_mock
 
 
+# 视觉（多模态）模型判定：目前仅 OpenAI 网关的 gpt-4o 系列稳定支持图片输入
+_VISION_HINTS = ("4o", "vision", "gpt-4-turbo", "gpt-4v")
+
+
+def is_vision_capable() -> bool:
+    """当前配置的网关/模型是否支持图片多模态输入（如手绘图纸照片）。"""
+    cfg = _config_override
+    gateway = (cfg or {}).get("gateway") or (LLM_GATEWAY or "deepseek")
+    gateway = gateway.lower()
+    if gateway != "openai":
+        return False
+    models = (cfg or {}).get("models") or {}
+    model = models.get("openai") or LLM_MODEL or GATEWAY_ROUTES["openai"][1]
+    model = (model or "").lower()
+    return any(h in model for h in _VISION_HINTS)
+
+
+def vision_invoke(prompt_text: str, image_paths: list) -> str:
+    """多模态调用：把文本与本地图片一起发给视觉模型，返回文本回答。
+
+    仅当 is_vision_capable() 为 True 时调用（否则图片无法识别）。
+    """
+    cfg = _config_override
+    gateway = (cfg or {}).get("gateway") or (LLM_GATEWAY or "deepseek")
+    gateway = gateway.lower()
+    keys = (cfg or {}).get("keys") or {}
+    api_key = keys.get(gateway) or LLM_API_KEY
+    if not api_key:
+        return "⚠️ 当前未配置支持图片识别的模型 API Key，无法解析图片。请上传 DXF/PDF/文本类图纸，或在「平台设置-模型设置」中配置 OpenAI（gpt-4o）后重试。"
+
+    base_url, model = _resolve_route()
+    try:
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model=model, api_key=api_key, base_url=base_url,
+            temperature=0.3, max_tokens=2048,
+        )
+    except Exception:
+        if not LLM_FALLBACK:
+            raise
+        return "⚠️ 视觉模型初始化失败，请检查模型配置。"
+
+    content = [{"type": "text", "text": prompt_text}]
+    _MIME = {
+        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp",
+    }
+    for p in image_paths or []:
+        ext = os.path.splitext(p)[1].lower()
+        mime = _MIME.get(ext, "image/png")
+        try:
+            with open(p, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64}"},
+            })
+        except Exception as e:
+            content.append({"type": "text",
+                             "text": f"（图片 {os.path.basename(p)} 读取失败：{e}）"})
+    try:
+        res = llm.invoke(content)
+        return res.content
+    except Exception as e:
+        return f"⚠️ 视觉模型调用失败：{e}\n请尝试上传更清晰的图片，或改传 DXF/PDF/文本图纸。"
+
+
 def _demo_answer(prompt: str) -> str:
     """Mock 模式下根据提示词返回贴近场景的演示答案"""
     # 销售分析
