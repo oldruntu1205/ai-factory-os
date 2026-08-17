@@ -48,6 +48,9 @@ def list_candidates(company_id: int, status: str = None,
                                              if r.eval_score is not None and r.baseline_score is not None else None),
         "status": r.status, "rationale": r.rationale,
         "guardrails_pass": (r.guardrails or {}).get("all_pass"),
+        # 审批 UI 需要展示进化前后内容（截断，避免列表过载）
+        "current_text": (r.current_text or "")[:800],
+        "candidate_text": (r.candidate_text or "")[:1200],
         "soul_version": r.soul_version,
         "soul_changed": (bool(r.soul_version) and _cur(r.agent_name) is not None
                          and r.soul_version != _cur(r.agent_name)),

@@ -13,6 +13,7 @@ const NAV_GROUPS = [
       { href: '/bigdata', label: '大数据看板', icon: '📺' },
       { to: '/dashboard', label: '驾驶舱', icon: '📊' },
       { to: '/agents', label: 'AI员工', icon: '🤖' },
+      { to: '/evolution', label: '自进化', icon: '🧬' },
       { to: '/chat', label: 'AI对话', icon: '💬' },
       { to: '/drawing-chat', label: 'AI图纸助手', icon: '📐' },
       { to: '/knowledge', label: '知识库', icon: '📚' },

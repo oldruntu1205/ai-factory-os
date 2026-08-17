@@ -7,6 +7,7 @@ import Agents from './pages/Agents'
 import Knowledge from './pages/Knowledge'
 import Chat from './pages/Chat'
 import DrawingChat from './pages/DrawingChat'
+import Evolution from './pages/Evolution'
 import CRM from './pages/CRM'
 import Quotations from './pages/Quotations'
 import Leads from './pages/Leads'
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/hermes" element={<Hermes />} />
         <Route path="/marketplace" element={<Marketplace />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/evolution" element={<Evolution />} />
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/drawing-chat" element={<DrawingChat />} />
