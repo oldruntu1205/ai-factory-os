@@ -1,5 +1,8 @@
 """
-connectors/erp/kingdee.py —— 金蝶 ERP 连接器示例（占位实现）
+connectors/erp/kingdee.py —— 金蝶 ERP 连接器（占位实现）
+
+安全修复：未对接真实 API 前禁止返回伪装成真实数据的假值（如 stock=0），
+统一抛 NotImplementedError，调用方必须感知"未实现"而非把占位当真实业务数据。
 """
 from connectors.erp.base import ERPConnector
 
@@ -10,15 +13,19 @@ class KingdeeConnector(ERPConnector):
         self.app_id = app_id
         self.app_secret = app_secret
 
+    def _not_implemented(self, method: str) -> dict:
+        raise NotImplementedError(
+            f"金蝶连接器 {method} 尚未对接真实 API（base_url={self.base_url}），"
+            "请实现金蝶云星空对接后再启用；当前返回占位数据会误导业务决策")
+
     def get_product(self, product_id: str) -> dict:
-        # TODO: 调用金蝶云星空 API
-        return {"id": product_id, "source": "kingdee", "note": "需要实现金蝶 API 对接"}
+        return self._not_implemented("get_product")
 
     def get_stock(self, product_id: str) -> dict:
-        return {"id": product_id, "stock": 0, "source": "kingdee"}
+        return self._not_implemented("get_stock")
 
     def create_order(self, order: dict) -> dict:
-        return {"status": "pending", "source": "kingdee", "order": order}
+        return self._not_implemented("create_order")
 
     def get_customer(self, customer_id: str) -> dict:
-        return {"id": customer_id, "source": "kingdee"}
+        return self._not_implemented("get_customer")

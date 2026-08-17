@@ -200,6 +200,18 @@ def _lightweight_migrate():
                                 logger.info(f"迁移: {tbl}.{col} 新增")
                             except Exception as e:
                                 logger.debug(f"迁移跳过 {tbl}.{col}: {e}")
+                # 渠道消息幂等：conversations.msg_id（WhatsApp/企微去重）
+                if "conversations" in tables:
+                    existing = {c["name"] for c in inspector.get_columns("conversations")}
+                    if "msg_id" not in existing:
+                        try:
+                            conn.execute(text(
+                                "ALTER TABLE conversations ADD COLUMN msg_id VARCHAR(100)"))
+                            conn.execute(text(
+                                "CREATE INDEX IF NOT EXISTS idx_conversations_msg_id ON conversations(msg_id)"))
+                            logger.info("迁移: conversations.msg_id 新增")
+                        except Exception as e:
+                            logger.debug(f"迁移跳过 conversations.msg_id: {e}")
             # ---------- PostgreSQL：幂等 ADD COLUMN IF NOT EXISTS ----------
             if is_postgres:
                 _PG_ALL_COLS = []
@@ -220,6 +232,8 @@ def _lightweight_migrate():
                     ("agent_skills", "quarantined", "BOOLEAN DEFAULT FALSE"),
                     ("agent_skills", "quarantined_at", "DOUBLE PRECISION"),
                     ("agent_skills", "quarantine_reason", "TEXT DEFAULT ''"),
+                    # 渠道消息幂等：conversations.msg_id
+                    ("conversations", "msg_id", "VARCHAR(100)"),
                 ]
                 for tbl, col, sqltype in _PG_ALL_COLS:
                     if tbl in tables:

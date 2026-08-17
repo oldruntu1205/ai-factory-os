@@ -16,7 +16,12 @@ WECOM_ROBOT_KEY=xxxx         群机器人 Webhook key（可选）
 import os
 import hashlib
 import hmac
+import base64
+import struct
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ---------- 自建应用 ----------
 WECOM_CORP_ID = os.getenv("WECOM_CORP_ID", "")
@@ -68,3 +73,33 @@ def verify_post_signature(signature: str, timestamp: str, nonce: str, body: str)
     s = "".join(items)
     calc = hashlib.sha1(s.encode()).hexdigest()
     return hmac.compare_digest(calc, signature)
+
+
+def decrypt_wecom_msg(encrypt_b64: str, encoding_aes_key: str = None) -> tuple:
+    """企微回调密文解密（安全模式）：返回 (msg, receiveid)。
+
+    企微规范：EncodingAESKey base64 解码得 32 字节 key；
+    AES-256-CBC 解密（key 前 16 字节为 IV）；PKCS7 去填充；
+    明文 = 16 字节随机 + 4 字节网络序消息长度 + 消息 + receiveid。
+    未配置 EncodingAESKey 时抛 ValueError（调用方应仅在该模式启用时调用）。
+    """
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.primitives import padding as sym_padding
+
+    aes_key = encoding_aes_key or WECOM_AES_KEY
+    if not aes_key:
+        raise ValueError("未配置 WECOM_AES_KEY，无法解密企微密文回调")
+    key = base64.b64decode(aes_key + "=")  # 43 位 key 补 = 还原 32 字节
+    iv = key[:16]
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    dec = cipher.decryptor()
+    raw = dec.update(base64.b64decode(encrypt_b64)) + dec.finalize()
+    # PKCS7 去填充
+    pad = raw[-1]
+    raw = raw[:-pad] if 1 <= pad <= 32 else raw
+    if len(raw) < 20:
+        raise ValueError("解密结果过短")
+    msg_len = struct.unpack(">I", raw[16:20])[0]
+    msg = raw[20:20 + msg_len].decode("utf-8", errors="ignore")
+    receiveid = raw[20 + msg_len:].decode("utf-8", errors="ignore")
+    return msg, receiveid

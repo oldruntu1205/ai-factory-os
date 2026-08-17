@@ -68,4 +68,13 @@ def send_app_text(user_id: str, content: str, company_id: int = None) -> dict:
     }
     r = requests.post(f"{WECOM_BASE}/message/send?access_token={token}",
                       json=payload, timeout=10).json()
-    return {"ok": r.get("errcode", -1) == 0, "response": r}
+    errcode = r.get("errcode", -1)
+    # token 失效/被吊销：清缓存并重试一次（42001/40014）
+    if errcode in (42001, 40014):
+        _token_cache.pop(_cache_key(company_id, corp), None)
+        token = get_access_token(company_id)
+        if token:
+            r = requests.post(f"{WECOM_BASE}/message/send?access_token={token}",
+                              json=payload, timeout=10).json()
+            errcode = r.get("errcode", -1)
+    return {"ok": errcode == 0, "response": r}

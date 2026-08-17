@@ -163,6 +163,10 @@ class Bm25Chunk(Base):
 class Conversation(Base):
     """对话记录（多租户隔离）"""
     __tablename__ = "conversations"
+    # 安全/正确性修复：msg_id 用于外部渠道（WhatsApp/企微）消息幂等去重（至少一次投递防重复处理）
+    __table_args__ = (
+        UniqueConstraint("msg_id", name="uq_conversations_msg_id"),
+    )
 
     id = Column(Integer, primary_key=True)
     session_id = Column(String(64), index=True)
@@ -171,6 +175,8 @@ class Conversation(Base):
     agent_answer = Column(Text, default="")
     channel = Column(String(20), default="web")           # web/whatsapp/wecom/email
     company_id = Column(Integer, index=True)
+    # 外部渠道消息 ID（web 对话为 NULL；非 NULL 唯一，用于幂等去重）
+    msg_id = Column(String(100), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

@@ -12,6 +12,7 @@ channels/email/sequence.py —— AI 邮件跟进序列（V2.1 邮件自动化�
 """
 import json
 import logging
+import os
 import re
 import html as _html
 from datetime import datetime, timedelta
@@ -174,17 +175,19 @@ Return ONLY valid JSON: {{"email1":"...","email2":"...","email3":"...","email4":
         m = re.search(r"\{.*\}", result.content, re.S)
         if m:
             seq = json.loads(m.group())
-            # 补齐缺失步骤
+            # 补齐缺失步骤（修复：回退模板必须先 format，否则发出含 {company}/{product} 占位符的字面量）
             for i in range(1, 5):
-                seq.setdefault(f"email{i}", templates.get(f"email{min(i,3)}", ""))
+                if f"email{i}" not in seq:
+                    seq[f"email{i}"] = templates.get(
+                        f"email{min(i,3)}", "").format(company=company, product=product)
             return seq
     except Exception as e:
         logger.debug(f"LLM 跟进序列失败（{language}/{variant}），用模板: {e}")
 
     seq = {key: tmpl.format(company=company, product=product)
            for key, tmpl in templates.items()}
-    # 模板只到 email3，补第4封（与 email3 同内容，提示最终）
-    seq.setdefault("email4", templates["email3"])
+    # 模板只到 email3，补第4封（与 email3 同内容，提示最终）——同样需 format
+    seq.setdefault("email4", templates["email3"].format(company=company, product=product))
     return seq
 
 
@@ -233,11 +236,13 @@ def send_follow_up(lead_id: int, company_id: int, step: int = 1,
 
         subject = subject_for(step, language, product, company_name, variant)
 
-        # 报价 PDF 附件（仅首封）
+        # 报价 PDF 附件（仅首封）——安全修复：只附与线索企业名匹配的报价单（此前取企业最新报价，会跨客户泄露 PDF）
         atts = list(attachments or [])
-        if step == 1:
-            q = db.query(Quotation).filter(Quotation.company_id == company_id) \
-                .order_by(Quotation.id.desc()).first()
+        if step == 1 and lead.company_name:
+            q = db.query(Quotation).filter(
+                Quotation.company_id == company_id,
+                Quotation.customer_name == lead.company_name,
+            ).order_by(Quotation.id.desc()).first()
             if q and getattr(q, "pdf_path", None):
                 atts.append((q.pdf_path, f"quotation_{q.quotation_no}.pdf"))
 
@@ -289,21 +294,26 @@ def run_due_follow_ups(company_id: int = None) -> dict:
             query = query.filter(Lead.company_id.isnot(None))
         leads = query.all()
         now = datetime.utcnow()
+        # 单轮发送上限（防历史积压批量爆发；可配置 EMAIL_MAX_PER_RUN）
+        max_per_run = int(os.getenv("EMAIL_MAX_PER_RUN", "200"))
         for lead in leads:
+            if len(sent) >= max_per_run:
+                logger.warning("run_due_follow_ups 达到单轮上限 %d，停止本轮", max_per_run)
+                break
             if lead.status in _STOP_STATUSES:
                 continue
             step = getattr(lead, "follow_up_step", 0) or 0
-            if step >= MAX_STEP:
+            # 修复：允许第 4 封（step=3 -> email4）；step=4 表示序列已完成
+            if step >= len(SEQUENCE_INTERVALS):
                 continue
-            last_at = lead.follow_up_at or lead.created_at or now
-            # 修复：首封（step=0 -> 1）应立即发送（此前按间隔推算出要等 D+3 才发首封）
+            # 修复：到期时间以序列起点（created_at）锚定 INTERVALS（D0/D3/D7/D14），
+            # 不再按相邻间隔累计（此前 D0→D4→D11 逐封漂移）
+            start = lead.created_at or now
             if step == 0:
-                due = timedelta(0)
+                due = timedelta(0)  # 首封立即
             else:
-                if step >= len(SEQUENCE_INTERVALS) - 1:
-                    continue
-                due = timedelta(days=SEQUENCE_INTERVALS[step + 1] - SEQUENCE_INTERVALS[step])
-            if now - last_at >= due:
+                due = timedelta(days=SEQUENCE_INTERVALS[step + 1])
+            if now - start >= due:
                 try:
                     r = send_follow_up(lead.id, lead.company_id, step=step + 1,
                                        language="en", variant=lead.variant or "A",

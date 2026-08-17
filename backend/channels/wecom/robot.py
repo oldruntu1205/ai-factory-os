@@ -19,6 +19,19 @@ def _robot_url(company_id=None) -> tuple:
     return (WECOM_ROBOT_URL, False)
 
 
+def _post_robot(url: str, payload: dict) -> dict:
+    """发送并校验企微 errcode（修复：此前仅看 HTTP 200，key 失效/内容违规时误报成功）"""
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        body = r.json()
+    except Exception as e:
+        return {"ok": False, "error": f"企微 API 请求失败: {e}"}
+    errcode = body.get("errcode", -1)
+    if errcode != 0:
+        return {"ok": False, "error": body.get("errmsg", f"errcode={errcode}"), "response": body}
+    return {"ok": True, "response": body}
+
+
 def send_robot_markdown(content: str, mentioned: list = None, company_id: int = None) -> dict:
     """向企微群推送 markdown 消息"""
     url, configured = _robot_url(company_id)
@@ -28,8 +41,7 @@ def send_robot_markdown(content: str, mentioned: list = None, company_id: int = 
         "msgtype": "markdown",
         "markdown": {"content": content, "mentioned_list": mentioned or []},
     }
-    r = requests.post(url, json=payload, timeout=10)
-    return {"ok": r.status_code == 200, "response": r.json()}
+    return _post_robot(url, payload)
 
 
 def send_robot_text(content: str, mentioned: list = None, company_id: int = None) -> dict:
@@ -41,11 +53,10 @@ def send_robot_text(content: str, mentioned: list = None, company_id: int = None
         "msgtype": "text",
         "text": {"content": content, "mentioned_list": mentioned or []},
     }
-    r = requests.post(url, json=payload, timeout=10)
-    return {"ok": r.status_code == 200, "response": r.json()}
+    return _post_robot(url, payload)
 
 
 def send_daily_report(report: str, company_id: int = None) -> dict:
-    """把 CEO 经营日报推送到企微群（截断保护）"""
-    content = report[:3800]
+    """把 CEO 经营日报推送到企微群（按 UTF-8 字节截断，防中文超 4096 字节被拒）"""
+    content = report.encode("utf-8")[:3800].decode("utf-8", errors="ignore")
     return send_robot_markdown(f"### 📊 CEO 经营日报\n\n{content}", company_id=company_id)

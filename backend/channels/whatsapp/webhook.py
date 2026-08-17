@@ -8,9 +8,11 @@ channels/whatsapp/webhook.py —— WhatsApp Webhook 接口（第五阶段 1.5�
   2. 消息收发入库（conversations 表，按 phone 维度记录）
   3. 按手机号会话路由 AI 员工（_resolve_company 支持查询绑定）
 """
+import asyncio
 import hashlib
 import hmac
 import json
+import logging
 
 from fastapi import APIRouter, Request, HTTPException
 import requests
@@ -21,6 +23,7 @@ from channels.whatsapp.config import GRAPH_API_URL, WHATSAPP_VERIFY_TOKEN, \
 from config import WHATSAPP_APP_SECRET
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/webhook")
@@ -56,7 +59,7 @@ async def _check_signature(request: Request, raw: bytes):
 
 @router.post("/webhook")
 async def receive(request: Request):
-    """接收 WhatsApp 消息并让 AI Agent 回复（入库 + 路由）"""
+    """接收 WhatsApp 消息并让 AI Agent 回复（幂等去重 + 入库 + 路由）"""
     if not is_configured():
         raise HTTPException(status_code=503, detail="WhatsApp 未配置，请先设置 token 与 phone_id")
 
@@ -77,25 +80,49 @@ async def receive(request: Request):
         phone = msg.get("from", "")
         text = msg.get("text", {}).get("body", "")
         msg_id = msg.get("id", "")
-        # 通过手机号查客户归属企业
+        # 通过手机号查客户归属企业（未绑定则拒绝，不再回退演示企业 1）
         company_id = _resolve_company(phone)
     except (KeyError, IndexError, json.JSONDecodeError):
         raise HTTPException(status_code=400, detail="无效的 WhatsApp 消息结构")
 
-    # AI 员工处理
-    answer = execute_agent(text, company_id)
+    if not company_id:
+        logger.warning("WhatsApp 消息来自未绑定企业的手机号 %s，拒绝处理", phone)
+        return {"status": "ok", "handled": False, "reason": "unbound_phone"}
 
-    # 消息入库（conversations 表）
-    _save_conversation(company_id, phone, text, answer, msg_id)
+    # 幂等去重：Meta 为至少一次投递，同一 msg_id 重复到达直接跳过（防重复 AI/回复/入库）
+    if msg_id and _message_seen(company_id, msg_id):
+        return {"status": "ok", "handled": True, "duplicate": True}
 
-    # 异步发送回复
-    send_whatsapp_message(phone, answer)
+    try:
+        # 同步 LLM 调用放到线程池，避免阻塞事件循环
+        answer = await asyncio.to_thread(execute_agent, text, company_id)
+        _save_conversation(company_id, phone, text, answer, msg_id)
+        send_whatsapp_message(phone, answer, company_id=company_id)
+        return {"status": "ok", "handled": True, "answer": answer}
+    except Exception as e:
+        # 记录错误并返回 200（避免 Meta 重试造成重复处理）
+        logger.error("WhatsApp 消息处理失败: %s", e)
+        return {"status": "ok", "handled": False, "error": "internal"}
 
-    return {"status": "ok", "handled": True, "answer": answer}
+
+def _message_seen(company_id: int, msg_id: str) -> bool:
+    """幂等检查：msg_id 是否已入库（webhook 至少一次投递去重）"""
+    try:
+        from database import SessionLocal
+        from models import Conversation
+        db = SessionLocal()
+        try:
+            return db.query(Conversation.id).filter(
+                Conversation.msg_id == msg_id,
+                Conversation.company_id == company_id).first() is not None
+        finally:
+            db.close()
+    except Exception:
+        return False
 
 
 def _save_conversation(company_id: int, phone: str, question: str, answer: str, msg_id: str = ""):
-    """把 WhatsApp 往来消息写入 conversations 表（channel 维度）"""
+    """把 WhatsApp 往来消息写入 conversations 表（channel 维度，记录 msg_id 供幂等）"""
     try:
         from database import SessionLocal
         from models import Conversation
@@ -107,6 +134,7 @@ def _save_conversation(company_id: int, phone: str, question: str, answer: str, 
                 user_message=question,
                 agent_answer=answer,
                 channel="whatsapp",
+                msg_id=msg_id or None,
             ))
             db.commit()
         finally:
@@ -115,8 +143,8 @@ def _save_conversation(company_id: int, phone: str, question: str, answer: str, 
         pass  # 入库失败不影响回复
 
 
-def _resolve_company(phone: str) -> int:
-    """手机号 -> 企业映射（优先查 companies 绑定，缺省演示企业 1）"""
+def _resolve_company(phone: str):
+    """手机号 -> 企业映射（优先查 companies 绑定；未绑定返回 None，拒绝处理防跨租户）"""
     try:
         from database import SessionLocal
         from models import Company
@@ -129,7 +157,7 @@ def _resolve_company(phone: str) -> int:
             db.close()
     except Exception:
         pass
-    return 1
+    return None
 
 
 def send_whatsapp_message(to_phone: str, text: str, company_id: int = None) -> dict:
