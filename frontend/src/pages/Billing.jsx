@@ -337,17 +337,6 @@ export default function Billing() {
                     <span className={`badge ${inv.status === 'issued' ? 'badge-green' : inv.status === 'rejected' ? 'badge-red' : inv.status === 'pending' ? 'badge-yellow' : 'badge-gray'}`}>
                       {inv.status_label || '未申请'}
                     </span>
-                    {inv.status === 'issued' && inv.invoice_no && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {inv.invoice_no}
-                      </div>
-                    )}
-                    {inv.status === 'issued' && inv.pdf_url && (
-                      <div style={{ marginTop: 2 }}>
-                        <a href={inv.pdf_url} target="_blank" rel="noreferrer"
-                          style={{ color: 'var(--primary)', fontSize: 11 }}>下载电子发票</a>
-                      </div>
-                    )}
                     {inv.status === 'rejected' && inv.reject_reason && (
                       <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, maxWidth: 140 }}>
                         {inv.reject_reason}
@@ -390,7 +379,7 @@ export default function Billing() {
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 6 }}>开票信息</h3>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.8, marginBottom: 0 }}>
-          开票类别：<b>服务费</b>（SaaS 订阅服务）。开票资料请在
+          开票资料请在
           <a href="/settings?tab=invoice" style={{ color: 'var(--primary)', fontWeight: 600 }}> 企业设置 → 开票信息 </a>
           中维护；填写后可对已支付账单提交开票申请，电子发票开具后可在下方申请记录中下载。
         </p>
