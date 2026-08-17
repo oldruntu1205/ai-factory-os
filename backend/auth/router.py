@@ -133,7 +133,7 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
         pass
     return {
         "access_token": token,
-        "company_id": user.company_id,
+        "company_id": user.company_id or 0,   # 平台超管 company_id 为空 → 0（与 deps 一致，防前端 NaN）
         "user_id": user.id,
         "name": user.name,
         "role": user.role,

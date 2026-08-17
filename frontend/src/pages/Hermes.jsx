@@ -26,7 +26,8 @@ export default function Hermes() {
     label: '', description: '', tools: 'crm.get_customer, knowledge.search',
     system_prompt: '',
   })
-  const companyId = Number(localStorage.getItem('company_id'))
+  // 修复：company_id 兜底为 0（历史 localStorage 可能残留 "null" 字符串 → Number 得 NaN，导致后端 422）
+  const companyId = Number(localStorage.getItem('company_id')) || 0
 
   const load = async () => {
     const [a, t] = await Promise.all([
