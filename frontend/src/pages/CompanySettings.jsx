@@ -13,6 +13,7 @@ const TABS = [
   { key: 'basic', label: '基本信息' },
   { key: 'license', label: '企业认证' },
   { key: 'members', label: '成员管理' },
+  { key: 'invoice', label: '开票信息' },
   { key: 'security', label: '操作日志' },
 ]
 
@@ -20,7 +21,7 @@ export default function CompanySettings() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTab = (() => {
     const t = searchParams.get('tab')
-    if (['basic', 'license', 'security', 'members'].includes(t)) return t
+    if (['basic', 'license', 'security', 'members', 'invoice'].includes(t)) return t
     return 'basic'
   })()
   const [tab, setTab] = useState(initialTab)
@@ -53,6 +54,11 @@ export default function CompanySettings() {
   const [inviteCode, setInviteCode] = useState('')
   const [memberMsg, setMemberMsg] = useState('')
 
+  // 开票信息
+  const [invInfo, setInvInfo] = useState(null)
+  const [invMsg, setInvMsg] = useState('')
+  const [invSaving, setInvSaving] = useState(false)
+
   const load = async () => {
     try {
       const [{ data }, { data: ind }] = await Promise.all([
@@ -80,9 +86,35 @@ export default function CompanySettings() {
     setMembers(data.members || [])
   }
 
+  const loadInvInfo = async () => {
+    try {
+      const { data } = await api.get('/billing/invoice-info', { params: { company_id: companyId } })
+      setInvInfo(data.info)
+    } catch (e) { /* 忽略 */ }
+  }
+
+  const saveInvInfo = async () => {
+    if (!invInfo || !invInfo.invoice_title || !invInfo.invoice_tax_no) {
+      setInvMsg('❌ 请填写发票抬头与纳税人识别号')
+      return
+    }
+    setInvSaving(true)
+    try {
+      const { data } = await api.put('/billing/invoice-info', invInfo,
+        { params: { company_id: companyId } })
+      setInvMsg(`✅ ${data.message}`)
+      loadInvInfo()
+    } catch (e) {
+      setInvMsg(`❌ ${e.response?.data?.detail || '保存失败'}`)
+    } finally {
+      setInvSaving(false)
+    }
+  }
+
   useEffect(() => { load() }, [])
   useEffect(() => { if (tab === 'security') loadLogs() }, [tab])
   useEffect(() => { if (tab === 'members') loadMembers() }, [tab])
+  useEffect(() => { if (tab === 'invoice') loadInvInfo() }, [tab])
 
   // 验证码倒计时
   useEffect(() => {
@@ -455,6 +487,72 @@ export default function CompanySettings() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 开票信息 ===== */}
+      {tab === 'invoice' && (
+        <div>
+          <div className="card">
+            <h3 style={{ marginBottom: 6 }}>开票信息</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.7 }}>
+              开票类别：<b>服务费</b>（SaaS 订阅服务）。填写本单位的开票资料后，
+              可在「套餐与账单」对已支付账单提交开票申请；电子发票开具后发送至企业邮箱。
+            </p>
+            {invMsg && (
+              <div style={{ marginBottom: 12 }}>
+                {invMsg.startsWith('✅')
+                  ? <div className="alert alert-success">{invMsg}</div>
+                  : <div className="alert alert-error">{invMsg}</div>}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+              <div className="form-group">
+                <label>发票抬头（企业全称）*</label>
+                <input value={invInfo?.invoice_title || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_title: e.target.value })}
+                  placeholder="与营业执照一致的企业全称" />
+              </div>
+              <div className="form-group">
+                <label>纳税人识别号 *</label>
+                <input value={invInfo?.invoice_tax_no || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_tax_no: e.target.value })}
+                  placeholder="统一社会信用代码" />
+              </div>
+              <div className="form-group">
+                <label>开户银行</label>
+                <input value={invInfo?.invoice_bank || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_bank: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>银行账号</label>
+                <input value={invInfo?.invoice_bank_account || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_bank_account: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>注册地址</label>
+                <input value={invInfo?.invoice_address || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_address: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>注册电话</label>
+                <input value={invInfo?.invoice_phone || ''}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_phone: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>发票类型</label>
+                <select value={invInfo?.invoice_type || 'normal'}
+                  onChange={(e) => setInvInfo({ ...invInfo, invoice_type: e.target.value })}>
+                  <option value="normal">电子普通发票</option>
+                  <option value="special">电子专票（需一般纳税人）</option>
+                </select>
+              </div>
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 16 }}
+              onClick={saveInvInfo} disabled={invSaving}>
+              {invSaving ? '保存中...' : '保存开票信息'}
+            </button>
           </div>
         </div>
       )}

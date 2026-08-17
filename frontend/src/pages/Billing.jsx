@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import api from '../api'
 
 const PLAN_BADGES = {
   starter: 'badge-gray',
   professional: 'badge-blue',
   enterprise: 'badge-green',
+}
+
+const PAY_STATUS_MAP = {
+  unpaid: ['badge-yellow', '待支付'],
+  pending_review: ['badge-blue', '待财务审核'],
+  paid: ['badge-green', '已支付'],
+  rejected: ['badge-red', '审核驳回'],
+  expired: ['badge-red', '缓冲过期'],
 }
 
 export default function Billing() {
@@ -15,19 +23,32 @@ export default function Billing() {
   const [msg, setMsg] = useState('')
   const [invInfo, setInvInfo] = useState(null)
   const [invReqs, setInvReqs] = useState([])
+  const [payAccount, setPayAccount] = useState(null)
+
+  // 付款弹窗（对公转账）
+  const [payBill, setPayBill] = useState(null)
+  const [voucherFile, setVoucherFile] = useState(null)
+  const [voucherNote, setVoucherNote] = useState('')
+  const [paying, setPaying] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const voucherRef = useRef(null)
+
   const companyId = Number(localStorage.getItem('company_id'))
 
   const load = async () => {
-    const [p, u, i, inst] = await Promise.all([
+    const [p, u, i, inst, acc] = await Promise.all([
       api.get('/billing/plans'),
       api.get('/billing/usage', { params: { company_id: companyId } }),
       api.get('/billing/invoices', { params: { company_id: companyId } }),
       api.get('/marketplace/installed', { params: { company_id: companyId } }),
+      api.get('/billing/pay-account').catch(() => ({ data: { account: null } })),
     ])
     setPlans(p.data.plans)
     setUsage(u.data)
     setInvoices(i.data.invoices)
     setInstalled(inst.data.installed || [])
+    setPayAccount(acc.data.account)
+    return i.data.invoices
   }
 
   const loadInvoice = async () => {
@@ -50,17 +71,56 @@ export default function Billing() {
         company_id: companyId, plan: planKey,
       })
       setMsg(`✅ ${data.message}（账单号 ${data.bill_no}，¥${data.amount}）`)
-      load()
+      const fresh = (await load()).find((b) => b.bill_no === data.bill_no)
+      if (fresh) openPay(fresh)
     } catch (e) {
       setMsg(`❌ ${e.response?.data?.detail || '升级失败'}`)
     }
   }
 
-  const pay = async (billNo) => {
-    if (!window.confirm('模拟支付该账单？')) return
-    await api.post(`/billing/pay?bill_no=${billNo}`)
-    setMsg('✅ 支付成功')
-    load()
+  const openPay = (bill) => {
+    setPayBill(bill)
+    setVoucherFile(null)
+    setVoucherNote('')
+    setCopied(false)
+    if (voucherRef.current) voucherRef.current.value = ''
+  }
+
+  const closePay = () => setPayBill(null)
+
+  const copyAccount = async () => {
+    if (!payAccount) return
+    const text = `收款单位：${payAccount.account_name}\n开户银行：${payAccount.bank_name}\n账号：${payAccount.account_no}\n${payAccount.note || ''}`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (e) {
+      // 兼容非 HTTPS 环境：降级选中提示
+      window.prompt('请复制以下付款信息：', text)
+    }
+  }
+
+  const submitPay = async () => {
+    if (!voucherFile) {
+      setMsg('❌ 请先上传转账凭证截图')
+      return
+    }
+    setPaying(true)
+    try {
+      const fd = new FormData()
+      fd.append('bill_no', payBill.bill_no)
+      fd.append('voucher', voucherFile)
+      fd.append('note', voucherNote)
+      const { data } = await api.post('/billing/pay', fd)
+      setMsg(`✅ ${data.message}`)
+      setPayBill(null)
+      load()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '提交失败'}`)
+    } finally {
+      setPaying(false)
+    }
   }
 
   const saveInvoiceInfo = async () => {
@@ -256,26 +316,63 @@ export default function Billing() {
       <div className="card">
         <h3 style={{ marginBottom: 16 }}>账单历史</h3>
         <table className="table">
-          <thead><tr><th>账单号</th><th>套餐</th><th>金额</th><th>状态</th><th>日期</th><th>操作</th></tr></thead>
+          <thead><tr><th>账单号</th><th>套餐</th><th>金额</th><th>状态</th><th>开票状态</th><th>日期</th><th>操作</th></tr></thead>
           <tbody>
             {invoices.map((b) => {
               const hasReq = invReqs.some((r) => r.bill_no === b.bill_no)
+              const inv = b.invoice || {}
+              const paySt = PAY_STATUS_MAP[b.status] || ['badge-gray', b.status]
               return (
                 <tr key={b.id}>
                   <td style={{ fontSize: 12 }}>{b.bill_no}</td>
                   <td><span className="badge badge-blue">{b.plan}</span></td>
                   <td style={{ fontWeight: 600 }}>{b.currency} {b.amount.toLocaleString()}</td>
                   <td>
-                    <span className={`badge ${b.status === 'paid' ? 'badge-green' : 'badge-yellow'}`}>
-                      {b.status === 'paid' ? '已支付' : '待支付'}
+                    <span className={`badge ${paySt[0]}`}>{paySt[1]}</span>
+                    {b.status === 'pending_review' && b.grace_expires_at && (
+                      <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
+                        缓冲至 {new Date(b.grace_expires_at).toLocaleString('zh-CN')}
+                      </div>
+                    )}
+                    {(b.status === 'rejected' || b.status === 'expired') && b.review_note && (
+                      <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, maxWidth: 150 }}>
+                        {b.review_note}
+                      </div>
+                    )}
+                    {b.status === 'pending_review' && b.voucher_path && (
+                      <div style={{ marginTop: 4 }}>
+                        <a href={b.voucher_path} target="_blank" rel="noreferrer"
+                          style={{ fontSize: 11, color: 'var(--primary)' }}>查看凭证</a>
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`badge ${inv.status === 'issued' ? 'badge-green' : inv.status === 'rejected' ? 'badge-red' : inv.status === 'pending' ? 'badge-yellow' : 'badge-gray'}`}>
+                      {inv.status_label || '未申请'}
                     </span>
+                    {inv.status === 'issued' && inv.invoice_no && (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {inv.invoice_no}
+                      </div>
+                    )}
+                    {inv.status === 'rejected' && inv.reject_reason && (
+                      <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, maxWidth: 140 }}>
+                        {inv.reject_reason}
+                      </div>
+                    )}
                   </td>
                   <td style={{ fontSize: 12 }}>{new Date(b.created_at).toLocaleDateString('zh-CN')}</td>
                   <td style={{ display: 'flex', gap: 6 }}>
-                    {b.status !== 'paid' && (
-                      <button className="btn btn-success btn-sm" onClick={() => pay(b.bill_no)}>
-                        模拟支付
+                    {b.status === 'unpaid' && (
+                      <button className="btn btn-success btn-sm" onClick={() => openPay(b)}>
+                        去付款
                       </button>
+                    )}
+                    {b.status === 'pending_review' && (
+                      <span className="badge badge-gray" style={{ alignSelf: 'center' }}>财务审核中</span>
+                    )}
+                    {(b.status === 'rejected' || b.status === 'expired') && (
+                      <span className="badge badge-gray" style={{ alignSelf: 'center' }}>未生效</span>
                     )}
                     {b.status === 'paid' && !hasReq && (
                       <button className="btn btn-primary btn-sm" onClick={() => applyInvoice(b.bill_no)}>
@@ -290,7 +387,7 @@ export default function Billing() {
               )
             })}
             {invoices.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单，升级套餐后生成</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单，升级套餐后生成</td></tr>
             )}
           </tbody>
         </table>
@@ -383,6 +480,92 @@ export default function Billing() {
           </div>
         )}
       </div>
+
+      {/* 对公转账付款弹窗 */}
+      {payBill && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+        }} onClick={closePay}>
+          <div className="card" style={{ width: 520, maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ margin: 0 }}>💳 对公转账付款</h3>
+              <button className="btn btn-secondary btn-sm" onClick={closePay}>✕</button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.7 }}>
+              账单 <b>{payBill.bill_no}</b> · {payBill.plan} 套餐 · 金额
+              <b style={{ color: 'var(--primary)' }}> ¥{payBill.amount.toLocaleString()}</b>
+            </div>
+
+            {/* 付款账号（演示数据）+ 复制按钮 */}
+            <div style={{ background: 'var(--bg-subtle)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>对公收款账户</div>
+                <span className="badge badge-gray" style={{ fontSize: 10 }}>演示数据</span>
+              </div>
+              {payAccount ? (
+                <>
+                  <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+                    <div>收款单位：<b>{payAccount.account_name}</b></div>
+                    <div>开户银行：{payAccount.bank_name}</div>
+                    <div>账号：<b style={{ color: 'var(--primary)', letterSpacing: 0.5 }}>{payAccount.account_no}</b></div>
+                    {payAccount.note && <div style={{ fontSize: 12, color: '#b45309' }}>⚠ {payAccount.note}</div>}
+                  </div>
+                  <button className="btn btn-secondary btn-sm" style={{ marginTop: 10 }}
+                    onClick={copyAccount}>
+                    {copied ? '✅ 已复制' : '📋 复制付款账号'}
+                  </button>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>付款账户信息加载中...</div>
+              )}
+            </div>
+
+            {/* 上传付款凭证 */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+                上传转账凭证截图 <span style={{ color: '#b91c1c' }}>*</span>
+              </div>
+              <input
+                ref={voucherRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => setVoucherFile(e.target.files[0] || null)}
+                style={{ fontSize: 12, width: '100%' }}
+              />
+              {voucherFile && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src={URL.createObjectURL(voucherFile)} alt="凭证预览"
+                    style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {voucherFile.name}（{(voucherFile.size / 1024 / 1024).toFixed(1)} MB）
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label>转账备注（选填，如转账时间/流水号）</label>
+              <input value={voucherNote} onChange={(e) => setVoucherNote(e.target.value)}
+                placeholder="例：2026-08-18 上午转账，备注 BILL 单号" />
+            </div>
+
+            <div className="alert alert-info" style={{ fontSize: 12, lineHeight: 1.8, marginBottom: 14 }}>
+              <b>24 小时缓冲期：</b>上传凭证后套餐<b>立即临时生效</b>；平台财务核对到账后正式确认。
+              若 24 小时内未获审核通过，将自动取消本次升级（套餐回退），请留意审核结果。
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={closePay}>取消</button>
+              <button className="btn btn-success" onClick={submitPay} disabled={paying || !voucherFile}>
+                {paying ? '提交中...' : '提交凭证'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

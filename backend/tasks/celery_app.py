@@ -16,7 +16,7 @@ celery_app = Celery(
     "industrial_ai",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["tasks.followup"],
+    include=["tasks.followup", "tasks.billing"],
 )
 
 celery_app.conf.update(
@@ -41,6 +41,11 @@ celery_app.conf.update(
         "scheduled-discovery": {
             "task": "tasks.followup.scheduled_discovery",
             "schedule": 86400.0,
+        },
+        # 对公转账 24h 缓冲过期自动取消升级（每小时扫描，缓冲精度为小时级）
+        "expire-grace-bills": {
+            "task": "tasks.billing.expire_grace_bills",
+            "schedule": 3600.0,
         },
         # 注：旧机制 daily_follow（followup_day 字段、无追踪/退订）已从 beat 移除，
         # 避免与新序列机制双轨并行对同一条线索重复发信；函数保留供兼容调用。

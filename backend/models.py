@@ -571,7 +571,15 @@ class MemberInvite(Base):
 
 
 class Bill(Base):
-    """SaaS 账单（计费系统）"""
+    """SaaS 账单（计费系统）
+
+    支付状态 status：
+      unpaid          待支付（生成后）
+      pending_review  已上传转账凭证，待财务审核（24h 缓冲期内套餐已临时生效）
+      paid            审核通过，套餐正式生效
+      rejected        审核驳回（未到账/凭证不符），已取消临时生效
+      expired         24h 缓冲期内未获审核通过，自动取消升级
+    """
     __tablename__ = "bills"
 
     id = Column(Integer, primary_key=True)
@@ -582,9 +590,20 @@ class Bill(Base):
     currency = Column(String(10), default="CNY")
     period_start = Column(DateTime, nullable=True)
     period_end = Column(DateTime, nullable=True)
-    status = Column(String(20), default="unpaid")          # unpaid/paid/refunded
+    status = Column(String(20), default="unpaid")          # 见类注释
     paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ===== 对公转账（凭证 + 审核 + 24h 缓冲）=====
+    prev_plan = Column(String(50), default="starter")      # 升级前套餐（驳回/过期时回退）
+    prev_snapshot = Column(JSON, default=dict)             # 升级前套餐完整快照（回退用）
+    voucher_path = Column(String(500), default="")         # 转账凭证图片路径
+    voucher_note = Column(String(300), default="")         # 客户备注（如转账时间/单号）
+    submitted_at = Column(DateTime, nullable=True)         # 凭证提交时间（缓冲期起算）
+    grace_expires_at = Column(DateTime, nullable=True)     # 缓冲截止 = submitted_at + 24h
+    reviewed_by = Column(String(100), default="")          # 审核人
+    reviewed_at = Column(DateTime, nullable=True)          # 审核时间
+    review_note = Column(String(300), default="")          # 审核备注（通过/驳回说明）
 
 
 class InvoiceRequest(Base):

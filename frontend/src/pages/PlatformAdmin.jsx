@@ -28,6 +28,10 @@ export default function PlatformAdmin() {
   const [invReqs, setInvReqs] = useState([])
   const [issueNoMap, setIssueNoMap] = useState({})
 
+  // 对公转账凭证审核
+  const [payBills, setPayBills] = useState([])
+  const [reviewNote, setReviewNote] = useState({})
+
   // 模型设置
   const [llm, setLlm] = useState(null)
   const [gateway, setGateway] = useState('deepseek')
@@ -53,6 +57,25 @@ export default function PlatformAdmin() {
       const reqs = await api.get('/platform/invoice-requests')
       setInvReqs(reqs.data.requests || [])
     } catch (e) { /* 忽略 */ }
+    try {
+      const pb = await api.get('/platform/bills/pending-review')
+      setPayBills(pb.data.bills || [])
+    } catch (e) { /* 忽略 */ }
+  }
+
+  const reviewBill = async (billNo, action) => {
+    const note = action === 'reject'
+      ? (window.prompt('请输入驳回原因（客户可见）：', '凭证与到账不符，请核对后重新提交') || '')
+      : (reviewNote[billNo] || '')
+    if (action === 'reject' && note === null) return
+    try {
+      const { data } = await api.post(`/platform/bills/${billNo}/review`,
+        { action, note })
+      setMsg(`✅ ${data.message}`)
+      loadFinance()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '审核失败'}`)
+    }
   }
 
   const issueInvoice = async (reqId) => {
@@ -377,6 +400,73 @@ export default function PlatformAdmin() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* 对公转账凭证审核（24h 缓冲） */}
+          <div className="card" style={{ marginTop: 20 }}>
+            <h3 style={{ marginBottom: 12 }}>对公转账凭证审核（{payBills.length} 笔待审核）</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              客户上传转账凭证后套餐已临时生效（24 小时缓冲）。请与会计核对到账：确认到账 → 「通过」（套餐正式生效）；
+              未到账/凭证不符 → 「驳回」（套餐自动回退）。缓冲期结束仍未审核将自动取消升级。
+            </p>
+            {payBills.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>暂无待审核的转账凭证</div>
+            ) : (
+              <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>账单号</th><th>企业</th><th>套餐</th><th>金额</th>
+                      <th>凭证</th><th>客户备注</th><th>缓冲剩余</th><th>审核</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payBills.map((b) => (
+                      <tr key={b.bill_no}>
+                        <td style={{ fontSize: 12 }}>{b.bill_no}</td>
+                        <td style={{ fontSize: 12 }}>{b.company_id}</td>
+                        <td style={{ fontSize: 12 }}>{b.plan}</td>
+                        <td style={{ fontWeight: 600 }}>¥{b.amount.toLocaleString()}</td>
+                        <td>
+                          {b.voucher_path ? (
+                            <a href={b.voucher_path} target="_blank" rel="noreferrer"
+                              style={{ color: 'var(--primary)', fontSize: 12 }}>
+                              查看凭证图
+                            </a>
+                          ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.voucher_note}>
+                          {b.voucher_note || '—'}
+                        </td>
+                        <td>
+                          <span className={`badge ${(b.grace_left_hours ?? 24) < 4 ? 'badge-red' : 'badge-yellow'}`}>
+                            {(b.grace_left_hours ?? 24)} 小时
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input
+                              value={reviewNote[b.bill_no] || ''}
+                              onChange={(e) => setReviewNote((m) => ({ ...m, [b.bill_no]: e.target.value }))}
+                              placeholder="到账备注"
+                              style={{ width: 100, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-strong)', fontSize: 12 }}
+                            />
+                            <button className="btn btn-success btn-sm"
+                              onClick={() => reviewBill(b.bill_no, 'approve')}>
+                              通过
+                            </button>
+                            <button className="btn btn-danger btn-sm"
+                              onClick={() => reviewBill(b.bill_no, 'reject')}>
+                              驳回
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* 开票申请（类别：服务费） */}

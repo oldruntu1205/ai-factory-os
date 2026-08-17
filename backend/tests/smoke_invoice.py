@@ -2,7 +2,8 @@
 import os, sys, time
 os.environ["USE_SQLITE"] = "1"
 os.environ["TESTING"] = "1"
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _BACKEND)
 
 from fastapi.testclient import TestClient
 from main import app
@@ -67,29 +68,30 @@ r = client.post("/billing/invoice-request", headers=H, json={"bill_no": bill_no}
 assert r.status_code == 400, f"expect 400: {r.text}"
 print("[OK] 未支付账单申请被拒:", r.json()["detail"])
 
-# 6. 支付账单
-r = client.post(f"/billing/pay?bill_no={bill_no}", headers=H)
-assert r.status_code == 200, f"pay: {r.status_code} {r.text}"
-print("[OK] 支付成功")
+# 6. 对公转账：查看付款账号
+r = client.get("/billing/pay-account", headers=H)
+assert r.status_code == 200 and r.json()["pay_method"] == "bank_transfer", r.text
+print("[OK] 对公账户:", r.json()["account"]["account_name"])
 
-# 7. 申请开票
-r = client.post("/billing/invoice-request", headers=H, json={"bill_no": bill_no})
-assert r.status_code == 200, f"apply: {r.status_code} {r.text}"
-req_no = r.json()["req_no"]
-assert r.json()["category"] == "服务费", r.text
-print("[OK] 开票申请提交:", req_no, "类别:", r.json()["category"])
+# 7. 上传转账凭证 → pending_review + 套餐临时生效（24h 缓冲）
+import io
+tiny_png = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 极简 PNG（仅测上传链路）
+r = client.post("/billing/pay", headers=H,
+                data={"bill_no": bill_no, "note": "2026-08-18 对公转账"},
+                files={"voucher": ("voucher.png", io.BytesIO(tiny_png), "image/png")})
+assert r.status_code == 200, f"pay submit: {r.status_code} {r.text}"
+assert r.json()["status"] == "pending_review", r.text
+assert r.json()["grace_expires_at"], r.text
+print("[OK] 凭证已提交 pending_review, 缓冲至:", r.json()["grace_expires_at"])
 
-# 8. 重复申请 → 应拒绝
-r = client.post("/billing/invoice-request", headers=H, json={"bill_no": bill_no})
-assert r.status_code == 400, f"expect dup reject: {r.text}"
-print("[OK] 重复申请被拒")
+# 8. 重复提交 → 应拒绝
+r = client.post("/billing/pay", headers=H,
+                data={"bill_no": bill_no, "note": ""},
+                files={"voucher": ("v2.png", io.BytesIO(tiny_png), "image/png")})
+assert r.status_code == 400, f"expect dup submit reject: {r.text}"
+print("[OK] 重复提交凭证被拒:", r.json()["detail"])
 
-# 9. 企业侧申请列表
-r = client.get(f"/billing/invoice-requests?company_id={company_id}", headers=H)
-assert r.status_code == 200 and len(r.json()["requests"]) == 1, r.text
-print("[OK] 企业侧申请列表 1 条, status:", r.json()["requests"][0]["status"])
-
-# 10. 平台侧（超管）查看并开具
+# 8.5 平台侧（超管）登录（供步骤 9 使用）
 # 确保种子超管 company_id=None（防测试库历史数据污染）
 from database import SessionLocal
 from models import User
@@ -102,6 +104,39 @@ r = client.post("/auth/login", json={"email": "platform@demo.com", "password": "
 assert r.status_code == 200, f"platform login: {r.status_code} {r.text}"
 token_p = r.json()["access_token"]
 HP = {"Authorization": f"Bearer {token_p}"}
+print("[OK] 平台超管登录")
+
+# 9. 平台侧待审核列表
+r = client.get("/platform/bills/pending-review", headers=HP)
+assert r.status_code == 200, f"pending list: {r.status_code} {r.text}"
+pb = [x for x in r.json()["bills"] if x["bill_no"] == bill_no]
+assert pb and pb[0]["voucher_path"], r.text
+print("[OK] 平台待审核列表见凭证:", pb[0]["voucher_path"])
+
+# 10. 平台审核通过 → 正式生效
+r = client.post(f"/platform/bills/{bill_no}/review", headers=HP,
+                json={"action": "approve", "note": "已核对到账"})
+assert r.status_code == 200 and r.json()["status"] == "paid", r.text
+print("[OK] 平台审核通过:", r.json()["message"])
+
+# 11. 已支付账单申请开票
+r = client.post("/billing/invoice-request", headers=H, json={"bill_no": bill_no})
+assert r.status_code == 200, f"apply: {r.status_code} {r.text}"
+req_no = r.json()["req_no"]
+assert r.json()["category"] == "服务费", r.text
+print("[OK] 开票申请提交:", req_no, "类别:", r.json()["category"])
+
+# 12. 重复申请 → 应拒绝
+r = client.post("/billing/invoice-request", headers=H, json={"bill_no": bill_no})
+assert r.status_code == 400, f"expect dup reject: {r.text}"
+print("[OK] 重复申请被拒")
+
+# 13. 企业侧申请列表
+r = client.get(f"/billing/invoice-requests?company_id={company_id}", headers=H)
+assert r.status_code == 200 and len(r.json()["requests"]) == 1, r.text
+print("[OK] 企业侧申请列表 1 条, status:", r.json()["requests"][0]["status"])
+
+# 14. 平台侧查看并开具
 r = client.get("/platform/invoice-requests", headers=HP)
 assert r.status_code == 200, f"platform list: {r.status_code} {r.text}"
 reqs = r.json()["requests"]

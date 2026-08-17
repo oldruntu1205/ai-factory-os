@@ -12,6 +12,7 @@ api/platform.py —— 平台超级管理员 API
 """
 from datetime import datetime
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -22,6 +23,7 @@ from database import get_db, SessionLocal
 from models import Company, User, Bill, Conversation, AIAgent, PlatformLLMConfig, InvoiceRequest
 from auth.deps import get_current_user
 from ai.llm import GATEWAY_ROUTES, set_config_override, get_config_override
+from api.billing import _revert_plan
 
 logger = logging.getLogger(__name__)
 
@@ -290,15 +292,100 @@ def suspend_company(company_id: int, suspend: bool = True,
 @router.get("/bills")
 def platform_bills(db: Session = Depends(get_db),
                    current: dict = Depends(get_current_user)):
-    """平台账单流水"""
+    """平台账单流水（含对公转账凭证/审核状态）"""
     _require_platform(current)
-    bills = db.query(Bill).order_by(Bill.created_at.desc()).limit(100).all()
+    bills = db.query(Bill).order_by(Bill.created_at.desc()).limit(200).all()
     return {"bills": [{
         "id": b.id, "bill_no": b.bill_no, "company_id": b.company_id,
         "plan": b.plan, "amount": b.amount, "currency": b.currency,
         "status": b.status, "paid_at": b.paid_at.isoformat() if b.paid_at else None,
         "created_at": b.created_at.isoformat(),
+        "voucher_path": b.voucher_path or "",
+        "voucher_note": b.voucher_note or "",
+        "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
+        "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
+        "review_note": b.review_note or "",
     } for b in bills]}
+
+
+@router.get("/bills/pending-review")
+def platform_pending_review_bills(db: Session = Depends(get_db),
+                                  current: dict = Depends(get_current_user)):
+    """待财务审核的对公转账账单（凭证 + 缓冲倒计时）"""
+    _require_platform(current)
+    now = datetime.utcnow()
+    bills = db.query(Bill).filter(
+        Bill.status == "pending_review").order_by(Bill.submitted_at.asc()).all()
+    result = []
+    for b in bills:
+        grace_left = None
+        if b.grace_expires_at:
+            grace_left = max(0, int((b.grace_expires_at - now).total_seconds() // 3600))
+        result.append({
+            "id": b.id, "bill_no": b.bill_no, "company_id": b.company_id,
+            "plan": b.plan, "amount": b.amount, "currency": b.currency,
+            "voucher_path": b.voucher_path or "",
+            "voucher_note": b.voucher_note or "",
+            "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
+            "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
+            "grace_left_hours": grace_left,
+        })
+    return {"bills": result}
+
+
+class BillReviewIn(BaseModel):
+    action: str = "approve"    # approve / reject
+    note: str = ""
+
+
+@router.post("/bills/{bill_no}/review")
+def review_bill(bill_no: str, data: BillReviewIn,
+                db: Session = Depends(get_db),
+                current: dict = Depends(get_current_user)):
+    """财务审核对公转账：approve 确认到账（套餐正式生效）/ reject 驳回（回退套餐）"""
+    _require_platform(current)
+    bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    if bill.status != "pending_review":
+        raise HTTPException(status_code=400, detail="仅待审核账单可审核")
+
+    c = db.query(Company).filter(Company.id == bill.company_id).first()
+    now = datetime.utcnow()
+
+    if data.action == "approve":
+        bill.status = "paid"
+        bill.paid_at = now
+        bill.reviewed_by = current.get("email", "")
+        bill.reviewed_at = now
+        bill.review_note = (data.note or "").strip()[:300]
+        # 套餐已在提交凭证时临时生效，正式确认无需重复应用
+        msg = f"已确认到账，套餐正式生效（{bill.plan}）"
+        act = "finance.bill_approve"
+    elif data.action == "reject":
+        bill.status = "rejected"
+        bill.reviewed_by = current.get("email", "")
+        bill.reviewed_at = now
+        bill.review_note = (data.note or "凭证与到账不符").strip()[:300]
+        # 回退套餐到升级前
+        if c:
+            _revert_plan(c, bill)
+        msg = f"已驳回，套餐已回退至 {c.plan if c else bill.prev_plan}"
+        act = "finance.bill_reject"
+    else:
+        raise HTTPException(status_code=400, detail="action 仅支持 approve/reject")
+
+    db.commit()
+
+    try:
+        from utils.audit import log_action
+        log_action(bill.company_id, act,
+                   f"{'确认到账' if data.action == 'approve' else '驳回'} {bill.bill_no}：{bill.review_note}",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+
+    return {"message": msg, "bill_no": bill.bill_no, "status": bill.status}
 
 
 @router.get("/finance")

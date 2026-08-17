@@ -3,17 +3,20 @@ api/billing.py —— SaaS 计费系统（落地手册第22章）
 
 - GET  /billing/plans            套餐列表（价格/配额）
 - GET  /billing/usage            当前企业用量（对话/Agent/文档/存储）
-- GET  /billing/invoices         账单历史
-- POST /billing/upgrade          升级套餐（演示版直接生效）
-- POST /billing/pay              模拟支付账单
+- GET  /billing/invoices         账单历史（含开票状态）
+- POST /billing/upgrade          升级套餐：生成待支付账单（对公转账）
+- GET  /billing/pay-account      对公收款账户信息（客户付款前展示）
+- POST /billing/pay              提交转账凭证（multipart：bill_no+voucher+note）
+                                 进入 pending_review，套餐立即临时生效（24h 缓冲）
 - GET  /billing/invoice-info     获取/保存开票信息
 - POST /billing/invoice-request  对已支付账单提交开票申请（类别：服务费）
 - GET  /billing/invoice-requests 当前企业开票申请列表
 """
+import os
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -28,6 +31,32 @@ from constants.plans import PLANS, PLAN_DAYS
 
 # 开票类别：本平台 SaaS 订阅服务，统一按「服务费」开具
 INVOICE_CATEGORY = "服务费"
+
+# 付款方式：对公转账
+PAY_METHOD = "bank_transfer"
+GRACE_HOURS = 24   # 提交凭证后套餐临时生效的缓冲小时数（平台审核窗口）
+
+# 对公收款账户（演示数据，生产替换为真实账户并建议移到平台配置表）
+PAY_ACCOUNT = {
+    "account_name": "AI Factory 科技（宁波）有限公司",
+    "bank_name": "中国工商银行宁波海曙支行",
+    "account_no": "3901 1122 3344 5566 778",
+    "payee": "AI Factory 科技（宁波）有限公司",
+    "note": "转账时请备注账单号，便于财务核对到账",
+}
+
+# 转账凭证保存目录（与官网图片同挂载：/static/site/...）
+VOUCHER_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "site", "payments")
+os.makedirs(VOUCHER_DIR, exist_ok=True)
+
+# 支付状态 → 中文标签
+PAY_STATUS_LABELS = {
+    "unpaid": "待支付",
+    "pending_review": "待财务审核",
+    "paid": "已支付",
+    "rejected": "审核驳回",
+    "expired": "缓冲过期",
+}
 
 
 class InvoiceInfoIn(BaseModel):
@@ -53,6 +82,42 @@ def _require_admin_billing(current: dict) -> None:
 class UpgradeIn(BaseModel):
     company_id: int
     plan: str
+
+
+def _apply_plan(c: Company, plan_key: str) -> None:
+    """应用套餐：配额 + 到期时间增量叠加（max(expires, now) + plan_days，防无限续期）"""
+    plan = PLANS[plan_key]
+    c.plan = plan_key
+    c.max_agents = plan["max_agents"]
+    c.max_conversations = plan["max_conversations"]
+    plan_days = PLAN_DAYS.get(plan_key, 365)
+    base = c.plan_expires_at if (c.plan_expires_at and c.plan_expires_at > datetime.utcnow()) \
+        else datetime.utcnow()
+    if not c.plan_started_at:
+        c.plan_started_at = datetime.utcnow()
+    c.plan_expires_at = base + timedelta(days=plan_days)
+
+
+def _revert_plan(c: Company, bill: Bill) -> None:
+    """回退套餐到升级前快照（审核驳回 / 24h 缓冲过期时）"""
+    snap = bill.prev_snapshot or {}
+    prev_plan = snap.get("plan") or bill.prev_plan or "starter"
+    plan = PLANS.get(prev_plan, PLANS["starter"])
+    c.plan = prev_plan
+    c.max_agents = snap.get("max_agents", plan["max_agents"])
+    c.max_conversations = snap.get("max_conversations", plan["max_conversations"])
+    if snap.get("plan_expires_at"):
+        try:
+            c.plan_expires_at = datetime.fromisoformat(str(snap["plan_expires_at"]))
+        except Exception:
+            c.plan_expires_at = None
+    else:
+        c.plan_expires_at = None
+    if snap.get("plan_started_at"):
+        try:
+            c.plan_started_at = datetime.fromisoformat(str(snap["plan_started_at"]))
+        except Exception:
+            pass
 
 
 @router.get("/plans")
@@ -117,23 +182,53 @@ def get_usage(company_id: int, db: Session = Depends(get_db),
 @router.get("/invoices")
 def list_invoices(company_id: int, db: Session = Depends(get_db),
                   current: dict = Depends(get_current_user)):
-    """账单历史"""
+    """账单历史（含开票状态：未申请/待开票/已开票/已驳回）"""
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权访问")
     bills = db.query(Bill).filter(Bill.company_id == company_id)\
         .order_by(Bill.created_at.desc()).all()
-    return {"invoices": [{
-        "id": b.id, "bill_no": b.bill_no, "plan": b.plan,
-        "amount": b.amount, "currency": b.currency, "status": b.status,
-        "paid_at": b.paid_at.isoformat() if b.paid_at else None,
-        "created_at": b.created_at.isoformat(),
-    } for b in bills]}
+    # 关联开票申请：一账单最多一条申请
+    reqs = {r.bill_no: r for r in db.query(InvoiceRequest).filter(
+        InvoiceRequest.company_id == company_id).all()}
+    result = []
+    for b in bills:
+        req = reqs.get(b.bill_no)
+        if req:
+            inv_status = {"none": "未申请", "pending": "待开票",
+                          "issued": "已开票", "rejected": "已驳回"}.get(
+                              req.status, req.status)
+            inv_detail = {
+                "applied": True,
+                "status": req.status,          # pending/issued/rejected
+                "status_label": inv_status,
+                "req_no": req.req_no,
+                "invoice_no": req.invoice_no,
+                "reject_reason": req.reject_reason,
+            }
+        else:
+            inv_detail = {"applied": False, "status": "none",
+                          "status_label": "未申请", "req_no": "",
+                          "invoice_no": "", "reject_reason": ""}
+        result.append({
+            "id": b.id, "bill_no": b.bill_no, "plan": b.plan,
+            "amount": b.amount, "currency": b.currency, "status": b.status,
+            "status_label": PAY_STATUS_LABELS.get(b.status, b.status),
+            "paid_at": b.paid_at.isoformat() if b.paid_at else None,
+            "created_at": b.created_at.isoformat(),
+            "voucher_path": b.voucher_path or "",
+            "voucher_note": b.voucher_note or "",
+            "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
+            "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
+            "review_note": b.review_note or "",
+            "invoice": inv_detail,
+        })
+    return {"invoices": result}
 
 
 @router.post("/upgrade")
 def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
             current: dict = Depends(get_current_user)):
-    """升级套餐（仅管理员）：生成待支付账单，支付成功后生效（修复：不再未支付即生效）"""
+    """升级套餐（仅管理员）：生成待支付账单（对公转账），提交凭证后临时生效"""
     _require_admin_billing(current)
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
@@ -145,14 +240,24 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
         raise HTTPException(status_code=404, detail="企业不存在")
 
     plan = PLANS[data.plan]
-    # 存在未支付账单时拒绝重复下单，引导先完成支付
+    # 存在未支付/待审核账单时拒绝重复下单，引导先完成支付
     pending = db.query(Bill).filter(
-        Bill.company_id == data.company_id, Bill.status == "unpaid").first()
+        Bill.company_id == data.company_id,
+        Bill.status.in_(["unpaid", "pending_review"])).first()
     if pending:
         raise HTTPException(status_code=400,
-                            detail=f"存在待支付账单 {pending.bill_no}，请先完成支付")
+                            detail=f"存在处理中的账单 {pending.bill_no}（{PAY_STATUS_LABELS.get(pending.status)}），请先完成该笔")
 
-    # 生成待支付账单（套餐暂不变更）
+    # 记录升级前套餐快照（审核驳回 / 缓冲过期时回退）
+    prev_snapshot = {
+        "plan": c.plan,
+        "max_agents": c.max_agents,
+        "max_conversations": c.max_conversations,
+        "plan_started_at": c.plan_started_at.isoformat() if c.plan_started_at else None,
+        "plan_expires_at": c.plan_expires_at.isoformat() if c.plan_expires_at else None,
+    }
+
+    # 生成待支付账单（套餐暂不变更，提交凭证后临时生效）
     bill = Bill(
         bill_no=f"BILL{uuid.uuid4().hex[:10].upper()}",
         company_id=data.company_id,
@@ -162,6 +267,8 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
         status="unpaid",
         period_start=datetime.utcnow(),
         period_end=datetime.utcnow() + timedelta(days=PLAN_DAYS.get(data.plan, 365)),
+        prev_plan=c.plan,
+        prev_snapshot=prev_snapshot,
     )
     db.add(bill)
     db.commit()
@@ -175,52 +282,87 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
     except Exception:
         pass
 
-    return {"message": f"已生成 {data.plan} 套餐账单，请完成支付后生效",
+    return {"message": f"已生成 {data.plan} 套餐账单，请转账后上传付款凭证",
             "bill_no": bill.bill_no, "amount": bill.amount,
-            "currency": bill.currency, "status": "unpaid"}
+            "currency": bill.currency, "status": "unpaid",
+            "pay_method": PAY_METHOD, "grace_hours": GRACE_HOURS}
+
+
+@router.get("/pay-account")
+def get_pay_account(current: dict = Depends(get_current_user)):
+    """对公收款账户信息（付款前展示给客户，含复制内容）"""
+    return {"pay_method": PAY_METHOD, "account": PAY_ACCOUNT}
 
 
 @router.post("/pay")
-def pay(bill_no: str, db: Session = Depends(get_db),
-        current: dict = Depends(get_current_user)):
-    """模拟支付账单：支付成功后应用套餐（配额与到期时间增量叠加）"""
+async def pay(bill_no: str = Form(...),
+              voucher: UploadFile = File(...),
+              note: str = Form(""),
+              db: Session = Depends(get_db),
+              current: dict = Depends(get_current_user)):
+    """提交转账凭证（multipart）：账单进入待财务审核，套餐立即临时生效（24h 缓冲）。
+
+    客户付款 → 上传凭证 → 平台财务核对到账后审核；
+    24h 内未获审核通过 → 自动取消升级（回退套餐）。
+    """
     _require_admin_billing(current)
     bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
     if not bill or bill.company_id != current["company_id"]:
         raise HTTPException(status_code=404, detail="账单不存在")
     if bill.status == "paid":
         raise HTTPException(status_code=400, detail="账单已支付，请勿重复操作")
-    bill.status = "paid"
-    bill.paid_at = datetime.utcnow()
+    if bill.status != "unpaid":
+        raise HTTPException(status_code=400,
+                            detail=f"账单当前状态为「{PAY_STATUS_LABELS.get(bill.status)}」，无法重复提交")
 
-    # 应用套餐：配额 + 到期时间按增量叠加（max(expires, now) + plan_days，防无限续期）
-    applied_plan = None
+    # 保存凭证图片（限图片类型 + 大小）
+    content_type = (voucher.content_type or "").lower()
+    if content_type not in ("image/png", "image/jpeg", "image/jpg", "image/webp"):
+        raise HTTPException(status_code=400, detail="仅支持 PNG / JPG / WEBP 图片凭证")
+    ext = content_type.split("/")[-1]
+    if ext == "jpeg":
+        ext = "jpg"
+    max_bytes = 10 * 1024 * 1024
+    data = await voucher.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail="凭证图片过大，最大 10MB")
+    filename = f"{bill.bill_no}_{uuid.uuid4().hex[:8]}.{ext}"
+    save_path = os.path.join(VOUCHER_DIR, filename)
+    with open(save_path, "wb") as f:
+        f.write(data)
+
+    # 状态流转：unpaid → pending_review（缓冲期内套餐临时生效）
+    now = datetime.utcnow()
+    bill.status = "pending_review"
+    bill.voucher_path = f"/static/site/payments/{filename}"
+    bill.voucher_note = (note or "").strip()[:300]
+    bill.submitted_at = now
+    bill.grace_expires_at = now + timedelta(hours=GRACE_HOURS)
+
+    # 立即应用套餐（24h 缓冲，让客户无缝使用）
     c = db.query(Company).filter(Company.id == bill.company_id).first()
     if c and bill.plan in PLANS:
-        plan = PLANS[bill.plan]
-        c.plan = bill.plan
-        c.max_agents = plan["max_agents"]
-        c.max_conversations = plan["max_conversations"]
-        plan_days = PLAN_DAYS.get(bill.plan, 365)
-        base = c.plan_expires_at if (c.plan_expires_at and c.plan_expires_at > datetime.utcnow()) \
-            else datetime.utcnow()
-        if not c.plan_started_at:
-            c.plan_started_at = datetime.utcnow()
-        c.plan_expires_at = base + timedelta(days=plan_days)
-        applied_plan = bill.plan
+        _apply_plan(c, bill.plan)
     db.commit()
 
     # 审计日志
     try:
         from utils.audit import log_action
-        log_action(bill.company_id, "billing.pay",
-                   f"支付账单 {bill.bill_no}（{bill.plan}）并生效",
+        log_action(bill.company_id, "billing.pay_submit",
+                   f"提交转账凭证 {bill.bill_no}（{bill.plan}），缓冲至 {bill.grace_expires_at}",
                    current.get("user_id", 0), current.get("email", ""))
     except Exception:
         pass
 
-    return {"message": "支付成功，套餐已生效", "bill_no": bill.bill_no,
-            "plan": applied_plan or bill.plan, "status": bill.status}
+    return {
+        "message": f"凭证已提交，套餐已临时生效（{GRACE_HOURS} 小时缓冲期），等待财务审核",
+        "bill_no": bill.bill_no,
+        "plan": bill.plan,
+        "status": "pending_review",
+        "status_label": "待财务审核",
+        "grace_expires_at": bill.grace_expires_at.isoformat(),
+        "voucher_path": bill.voucher_path,
+    }
 
 
 @router.get("/invoice-info")
