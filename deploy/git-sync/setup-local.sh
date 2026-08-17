@@ -13,7 +13,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# 注意：deploy/git-sync 上两级才是仓库根（曾误写为 ../ 导致在 deploy/ 里 init 出嵌套仓库）
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 REMOTE="${1:-prod}"
 REMOTE_URL="${2:-}"
 

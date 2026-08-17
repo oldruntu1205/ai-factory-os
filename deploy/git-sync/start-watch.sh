@@ -26,8 +26,25 @@ WATCHER="$SCRIPT_DIR_W/watch-sync.py"
 PIDFILE="$REPO_ROOT_W/watch-sync.pid"
 LOGFILE="$REPO_ROOT_W/watch-sync.log"
 
-PY="python3"
-command -v python3 >/dev/null 2>&1 || PY="python"
+# 找一个真正可用的 Python（防止命中微软商店占位符，它启动即退出且无解释器）
+find_python() {
+  for c in python3 py python; do
+    if command -v "$c" >/dev/null 2>&1; then
+      if "$c" -c "print('ok')" >/dev/null 2>&1; then
+        echo "$c"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+if ! PY="$(find_python)"; then
+  echo "❌ 未找到可用的 Python 解释器（python3 / py / python 均不可用或是商店占位符）"
+  echo "   请安装 Python 3.10+，或用 Windows 自带的 launcher 手动启动："
+  echo "   py -3 deploy/git-sync/watch-sync.py"
+  exit 1
+fi
+echo "  使用解释器: $PY"
 
 is_running() {
   [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
