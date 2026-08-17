@@ -9,6 +9,7 @@ ai/llm.py —— LLM Gateway（模型路由）
 import logging
 import os
 import base64
+import threading
 
 from config import (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_FALLBACK,
                     LLM_GATEWAY, FIREWORKS_API_KEY, FIREWORKS_MODEL)
@@ -17,6 +18,20 @@ logger = logging.getLogger(__name__)
 
 _llm = None
 _use_mock = False
+
+# 性能/成本控制：LLM 调用全局并发信号量（防费用暴涨与 API 429）
+_llm_semaphore = threading.Semaphore(int(os.getenv("LLM_MAX_CONCURRENCY", "4")))
+
+
+class _RateLimitedLLM:
+    """LLM 并发限流包装：所有 invoke 走全局信号量"""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def invoke(self, *args, **kwargs):
+        with _llm_semaphore:
+            return self._inner.invoke(*args, **kwargs)
 
 # 运行时覆盖配置（平台超管后台可视化设置，优先于环境变量）
 # 结构: {"gateway": str, "keys": {gw: key}, "base_urls": {gw: url}, "models": {gw: model}}
@@ -127,7 +142,8 @@ def _get_llm():
     try:
         from langchain_openai import ChatOpenAI
         # 可靠性加固：超时 + 重试（此前默认 600s 无重试，请求可挂死线程）
-        _llm = ChatOpenAI(
+        # 性能：并发信号量限流（LLM_MAX_CONCURRENCY）
+        _llm = _RateLimitedLLM(ChatOpenAI(
             model=model,
             api_key=api_key,
             base_url=base_url,
@@ -135,7 +151,7 @@ def _get_llm():
             max_tokens=2048,
             timeout=int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
             max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
-        )
+        ))
         logger.info(f"LLM Gateway: [{gateway}] model={model} base={base_url}")
     except Exception:
         if not LLM_FALLBACK:
@@ -188,12 +204,12 @@ def vision_invoke(prompt_text: str, image_paths: list) -> str:
     base_url, model = _resolve_route()
     try:
         from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(
+        llm = _RateLimitedLLM(ChatOpenAI(
             model=model, api_key=api_key, base_url=base_url,
             temperature=0.3, max_tokens=2048,
             timeout=int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
             max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
-        )
+        ))
     except Exception:
         if not LLM_FALLBACK:
             raise

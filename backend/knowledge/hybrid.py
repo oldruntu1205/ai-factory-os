@@ -62,16 +62,27 @@ def _session():
 # ---------- 轻量 BM25（Okapi，无外部依赖） ----------
 
 class _BM25:
+    """轻量 BM25（Okapi）+ 倒排索引（性能优化：消除 O(N) 全量扫描与每查询全量 idf 重算）。
+
+    - 倒排表 postings: token -> [doc_idx]，查询只遍历包含 query token 的文档
+    - doc_len 缓存每文档长度，避免每次检索重新 len
+    - idf/avgdl 惰性重算（_dirty 标记，批量 add 后仅首次查询重算一次）
+    """
+
     def __init__(self, k1: float = 1.5, b: float = 0.75):
         self.k1 = k1
         self.b = b
         self.docs = []          # list of token lists
         self.doc_meta = []      # list of {text, source}
         self.doc_did = []       # 与 docs 平行的 document_id（用于按文档 prune）
+        self.doc_len = []       # 每文档 token 数（缓存，避免检索时重复 len）
+        self.doc_freq = []      # 每文档 token->词频 dict（预计算，检索 O(1) 查频）
+        self.postings = defaultdict(list)  # token -> [doc_idx]
         self.df = defaultdict(int)
         self.idf = {}
         self.avgdl = 0.0
         self.N = 0
+        self._dirty = True      # add/remove 后置 True，search 前惰性重算 idf/avgdl
         self.synced_max_id = 0  # 已持久化到 bm25_chunks 的最大行 id（跨进程增量同步水位线）
 
     @staticmethod
@@ -80,66 +91,84 @@ class _BM25:
 
     def add(self, text: str, meta: dict, document_id=None):
         tokens = self._tokenize(text)
+        idx = len(self.docs)
         self.docs.append(tokens)
         self.doc_meta.append(meta)
         self.doc_did.append(document_id)
-        for t in set(tokens):
+        self.doc_len.append(len(tokens))
+        freq = {}
+        for t in tokens:
+            freq[t] = freq.get(t, 0) + 1
+        self.doc_freq.append(freq)
+        for t in freq:
+            self.postings[t].append(idx)
             self.df[t] += 1
         self.N += 1
+        self._dirty = True
 
     def remove_document(self, document_id):
-        """按 document_id 精确剔除该文档全部切片，并重算 df/avgdl/N。"""
+        """按 document_id 精确剔除该文档全部切片，并重建倒排表（低频操作可接受重建）。"""
         if document_id is None:
             return
-        nd, nm, ndid = [], [], []
-        for i in range(self.N):
-            if self.doc_did[i] != document_id:
-                nd.append(self.docs[i])
-                nm.append(self.doc_meta[i])
-                ndid.append(self.doc_did[i])
-        self.docs, self.doc_meta, self.doc_did = nd, nm, ndid
-        self.N = len(self.docs)
+        keep = [i for i in range(self.N) if self.doc_did[i] != document_id]
+        self.docs = [self.docs[i] for i in keep]
+        self.doc_meta = [self.doc_meta[i] for i in keep]
+        self.doc_did = [self.doc_did[i] for i in keep]
+        self.doc_len = [self.doc_len[i] for i in keep]
+        self.doc_freq = [self.doc_freq[i] for i in keep]
+        self.postings = defaultdict(list)
         self.df = defaultdict(int)
-        for d in self.docs:
-            for t in set(d):
+        for i, freq in enumerate(self.doc_freq):
+            for t in freq:
+                self.postings[t].append(i)
                 self.df[t] += 1
+        self.N = len(self.docs)
         self.idf = {}
-        self.avgdl = (sum(len(d) for d in self.docs) / self.N) if self.N else 0.0
+        self._dirty = True
 
-    def _compute_idf(self):
-        if self.N == 0:
+    def _ensure_stats(self):
+        """惰性重算 idf/avgdl（仅在索引变更后执行一次）"""
+        if not self._dirty:
             return
-        for t, n in self.df.items():
-            self.idf[t] = math.log(1 + (self.N - n + 0.5) / (n + 0.5))
-        total = sum(len(d) for d in self.docs)
-        self.avgdl = (total / self.N) if self.N else 0.0
+        if self.N:
+            self.idf = {t: math.log(1 + (self.N - n + 0.5) / (n + 0.5))
+                        for t, n in self.df.items()}
+            self.avgdl = (sum(self.doc_len) / self.N) if self.N else 0.0
+        else:
+            self.idf = {}
+            self.avgdl = 0.0
+        self._dirty = False
 
     def search(self, query: str, top_k: int = 10):
         if self.N == 0:
             return []
-        self._compute_idf()
+        self._ensure_stats()
         q_tokens = self._tokenize(query)
-        scores = []
-        for i, doc in enumerate(self.docs):
-            dl = len(doc)
-            freq = defaultdict(int)
-            for t in doc:
-                freq[t] += 1
+        # 倒排检索：候选文档 = 含任一 query token 的文档（postings 并集去重），
+        # 词频用预计算 doc_freq O(1) 查询——远快于全量扫描 O(N)
+        candidates = set()
+        for qt in q_tokens:
+            if qt in self.idf:
+                candidates.update(self.postings.get(qt, ()))
+        scores = {}
+        for i in candidates:
+            freq = self.doc_freq[i]
+            dl = self.doc_len[i]
             score = 0.0
             for qt in q_tokens:
-                if qt not in self.idf:
+                idf = self.idf.get(qt)
+                if not idf:
                     continue
                 f = freq.get(qt, 0)
                 if f == 0:
                     continue
                 denom = f + self.k1 * (1 - self.b + self.b * (dl / (self.avgdl or 1)))
-                score += self.idf[qt] * (f * (self.k1 + 1) / denom)
-            scores.append((score, i))
-        scores.sort(key=lambda x: -x[0])
+                score += idf * (f * (self.k1 + 1) / denom)
+            if score > 0:
+                scores[i] = score
+        ranked = sorted(scores.items(), key=lambda x: -x[1])
         out = []
-        for score, i in scores[:top_k]:
-            if score <= 0:
-                break
+        for i, score in ranked[:top_k]:
             meta = dict(self.doc_meta[i])
             meta["sparse_score"] = round(score, 4)
             out.append(meta)

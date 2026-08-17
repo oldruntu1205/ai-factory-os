@@ -292,36 +292,43 @@ def run_due_follow_ups(company_id: int = None) -> dict:
             query = query.filter(Lead.company_id == company_id)
         else:
             query = query.filter(Lead.company_id.isnot(None))
-        leads = query.all()
         now = datetime.utcnow()
         # 单轮发送上限（防历史积压批量爆发；可配置 EMAIL_MAX_PER_RUN）
         max_per_run = int(os.getenv("EMAIL_MAX_PER_RUN", "200"))
-        for lead in leads:
-            if len(sent) >= max_per_run:
-                logger.warning("run_due_follow_ups 达到单轮上限 %d，停止本轮", max_per_run)
+        # 性能优化：分页扫描（不全表加载），每批处理完释放
+        batch_size = int(os.getenv("EMAIL_SCAN_BATCH", "500"))
+        page = 0
+        while len(sent) < max_per_run:
+            leads = query.order_by(Lead.id)\
+                .offset(page * batch_size).limit(batch_size).all()
+            if not leads:
                 break
-            if lead.status in _STOP_STATUSES:
-                continue
-            step = getattr(lead, "follow_up_step", 0) or 0
-            # 修复：允许第 4 封（step=3 -> email4）；step=4 表示序列已完成
-            if step >= len(SEQUENCE_INTERVALS):
-                continue
-            # 修复：到期时间以序列起点（created_at）锚定 INTERVALS（D0/D3/D7/D14）。
-            # 下标用 SEQUENCE_INTERVALS[step]（step=1→3、2→7、3→14）；
-            # 此前 [step+1] 错位且 step=3 时越界（IndexError），导致第 4 封永不发送。
-            start = lead.created_at or now
-            if step == 0:
-                due = timedelta(0)  # 首封立即
-            else:
-                due = timedelta(days=SEQUENCE_INTERVALS[step])
-            if now - start >= due:
-                try:
-                    r = send_follow_up(lead.id, lead.company_id, step=step + 1,
-                                       language="en", variant=lead.variant or "A",
-                                       track_id=lead.track_id or "")
-                    sent.append({"lead": lead.id, "email": lead.email, **r})
-                except Exception as e:
-                    logger.error(f"跟进失败 lead={lead.id}: {e}")
+            page += 1
+            for lead in leads:
+                if len(sent) >= max_per_run:
+                    break
+                if lead.status in _STOP_STATUSES:
+                    continue
+                step = getattr(lead, "follow_up_step", 0) or 0
+                # 修复：允许第 4 封（step=3 -> email4）；step=4 表示序列已完成
+                if step >= len(SEQUENCE_INTERVALS):
+                    continue
+                # 修复：到期时间以序列起点（created_at）锚定 INTERVALS（D0/D3/D7/D14）。
+                # 下标用 SEQUENCE_INTERVALS[step]（step=1→3、2→7、3→14）；
+                # 此前 [step+1] 错位且 step=3 时越界（IndexError），导致第 4 封永不发送。
+                start = lead.created_at or now
+                if step == 0:
+                    due = timedelta(0)  # 首封立即
+                else:
+                    due = timedelta(days=SEQUENCE_INTERVALS[step])
+                if now - start >= due:
+                    try:
+                        r = send_follow_up(lead.id, lead.company_id, step=step + 1,
+                                           language="en", variant=lead.variant or "A",
+                                           track_id=lead.track_id or "")
+                        sent.append({"lead": lead.id, "email": lead.email, **r})
+                    except Exception as e:
+                        logger.error(f"跟进失败 lead={lead.id}: {e}")
         return {"sent": sent, "count": len(sent)}
     finally:
         db.close()
