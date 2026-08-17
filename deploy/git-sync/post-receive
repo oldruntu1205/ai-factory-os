@@ -32,13 +32,21 @@ if [ ! -x "$PY" ]; then
 fi
 
 changed_backend=0
+NULL_OID="0000000000000000000000000000000000000000"
 while read oldrev newrev ref; do
   [ "$ref" = "refs/heads/$BRANCH" ] || continue
   git --work-tree="$WORK_TREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
 
-  # 首次推送 oldrev 为全 0，diff 会列出全部文件；只要存在 backend/ 文件即视为有变更
-  if git diff --name-only "$oldrev" "$newrev" 2>/dev/null | grep -q '^backend/'; then
-    changed_backend=1
+  if [ "$oldrev" = "$NULL_OID" ]; then
+    # 首次推送（新分支）：oldrev 为全 0，git diff 会报 bad object，
+    # 改用 ls-tree 检查新提交是否含 backend 文件
+    if git ls-tree -r --name-only "$newrev" 2>/dev/null | grep -q '^backend/'; then
+      changed_backend=1
+    fi
+  else
+    if git diff --name-only "$oldrev" "$newrev" 2>/dev/null | grep -q '^backend/'; then
+      changed_backend=1
+    fi
   fi
 done
 
