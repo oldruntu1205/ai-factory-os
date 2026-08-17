@@ -82,6 +82,8 @@ def process_agent(message: str, company_id: int, tools=None, db=None) -> str:
     else:
         param_block = "结构化图纸参数：未匹配到精确参数（已转混合检索）。"
 
+    # 实时数据块提前构造：f-string 表达式内不允许反斜杠（Python 3.11 语法限制）
+    live_block = f"# 实时工业数据（MES / ERP）\n{live}" if live else ""
     prompt = f"""
 你是制造企业「工艺/图纸助手」，服务车间、工艺与质检人员。
 你的首要职责是**防范工人误操作**：必须基于图纸真实参数给出公差范围、材质标准，
@@ -95,7 +97,7 @@ def process_agent(message: str, company_id: int, tools=None, db=None) -> str:
 
 # 混合检索上下文（自由描述类补充）
 {rag_text}
-{('# 实时工业数据（MES / ERP）\n' + live) if live else ''}
+{live_block}
 
 # 回答要求
 1. 若问具体型号的参数：先给「精确值」（公差范围 / 材质牌号 / 执行标准），并标注来源文件。
