@@ -24,6 +24,7 @@ export default function Hermes() {
   const [newAgent, setNewAgent] = useState({
     name: '', version: '1.0', industry: 'glassware',
     label: '', description: '', tools: 'crm.get_customer, knowledge.search',
+    system_prompt: '',
   })
   const companyId = Number(localStorage.getItem('company_id'))
 
@@ -62,7 +63,7 @@ export default function Hermes() {
 
   const registerAgent = async () => {
     try {
-      await api.post('/hermes/agent/register', {
+      const { data } = await api.post('/hermes/agent/register', {
         ...newAgent,
         tools: newAgent.tools.split(',').map((t) => t.trim()).filter(Boolean),
       })
@@ -70,10 +71,24 @@ export default function Hermes() {
       setNewAgent({
         name: '', version: '1.0', industry: 'glassware',
         label: '', description: '', tools: 'crm.get_customer, knowledge.search',
+        system_prompt: '',
       })
+      setMessage(`✅ 注册成功：${data.agent.label}（${data.mode === 'prompt_driven' ? '已配置系统提示词，注册即可用' : '空壳模式，未填提示词' }）`)
       load()
     } catch (e) {
       alert(e.response?.data?.detail || '注册失败')
+    }
+  }
+
+  const unregisterAgent = async (name) => {
+    if (!window.confirm(`确认注销 Agent「${name}」？注销后不可恢复。`)) return
+    try {
+      await api.delete(`/hermes/agent/${name}`)
+      setMessage(`✅ 已注销 ${name}`)
+      if (selected === name) setSelected(agents.find((a) => a.name !== name)?.name || 'sales_agent')
+      load()
+    } catch (e) {
+      alert(e.response?.data?.detail || '注销失败')
     }
   }
 
@@ -88,12 +103,18 @@ export default function Hermes() {
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
         AI 员工操作系统内核：Agent 注册中心 / Tool 调用 / 三层记忆 / RBAC 权限 / 消息队列
       </p>
+      {message && message.startsWith('✅') && (
+        <div className="alert alert-success" style={{ marginBottom: 16 }}>{message}</div>
+      )}
 
       {showRegister && (
         <div className="card" style={{ marginBottom: 24 }}>
-          <h3 style={{ marginBottom: 12 }}>注册新 AI 员工 Agent（动态加载）</h3>
+          <h3 style={{ marginBottom: 8 }}>注册新 AI 员工 Agent（注册即可用）</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.7 }}>
+            填写<b>系统提示词</b> + 选择<b>可用工具</b>后注册，Agent 即可执行任务（LLM 自动编排工具调用，持久化保存、重启不丢）。
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            <div className="form-group"><label>Agent 名称</label>
+            <div className="form-group"><label>Agent 名称 *</label>
               <input value={newAgent.name} onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
                 placeholder="如 procurement_agent" /></div>
             <div className="form-group"><label>展示名</label>
@@ -101,14 +122,49 @@ export default function Hermes() {
                 placeholder="如 AI采购" /></div>
             <div className="form-group"><label>行业</label>
               <input value={newAgent.industry} onChange={(e) => setNewAgent({ ...newAgent, industry: e.target.value })} /></div>
-            <div className="form-group"><label>Tools（逗号分隔）</label>
-              <input value={newAgent.tools} onChange={(e) => setNewAgent({ ...newAgent, tools: e.target.value })} /></div>
+            <div className="form-group"><label>描述</label>
+              <input value={newAgent.description} onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })} /></div>
           </div>
-          <div className="form-group">
-            <label>描述</label>
-            <input value={newAgent.description} onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })} />
+          <div className="form-group" style={{ marginTop: 10 }}>
+            <label>系统提示词（定义角色职责，Agent 按此执行）*</label>
+            <textarea
+              value={newAgent.system_prompt}
+              onChange={(e) => setNewAgent({ ...newAgent, system_prompt: e.target.value })}
+              placeholder="例如：你是采购专家。收到采购需求后：1) 用 crm.get_customer 查客户信息；2) 用 erp.get_stock 查库存；3) 给出采购建议。"
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--bg-subtle)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit' }}
+            />
           </div>
-          <button className="btn btn-success" onClick={registerAgent}>注册到 Hermes</button>
+          <div className="form-group" style={{ marginTop: 10 }}>
+            <label>可用工具（勾选 Agent 可调用的工具）</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+              {tools.map((t) => {
+                const selectedTools = newAgent.tools.split(',').map((x) => x.trim()).filter(Boolean)
+                const active = selectedTools.includes(t.name)
+                return (
+                  <span key={t.name}
+                    onClick={() => {
+                      const cur = new Set(selectedTools)
+                      if (cur.has(t.name)) cur.delete(t.name)
+                      else cur.add(t.name)
+                      setNewAgent({ ...newAgent, tools: [...cur].join(', ') })
+                    }}
+                    style={{
+                      cursor: 'pointer', padding: '5px 12px', borderRadius: 999, fontSize: 12,
+                      border: `1px solid ${active ? 'var(--primary)' : 'var(--border-strong)'}`,
+                      background: active ? 'var(--primary)' : 'var(--bg-subtle)',
+                      color: active ? '#fff' : 'var(--text)',
+                      userSelect: 'none',
+                    }}>
+                    {t.name}{active ? ' ✓' : ''}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+          <button className="btn btn-success" style={{ marginTop: 14 }} onClick={registerAgent}>
+            注册到 Hermes
+          </button>
         </div>
       )}
 
@@ -185,21 +241,30 @@ export default function Hermes() {
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <h3 style={{ marginBottom: 12 }}>Agent 注册中心（{agents.length}）</h3>
-            {agents.map((a) => (
+            {agents.map((a) => {
+              const isBuiltin = ['customer_agent', 'sales_agent', 'quotation_agent',
+                'production_agent', 'quality_agent', 'ceo_agent', 'process_agent'].includes(a.name)
+              return (
               <div key={a.name} style={{
                 padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600 }}>{roleEmoji[a.name] || '🤖'} {a.label}</span>
                   <span className="badge badge-gray">v{a.version}</span>
-                  <span className="badge badge-green" style={{ marginLeft: 'auto' }}>{a.status}</span>
+                  {a.system_prompt ? <span className="badge badge-green">✓ 注册即可用</span> : null}
+                  {isBuiltin && <span className="badge badge-blue">内置</span>}
+                  <span className="badge badge-gray" style={{ marginLeft: 'auto' }}>{a.status}</span>
+                  {!isBuiltin && (
+                    <button className="btn btn-danger btn-sm" onClick={() => unregisterAgent(a.name)}>注销</button>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{a.name} · {a.industry}</div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>
                   {a.tools.map((t) => <span key={t} className="badge badge-blue" style={{ marginRight: 4 }}>{t}</span>)}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="card">

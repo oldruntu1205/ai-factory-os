@@ -23,9 +23,11 @@ class AgentManifest:
     description: str = ""
     tools: List[str] = field(default_factory=list)   # 允许调用的 Tool 名单
     permissions: List[str] = field(default_factory=list)  # 所需权限点
+    system_prompt: str = ""                     # 自定义 Agent 系统提示词（prompt 驱动编排）
     handler: Optional[Callable] = None          # 处理函数 (message, runtime_ctx) -> str
     workflow: Optional[str] = None              # 可选 LangGraph 工作流名
     status: str = "registered"                  # registered / running / disabled
+    company_id: int = 0                         # 注册企业（0=平台级）
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +38,7 @@ class AgentManifest:
             "description": self.description,
             "tools": self.tools,
             "permissions": self.permissions,
+            "system_prompt": self.system_prompt,
             "workflow": self.workflow,
             "status": self.status,
         }

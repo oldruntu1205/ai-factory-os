@@ -496,6 +496,12 @@ def _init_hermes():
     # 权限系统初始化（默认开放企业工具权限）
     runtime.permission_system.init_tenant(1)
 
+    # 加载自定义注册的 Agent（agent_manifests 表持久化，重启不丢）
+    try:
+        registry.load_custom()
+    except Exception as e:
+        logger.warning(f"自定义 Agent 加载失败: {e}")
+
     logger.info("Hermes Runtime: 内置 6 个 AI 员工 Agent 注册完成")
 
 

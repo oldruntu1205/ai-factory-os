@@ -51,6 +51,7 @@ class AgentRegisterIn(BaseModel):
     description: str = ""
     tools: list = []
     permissions: list = []
+    system_prompt: str = ""
 
 
 class ExecuteIn(BaseModel):
@@ -82,7 +83,12 @@ class PermissionIn(BaseModel):
 
 @router.post("/agent/register")
 def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_user)):
-    """注册 Agent（第5章）：动态加载 AI 员工（仅管理员）"""
+    """注册 Agent（第5章）：动态加载 AI 员工（仅管理员）。
+
+    - 内置 Agent 名不可覆盖（防全局 manifest 被篡改影响所有租户）
+    - 自定义 Agent：填 system_prompt + tools 即注册即可用（prompt 驱动编排），
+      持久化到 agent_manifests 表（重启不丢）；不填 system_prompt 则注册空壳（兼容旧行为）。
+    """
     # 仅企业管理员/平台超管可注册 Agent（防止任意用户声明敏感工具）
     _require_admin(current)
     if data.name in BUILTIN_TOOLS or not data.name:
@@ -96,6 +102,7 @@ def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_us
         raise HTTPException(
             status_code=400,
             detail=f"工具不在白名单内: {', '.join(invalid_tools)}")
+
     manifest = AgentManifest(
         name=data.name,
         version=data.version,
@@ -104,48 +111,91 @@ def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_us
         description=data.description,
         tools=data.tools,
         permissions=data.permissions,
+        system_prompt=(data.system_prompt or "").strip(),
+        company_id=current["company_id"],
     )
-    # 关联内置 AI 员工实现（sales/customer/quotation 等角色直调）
-    from agents.service import execute_specialized
-    from database import SessionLocal
-    from models import AIAgent
 
-    def _generic_handler(message: str, runtime_ctx: dict):
-        """通用 Agent 处理器：按 manifest 名匹配 AI 员工角色"""
-        role_map = {
-            "sales_agent": "sales",
-            "customer_agent": "customer",
-            "quotation_agent": "quotation",
-            "production_agent": "production",
-            "quality_agent": "quality",
-            "ceo_agent": "ceo",
-            "process_agent": "process",
-        }
-        role = role_map.get(data.name)
-        if not role:
-            return f"[{data.name}] Agent 已运行，暂无自定义逻辑（请注册 handler）"
-        db = SessionLocal()
-        try:
-            agent = db.query(AIAgent).filter(
-                AIAgent.role == role,
-                AIAgent.company_id == runtime_ctx["company_id"]).first()
-            if not agent:
-                return "企业尚未创建对应 AI 员工，请先在 AI员工 页面创建"
-            return execute_specialized(agent, message, runtime_ctx["company_id"],
-                                       db, runtime_ctx.get("customer_id"),
-                                       tools=runtime_ctx.get("tools"))
-        finally:
-            db.close()
-
-    manifest.handler = _generic_handler
     reg = get_runtime().agent_registry
+
+    if manifest.system_prompt:
+        # 自定义 Agent：prompt 驱动编排（注册即可用），挂统一 handler
+        manifest.handler = reg._make_custom_handler(manifest)
+    else:
+        # 兼容旧行为：无提示词时挂角色映射 handler（命中内置角色直调）
+        from agents.service import execute_specialized
+        from database import SessionLocal
+        from models import AIAgent
+
+        def _generic_handler(message: str, runtime_ctx: dict):
+            """通用 Agent 处理器：按 manifest 名匹配 AI 员工角色"""
+            role_map = {
+                "sales_agent": "sales",
+                "customer_agent": "customer",
+                "quotation_agent": "quotation",
+                "production_agent": "production",
+                "quality_agent": "quality",
+                "ceo_agent": "ceo",
+                "process_agent": "process",
+            }
+            role = role_map.get(data.name)
+            if not role:
+                return f"[{data.name}] Agent 已运行，暂无自定义逻辑（请填写系统提示词后重新注册）"
+            db = SessionLocal()
+            try:
+                agent = db.query(AIAgent).filter(
+                    AIAgent.role == role,
+                    AIAgent.company_id == runtime_ctx["company_id"]).first()
+                if not agent:
+                    return "企业尚未创建对应 AI 员工，请先在 AI员工 页面创建"
+                return execute_specialized(agent, message, runtime_ctx["company_id"],
+                                           db, runtime_ctx.get("customer_id"),
+                                           tools=runtime_ctx.get("tools"))
+            finally:
+                db.close()
+
+        manifest.handler = _generic_handler
+
     reg.register(manifest)
+    # 自定义 Agent 持久化（重启不丢）
+    try:
+        reg.persist(manifest)
+    except Exception as e:
+        logger = __import__("logging").getLogger(__name__)
+        logger.warning(f"Agent 持久化失败（不影响内存注册）: {e}")
 
     # 同步到权限系统
     perm_sys = get_runtime().permission_system
     perm_sys.allow_agent(current["company_id"], data.name)
 
-    return {"message": "agent registered", "agent": manifest.to_dict()}
+    return {"message": "agent registered",
+            "agent": manifest.to_dict(),
+            "mode": "prompt_driven" if manifest.system_prompt else "shell"}
+
+
+@router.delete("/agent/{name}")
+def unregister_agent(name: str, current: dict = Depends(get_current_user)):
+    """注销自定义 Agent（内置 Agent 不可注销）"""
+    _require_admin(current)
+    if name in _BUILTIN_AGENT_NAMES:
+        raise HTTPException(status_code=400, detail="内置 Agent 不可注销")
+    reg = get_runtime().agent_registry
+    reg.unregister(name)
+    # 删除持久化记录
+    try:
+        from database import SessionLocal
+        from models import AgentManifestRecord
+        db = SessionLocal()
+        try:
+            row = db.query(AgentManifestRecord).filter(
+                AgentManifestRecord.name == name).first()
+            if row:
+                db.delete(row)
+                db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return {"message": f"agent [{name}] unregistered"}
 
 
 @router.get("/agent/list")

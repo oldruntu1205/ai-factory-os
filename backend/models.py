@@ -713,3 +713,22 @@ class PlatformLLMConfig(Base):
     id = Column(Integer, primary_key=True, default=1)   # 固定单行
     config = Column(JSON, default=dict)
     updated_at = Column(DateTime, nullable=True)
+
+
+class AgentManifestRecord(Base):
+    """自定义注册的 Hermes Agent manifest（持久化，重启不丢；内置 Agent 不入此表）"""
+    __tablename__ = "agent_manifests"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, index=True)
+    version = Column(String(20), default="1.0")
+    industry = Column(String(50), default="general")
+    label = Column(String(100), default="")
+    description = Column(String(500), default="")
+    tools = Column(JSON, default=list)           # 允许调用的 Tool 白名单
+    system_prompt = Column(Text, default="")     # 系统提示词（prompt 驱动编排）
+    permissions = Column(JSON, default=list)
+    company_id = Column(Integer, default=0)      # 注册企业（0=平台级）
+    status = Column(String(20), default="registered")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True)
