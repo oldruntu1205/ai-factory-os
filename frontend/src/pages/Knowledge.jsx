@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api'
 
 export default function Knowledge() {
@@ -83,7 +84,7 @@ export default function Knowledge() {
                     开通「工艺/图纸助手」？上传 CAD/PDF 图纸即可
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    上传 CAD(DXF/DWG) 或 PDF 图纸后，可在「<a href="#/agents" style={{ color: 'var(--primary)' }}>AI 员工管理</a>」创建
+                    上传 CAD(DXF/DWG) 或 PDF 图纸后，可在「<Link to="/agents" style={{ color: 'var(--primary)' }}>AI 员工管理</Link>」创建
                     「工艺/图纸助手」，即可查询型号公差、材质标准与防误操作要点。
                   </div>
                 </div>

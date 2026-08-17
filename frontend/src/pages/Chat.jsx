@@ -10,6 +10,8 @@ export default function Chat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [mockMode, setMockMode] = useState(false)
+  const [sessionId, setSessionId] = useState('')          // 会话 ID（刷新后恢复上下文）
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const bottomRef = useRef(null)
   const taRef = useRef(null)
   const companyId = Number(localStorage.getItem('company_id'))
@@ -35,9 +37,36 @@ export default function Chat() {
       .then(({ data }) => setAgents(data.agents))
   }, [])
 
+  // 恢复会话历史：拉取企业最近对话，过滤当前 session 重建消息（修复：此前刷新即丢上下文）
+  useEffect(() => {
+    if (!companyId || historyLoaded) return
+    api.get('/agent/conversations', { params: { company_id: companyId, page_size: 50 } })
+      .then(({ data }) => {
+        const convs = data.conversations || []
+        if (convs.length) {
+          const sid = sessionId || convs[0].session_id
+          setSessionId(sid)
+          const msgs = []
+          convs.filter((c) => c.session_id === sid).reverse().forEach((c) => {
+            if (c.user_message) msgs.push({ role: 'user', content: c.user_message })
+            if (c.agent_answer) msgs.push({ role: 'assistant', content: c.agent_answer })
+          })
+          if (msgs.length) setMessages(msgs)
+        }
+        setHistoryLoaded(true)
+      })
+      .catch(() => setHistoryLoaded(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const newChat = () => {
+    setSessionId('')
+    setMessages([])
+  }
 
   const send = async () => {
     if (!input.trim() || loading) return
@@ -51,7 +80,9 @@ export default function Chat() {
         message: userMsg,
         company_id: companyId,
         agent_id: agentId ? Number(agentId) : null,
+        session_id: sessionId || undefined,   // 携带会话 ID 保持多轮上下文
       })
+      if (data.session_id) setSessionId(data.session_id)
       setMockMode(data.mock_mode)
       setMessages((m) => [...m, {
         role: 'assistant',
@@ -75,6 +106,7 @@ export default function Chat() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ fontSize: 22 }}>AI 员工对话</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="btn btn-sm" onClick={newChat} style={{ fontSize: 13 }}>🆕 新对话</button>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>对话对象：</span>
           <select
             value={agentId}

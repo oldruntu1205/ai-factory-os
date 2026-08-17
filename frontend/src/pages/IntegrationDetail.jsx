@@ -59,7 +59,8 @@ export default function IntegrationDetail() {
     setBusy('save')
     setMsg('')
     try {
-      const body = { company_id: 0, ...config }
+      // 修复：company_id 从登录态读取（此前硬编码 0，平台超管视角必失败）
+      const body = { company_id: Number(localStorage.getItem('company_id')), ...config }
       const { data } = await api.put(`/integrations/${system}`, body)
       setConfig((c) => ({ ...c, ...data.integration }))
       setMsg(`✅ ${system.toUpperCase()} 对接配置已保存`)
@@ -74,7 +75,7 @@ export default function IntegrationDetail() {
     setBusy('test')
     setMsg('')
     try {
-      const body = { company_id: 0, ...config }
+      const body = { company_id: Number(localStorage.getItem('company_id')), ...config }
       const { data } = await api.post(`/integrations/${system}/test`, body)
       setConfig((c) => ({ ...c, ...data.integration }))
       setMsg(data.ok ? `✅ ${system.toUpperCase()} 连接成功（${data.message}）`

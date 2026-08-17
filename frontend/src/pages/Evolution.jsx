@@ -57,7 +57,9 @@ export default function Evolution() {
   const approve = async (id) => {
     if (!window.confirm('确认「通过」该进化候选？将写回运行态（Soul 底座层 / 工具描述 / 技能）。')) return
     try {
-      await api.post(`/hermes/evolution/candidates/${id}/approve`, null, { params: { company_id: companyId } })
+      const { data } = await api.post(`/hermes/evolution/candidates/${id}/approve`, null, { params: { company_id: companyId } })
+      // 修复：校验后端 ok 标志（候选不存在/护栏未过/状态非 pending 会返回 200+{ok:false}）
+      if (data.ok === false) { setMsg('❌ 审批未通过：' + (data.reason || '未知原因')); return }
       setMsg('✅ 已通过并应用')
       loadCandidates()
     } catch (e) { setMsg('❌ ' + errText(e)) }
@@ -65,7 +67,8 @@ export default function Evolution() {
   const reject = async (id) => {
     if (!window.confirm('确认拒绝该候选？')) return
     try {
-      await api.post(`/hermes/evolution/candidates/${id}/reject`, null, { params: { company_id: companyId } })
+      const { data } = await api.post(`/hermes/evolution/candidates/${id}/reject`, null, { params: { company_id: companyId } })
+      if (data.ok === false) { setMsg('❌ 拒绝失败：' + (data.reason || '未知原因')); return }
       setMsg('已拒绝')
       loadCandidates()
     } catch (e) { setMsg('❌ ' + errText(e)) }
@@ -90,7 +93,8 @@ export default function Evolution() {
     setRunning(true)
     try {
       const { data } = await api.post('/hermes/evolution/auto-run', null, { params: { company_id: companyId } })
-      setMsg(`✅ 进化循环完成：${data.candidates_created ?? ''} 个候选（详见响应）`)
+      const n = data.candidates_created?.length ?? 0
+      setMsg(`✅ 进化循环完成：扫描 ${data.agents_scanned ?? 0} 个 Agent，新增 ${n} 个候选`)
       loadCandidates()
     } catch (e) { setMsg('❌ ' + errText(e)) } finally { setRunning(false) }
   }
@@ -166,7 +170,11 @@ export default function Evolution() {
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {c.status === 'pending' && (
                   <>
-                    <button className="btn btn-primary btn-sm" onClick={() => approve(c.id)}>✅ 通过并应用</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => approve(c.id)}
+                      disabled={c.guardrails_pass === false}
+                      title={c.guardrails_pass === false ? '护栏未通过，不可审批' : undefined}>
+                      ✅ 通过并应用
+                    </button>
                     <button className="btn btn-sm" onClick={() => reject(c.id)}>❌ 拒绝</button>
                   </>
                 )}
