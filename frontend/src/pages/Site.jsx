@@ -163,6 +163,18 @@ function SiteInner() {
   const [error, setError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const [socialOpen, setSocialOpen] = useState(false)
+  const [dark, setDark] = useState(() => {
+    // 默认跟随系统偏好；用户手动切换后以 localStorage 为准
+    const saved = localStorage.getItem('site-theme')
+    if (saved === 'dark' || saved === 'light') return saved === 'dark'
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  })
+
+  // 主题切换：同步 body 背景（防滚动露白）+ 持久化
+  useEffect(() => {
+    document.body.style.background = dark ? '#0b1220' : ''
+    localStorage.setItem('site-theme', dark ? 'dark' : 'light')
+  }, [dark])
 
   useEffect(() => {
     api.get('/cms/content?lang=' + encodeURIComponent(lang || 'zh'))
@@ -195,7 +207,7 @@ function SiteInner() {
   const stats = about.stats || []
 
   return (
-    <div className="af-site">
+    <div className={`af-site${dark ? ' dark' : ''}`}>
       {/* 顶部导航 */}
       <header className="af-header">
         <div className="af-container af-header-inner">
@@ -211,6 +223,14 @@ function SiteInner() {
             <a onClick={() => scrollTo('contact')}>{t('nav.contact')}</a>
           </nav>
           <div className="af-header-actions">
+            <button
+              onClick={() => setDark((d) => !d)}
+              className="af-theme-toggle"
+              title={dark ? t('nav.theme_light') || '切换到日间模式' : t('nav.theme_dark') || '切换到夜间模式'}
+              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {dark ? '☀️' : '🌙'}
+            </button>
             <LanguageSwitcher />
             <Link to="/login" className="af-btn af-btn-primary af-btn-sm">{t('nav.login')}</Link>
           </div>

@@ -14,6 +14,19 @@
   --af-bg: #ffffff;
   --af-bg-soft: #f7f9fc;
   --af-bg-deep: #0b1220;
+  --af-glass: rgba(255, 255, 255, 0.82);      /* 头部毛玻璃 */
+  --af-glass-soft: rgba(255, 255, 255, 0.7);  /* 语言按钮 */
+  --af-glass-panel: rgba(255, 255, 255, 0.4); /* hero 内容面板 */
+  --af-glass-border: rgba(255, 255, 255, 0.55);
+  --af-hero-bg:
+    radial-gradient(1100px 520px at 82% -12%, rgba(124, 58, 237, 0.20), transparent 60%),
+    radial-gradient(900px 520px at 0% 0%, rgba(37, 99, 235, 0.20), transparent 55%),
+    linear-gradient(180deg, #f6f9ff 0%, #ffffff 100%);
+  --af-hero-title-grad: linear-gradient(120deg, #0f172a 30%, #1d4ed8 100%);
+  --af-feature-num-hover: rgba(37, 99, 235, 0.16);
+  --af-plan-featured-bg: linear-gradient(180deg, #ffffff 0%, var(--af-primary-soft) 100%);
+  --af-pop-bg: #ffffff;                        /* 下拉/弹出面板 */
+  --af-soft-hover: rgba(15, 23, 42, 0.04);     /* 通用 hover 底色 */
   --af-radius: 18px;
   --af-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
   --af-shadow-lg: 0 24px 60px rgba(37, 99, 235, 0.18);
@@ -24,6 +37,37 @@
   background: var(--af-bg);
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ========== 夜间模式 ==========
+   深蓝底色 + 提亮文字 + 降低纯白块，保证对比度与美观 */
+.af-site.dark {
+  --af-primary: #60a5fa;
+  --af-primary-dark: #93c5fd;
+  --af-primary-soft: rgba(37, 99, 235, 0.16);
+  --af-accent: #a78bfa;
+  --af-ink: #e6edf7;
+  --af-ink-2: #b6c2d4;
+  --af-muted: #8fa0b8;
+  --af-line: rgba(148, 163, 184, 0.18);
+  --af-bg: #0b1220;
+  --af-bg-soft: #0f1a2e;
+  --af-bg-deep: #070d18;
+  --af-glass: rgba(11, 18, 32, 0.82);
+  --af-glass-soft: rgba(11, 18, 32, 0.7);
+  --af-glass-panel: rgba(15, 26, 46, 0.62);
+  --af-glass-border: rgba(148, 163, 184, 0.22);
+  --af-hero-bg:
+    radial-gradient(1100px 520px at 82% -12%, rgba(124, 58, 237, 0.16), transparent 60%),
+    radial-gradient(900px 520px at 0% 0%, rgba(37, 99, 235, 0.16), transparent 55%),
+    linear-gradient(180deg, #0d1626 0%, #0b1220 100%);
+  --af-hero-title-grad: linear-gradient(120deg, #e6edf7 20%, #60a5fa 100%);
+  --af-feature-num-hover: rgba(96, 165, 250, 0.14);
+  --af-plan-featured-bg: linear-gradient(180deg, #111c30 0%, var(--af-primary-soft) 100%);
+  --af-pop-bg: #0f1a2e;
+  --af-soft-hover: rgba(148, 163, 184, 0.10);
+  --af-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+  --af-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 
 .af-site * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +84,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--af-glass);
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--af-line);
 }
@@ -89,6 +133,23 @@
 .af-header-actions {
   display: flex; align-items: center; gap: 10px;
 }
+/* 日/夜模式切换按钮 */
+.af-theme-toggle {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--af-line);
+  background: var(--af-glass-soft);
+  color: var(--af-ink);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: all 0.18s;
+}
+.af-theme-toggle:hover {
+  border-color: var(--af-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+}
 .af-lang {
   position: relative;
   display: flex; align-items: center;
@@ -100,7 +161,7 @@
   padding: 0 10px 0 8px;
   border-radius: 8px;
   border: 1px solid var(--af-line);
-  background: rgba(255,255,255,0.7);
+  background: var(--af-glass-soft);
   color: var(--af-ink);
   font-size: 14px; font-weight: 500;
   cursor: pointer; outline: none;
@@ -131,7 +192,7 @@
   min-width: 160px;
   list-style: none;
   margin: 0; padding: 6px;
-  background: #fff;
+  background: var(--af-pop-bg);
   border: 1px solid var(--af-line);
   border-radius: 12px;
   box-shadow: var(--af-shadow-lg);
@@ -152,7 +213,7 @@
   color: var(--af-ink-2);
   transition: background 0.12s, color 0.12s;
 }
-.af-lang-item:hover { background: var(--af-bg-soft); color: var(--af-ink); }
+.af-lang-item:hover { background: var(--af-soft-hover); color: var(--af-ink); }
 .af-lang-item.active { color: var(--af-primary); font-weight: 600; }
 .af-lang-check { margin-left: auto; color: var(--af-primary); font-size: 12px; }
 
@@ -170,7 +231,7 @@
 }
 .af-btn-primary { background: linear-gradient(135deg, var(--af-primary), var(--af-accent)); color: #fff; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28); }
 .af-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(37, 99, 235, 0.36); }
-.af-btn-ghost { background: #fff; color: var(--af-ink); border-color: var(--af-line); }
+.af-btn-ghost { background: var(--af-pop-bg); color: var(--af-ink); border-color: var(--af-line); }
 .af-btn-ghost:hover { border-color: var(--af-primary); color: var(--af-primary); }
 .af-btn-sm { padding: 9px 18px; font-size: 14px; }
 /* CTA 浅色按钮（深色背景上） */
@@ -183,10 +244,7 @@
 .af-hero {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(1100px 520px at 82% -12%, rgba(124, 58, 237, 0.20), transparent 60%),
-    radial-gradient(900px 520px at 0% 0%, rgba(37, 99, 235, 0.20), transparent 55%),
-    linear-gradient(180deg, #f6f9ff 0%, #ffffff 100%);
+  background: var(--af-hero-bg);
   padding: 104px 0 92px;
   min-height: 900px;
   display: flex;
@@ -214,12 +272,12 @@
 .af-hero-inner {
   position: relative; z-index: 1; max-width: 880px;
   transform: translateY(-40px);
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--af-glass-panel);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   padding: 44px 48px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--af-glass-border);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.10);
 }
 .af-hero-dots {
@@ -235,7 +293,7 @@
 .af-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 7px 15px; border-radius: 999px;
-  background: #fff; color: var(--af-primary-dark);
+  background: var(--af-pop-bg); color: var(--af-primary-dark);
   font-size: 13px; font-weight: 700; margin-bottom: 24px;
   border: 1px solid var(--af-line);
   box-shadow: var(--af-shadow);
@@ -244,7 +302,7 @@
   font-size: clamp(28px, 4.4vw, 46px);
   line-height: 1.15; font-weight: 800; letter-spacing: -1px;
   color: var(--af-ink); margin-bottom: 18px;
-  background: linear-gradient(120deg, #0f172a 30%, #1d4ed8 100%);
+  background: var(--af-hero-title-grad);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -353,7 +411,7 @@
   font-family: 'Segoe UI', system-ui, sans-serif;
   transition: color 0.25s;
 }
-.af-feature:hover .af-fnum { color: rgba(37, 99, 235, 0.16); }
+.af-feature:hover .af-fnum { color: var(--af-feature-num-hover); }
 .af-feature .f-icon {
   width: 56px; height: 56px; border-radius: 15px;
   background: var(--af-primary-soft); display: grid; place-items: center;
@@ -411,7 +469,7 @@
 .af-plan.featured {
   border-color: transparent;
   box-shadow: var(--af-shadow-lg);
-  background: linear-gradient(180deg, #ffffff 0%, var(--af-primary-soft) 100%);
+  background: var(--af-plan-featured-bg);
 }
 .af-plan-tag {
   position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
@@ -559,7 +617,7 @@
   padding: 4px 2px; border-radius: 10px;
   transition: background 0.15s;
 }
-a.af-sp-item:hover { background: var(--af-bg-soft); }
+a.af-sp-item:hover { background: var(--af-soft-hover); }
 .af-sp-ic {
   width: 40px; height: 40px; border-radius: 11px; flex: none;
   background: var(--af-primary-soft); color: var(--af-primary);
@@ -587,7 +645,7 @@ a.af-sp-item:hover { background: var(--af-bg-soft); }
   .af-nav {
     position: absolute; top: 66px; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 0;
-    background: #fff; border-bottom: 1px solid var(--af-line);
+    background: var(--af-pop-bg); border-bottom: 1px solid var(--af-line);
     padding: 8px 24px 16px; display: none;
   }
   .af-nav.open { display: flex; }
