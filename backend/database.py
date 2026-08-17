@@ -105,6 +105,7 @@ _LEAD_MIGRATIONS = [
 _SITE_CONTENT_MIGRATIONS = [
     ("pricing", "JSON DEFAULT '{}'"),
     ("social", "JSON DEFAULT '{}'"),
+    ("pay_account", "JSON DEFAULT '{}'"),
     ("translations", "JSON DEFAULT '{}'"),
 ]
 

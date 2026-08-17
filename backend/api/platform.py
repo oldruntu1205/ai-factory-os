@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from config import LLM_GATEWAY, LLM_FALLBACK
 from database import get_db, SessionLocal
-from models import Company, User, Bill, Conversation, AIAgent, PlatformLLMConfig, InvoiceRequest
+from models import Company, User, Bill, Conversation, AIAgent, PlatformLLMConfig, InvoiceRequest, SiteContent
 from auth.deps import get_current_user
 from ai.llm import GATEWAY_ROUTES, set_config_override, get_config_override
 from api.billing import _revert_plan
@@ -443,6 +443,51 @@ def platform_finance(db: Session = Depends(get_db),
             "status": b.status, "created_at": b.created_at.isoformat(),
         } for b in recent],
     }
+
+
+# ============ 对公收款账户配置（财务）============
+
+class PayAccountIn(BaseModel):
+    account_name: str = ""
+    bank_name: str = ""
+    account_no: str = ""
+    note: str = ""
+
+
+@router.get("/pay-account")
+def get_pay_account_config(db: Session = Depends(get_db),
+                           current: dict = Depends(get_current_user)):
+    """平台财务：查看当前对公收款账户配置（含是否使用演示数据）"""
+    _require_platform(current)
+    from api.billing import _get_pay_account
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    configured = bool(row and row.pay_account and any(row.pay_account.values()))
+    return {"account": _get_pay_account(db), "configured": configured}
+
+
+@router.put("/pay-account")
+def save_pay_account_config(data: PayAccountIn, db: Session = Depends(get_db),
+                            current: dict = Depends(get_current_user)):
+    """平台财务：维护对公收款账户（保存后付款弹窗实时生效）"""
+    _require_platform(current)
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    if not row:
+        row = SiteContent(id=1)
+        db.add(row)
+    row.pay_account = {
+        "account_name": data.account_name.strip(),
+        "bank_name": data.bank_name.strip(),
+        "account_no": data.account_no.strip(),
+        "note": data.note.strip(),
+    }
+    db.commit()
+    try:
+        from utils.audit import log_action
+        log_action(0, "finance.pay_account_config",
+                   "更新对公收款账户", current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+    return {"message": "对公收款账户已保存，付款弹窗实时生效"}
 
 
 # ============ 开票管理（财务）============

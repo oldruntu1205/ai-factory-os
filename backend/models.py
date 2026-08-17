@@ -652,6 +652,7 @@ class SiteContent(Base):
     contact = Column(JSON, default=dict)
     pricing = Column(JSON, default=dict)        # 套餐价格（标题/副标题/方案列表）
     social = Column(JSON, default=dict)         # 悬浮客服（热线电话/客服QQ/微信二维码）
+    pay_account = Column(JSON, default=dict)    # 对公收款账户（付款弹窗展示，平台超管维护）
     translations = Column(JSON, default=dict)   # 多语言翻译覆盖 {"en": {...}, "de": {...}}，仅存与默认(zh)不同的字段
     updated_at = Column(DateTime, nullable=True)
 

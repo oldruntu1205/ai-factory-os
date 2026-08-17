@@ -24,6 +24,7 @@ export default function Billing() {
   const [invInfo, setInvInfo] = useState(null)
   const [invReqs, setInvReqs] = useState([])
   const [payAccount, setPayAccount] = useState(null)
+  const [payAccountDemo, setPayAccountDemo] = useState(true)
 
   // 付款弹窗（对公转账）
   const [payBill, setPayBill] = useState(null)
@@ -41,13 +42,14 @@ export default function Billing() {
       api.get('/billing/usage', { params: { company_id: companyId } }),
       api.get('/billing/invoices', { params: { company_id: companyId } }),
       api.get('/marketplace/installed', { params: { company_id: companyId } }),
-      api.get('/billing/pay-account').catch(() => ({ data: { account: null } })),
+      api.get('/billing/pay-account').catch(() => ({ data: { account: null, is_demo: true } })),
     ])
     setPlans(p.data.plans)
     setUsage(u.data)
     setInvoices(i.data.invoices)
     setInstalled(inst.data.installed || [])
     setPayAccount(acc.data.account)
+    setPayAccountDemo(acc.data.is_demo !== false)
     return i.data.invoices
   }
 
@@ -503,7 +505,7 @@ export default function Billing() {
             <div style={{ background: 'var(--bg-subtle)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>对公收款账户</div>
-                <span className="badge badge-gray" style={{ fontSize: 10 }}>演示数据</span>
+                {payAccountDemo && <span className="badge badge-gray" style={{ fontSize: 10 }}>演示数据</span>}
               </div>
               {payAccount ? (
                 <>
@@ -517,9 +519,11 @@ export default function Billing() {
                     onClick={copyAccount}>
                     {copied ? '✅ 已复制' : '📋 复制付款账号'}
                   </button>
-                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                    当前为<b>演示收款账户</b>，正式收费启用前不会产生真实扣款；请按平台通知使用。
-                  </div>
+                  {payAccountDemo && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                      当前为<b>演示收款账户</b>，正式收费启用前不会产生真实扣款；请按平台通知使用。
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>付款账户信息加载中...</div>

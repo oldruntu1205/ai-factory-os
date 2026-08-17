@@ -32,6 +32,11 @@ export default function PlatformAdmin() {
   const [payBills, setPayBills] = useState([])
   const [reviewNote, setReviewNote] = useState({})
 
+  // 对公收款账户配置
+  const [payAccCfg, setPayAccCfg] = useState(null)
+  const [payAccSaving, setPayAccSaving] = useState(false)
+  const [payAccMsg, setPayAccMsg] = useState('')
+
   // 模型设置
   const [llm, setLlm] = useState(null)
   const [gateway, setGateway] = useState('deepseek')
@@ -61,6 +66,26 @@ export default function PlatformAdmin() {
       const pb = await api.get('/platform/bills/pending-review')
       setPayBills(pb.data.bills || [])
     } catch (e) { /* 忽略 */ }
+    try {
+      const pa = await api.get('/platform/pay-account')
+      setPayAccCfg(pa.data.account || {})
+    } catch (e) { /* 忽略 */ }
+  }
+
+  const savePayAccount = async () => {
+    if (!payAccCfg?.account_name || !payAccCfg?.account_no) {
+      setPayAccMsg('❌ 请填写收款单位与账号')
+      return
+    }
+    setPayAccSaving(true)
+    try {
+      const { data } = await api.put('/platform/pay-account', payAccCfg)
+      setPayAccMsg(`✅ ${data.message}`)
+    } catch (e) {
+      setPayAccMsg(`❌ ${e.response?.data?.detail || '保存失败'}`)
+    } finally {
+      setPayAccSaving(false)
+    }
   }
 
   const reviewBill = async (billNo, action) => {
@@ -400,6 +425,49 @@ export default function PlatformAdmin() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* 对公收款账户配置 */}
+          <div className="card" style={{ marginTop: 20 }}>
+            <h3 style={{ marginBottom: 6 }}>对公收款账户设置</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              客户升级套餐付款时展示的收款账户。当前未配置时使用<b>演示数据</b>；
+              保存真实账户后付款弹窗实时生效，并自动隐藏「演示数据」标识。
+            </p>
+            {payAccMsg && (
+              <div style={{ marginBottom: 10 }}>
+                {payAccMsg.startsWith('✅')
+                  ? <div className="alert alert-success">{payAccMsg}</div>
+                  : <div className="alert alert-error">{payAccMsg}</div>}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+              <div className="form-group">
+                <label>收款单位 *</label>
+                <input value={payAccCfg?.account_name || ''}
+                  onChange={(e) => setPayAccCfg({ ...payAccCfg, account_name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>开户银行 *</label>
+                <input value={payAccCfg?.bank_name || ''}
+                  onChange={(e) => setPayAccCfg({ ...payAccCfg, bank_name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>账号 *</label>
+                <input value={payAccCfg?.account_no || ''}
+                  onChange={(e) => setPayAccCfg({ ...payAccCfg, account_no: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>转账备注提示</label>
+                <input value={payAccCfg?.note || ''}
+                  onChange={(e) => setPayAccCfg({ ...payAccCfg, note: e.target.value })}
+                  placeholder="如：转账时请备注账单号" />
+              </div>
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 12 }}
+              onClick={savePayAccount} disabled={payAccSaving}>
+              {payAccSaving ? '保存中...' : '保存收款账户'}
+            </button>
           </div>
 
           {/* 对公转账凭证审核（24h 缓冲） */}

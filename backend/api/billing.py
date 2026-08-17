@@ -36,14 +36,26 @@ INVOICE_CATEGORY = "服务费"
 PAY_METHOD = "bank_transfer"
 GRACE_HOURS = 24   # 提交凭证后套餐临时生效的缓冲小时数（平台审核窗口）
 
-# 对公收款账户（演示数据，生产替换为真实账户并建议移到平台配置表）
-PAY_ACCOUNT = {
+# 对公收款账户默认值（演示数据；平台超管可在「财务管理 → 收款账户设置」中维护，
+# 保存到 site_contents.pay_account，付款弹窗实时读取）
+DEFAULT_PAY_ACCOUNT = {
     "account_name": "AI Factory 科技（宁波）有限公司",
     "bank_name": "中国工商银行宁波海曙支行",
     "account_no": "3901 1122 3344 5566 778",
-    "payee": "AI Factory 科技（宁波）有限公司",
     "note": "转账时请备注账单号，便于财务核对到账",
 }
+
+
+def _get_pay_account(db: Session) -> dict:
+    """读取对公收款账户：优先平台配置（site_contents.pay_account），未配置回退演示数据"""
+    from models import SiteContent
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    cfg = (row.pay_account or {}) if row else {}
+    merged = dict(DEFAULT_PAY_ACCOUNT)
+    for k, v in cfg.items():
+        if v:
+            merged[k] = v
+    return merged
 
 # 转账凭证保存目录（与官网图片同挂载：/static/site/payments/...）
 VOUCHER_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "site", "payments")
@@ -289,9 +301,14 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
 
 
 @router.get("/pay-account")
-def get_pay_account(current: dict = Depends(get_current_user)):
-    """对公收款账户信息（付款前展示给客户，含复制内容）"""
-    return {"pay_method": PAY_METHOD, "account": PAY_ACCOUNT}
+def get_pay_account(db: Session = Depends(get_db),
+                    current: dict = Depends(get_current_user)):
+    """对公收款账户信息（付款前展示给客户，含复制内容；平台配置优先，未配置回退演示数据）"""
+    from models import SiteContent
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    configured = bool(row and row.pay_account and any(row.pay_account.values()))
+    return {"pay_method": PAY_METHOD, "account": _get_pay_account(db),
+            "is_demo": not configured}
 
 
 @router.post("/pay")

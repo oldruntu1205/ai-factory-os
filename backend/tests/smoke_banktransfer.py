@@ -106,4 +106,32 @@ r = client.post("/billing/upgrade", headers=H3, json={"company_id": cid3, "plan"
 assert r.status_code == 400, r.text
 print("[OK] 存在待审核账单时重复升级被拒:", r.json()["detail"])
 
+# ===== 场景 4：对公收款账户后台配置 =====
+print("--- 场景 4：收款账户后台可配置 ---")
+r = client.get("/billing/pay-account", headers={"Authorization": f"Bearer {token}"})
+assert r.status_code == 200 and r.json()["is_demo"] is True, r.text
+print("[OK] 未配置时回退演示数据 is_demo=True:", r.json()["account"]["account_no"])
+
+r = client.put("/platform/pay-account", headers=HP, json={
+    "account_name": "真实收款公司（测试）",
+    "bank_name": "招商银行宁波分行",
+    "account_no": "6225 8888 0000 1111",
+    "note": "转账请备注账单号",
+})
+assert r.status_code == 200, r.text
+print("[OK] 平台保存收款账户:", r.json()["message"])
+
+r = client.get("/billing/pay-account", headers={"Authorization": f"Bearer {token}"})
+assert r.status_code == 200 and r.json()["is_demo"] is False, r.text
+assert r.json()["account"]["account_name"] == "真实收款公司（测试）", r.text
+print("[OK] 配置后付款弹窗读取真实账户 is_demo=False:", r.json()["account"]["account_no"])
+
+# 恢复演示数据（清空配置）
+r = client.put("/platform/pay-account", headers=HP, json={
+    "account_name": "", "bank_name": "", "account_no": "", "note": ""})
+assert r.status_code == 200, r.text
+r = client.get("/billing/pay-account", headers={"Authorization": f"Bearer {token}"})
+assert r.json()["is_demo"] is True, r.text
+print("[OK] 清空配置后回退演示数据")
+
 print("\n===== 对公转账 24h 缓冲冒烟测试全部通过 =====")
