@@ -45,7 +45,7 @@ PAY_ACCOUNT = {
     "note": "转账时请备注账单号，便于财务核对到账",
 }
 
-# 转账凭证保存目录（与官网图片同挂载：/static/site/...）
+# 转账凭证保存目录（与官网图片同挂载：/static/site/payments/...）
 VOUCHER_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "site", "payments")
 os.makedirs(VOUCHER_DIR, exist_ok=True)
 

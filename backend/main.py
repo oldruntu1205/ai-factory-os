@@ -645,9 +645,10 @@ def health():
 # 上传文件静态服务（安全：仅官网素材目录公开；报价 PDF 与营业执照改由鉴权接口提供）
 os.makedirs("output", exist_ok=True)
 
-# 官网图片静态服务（客户 LOGO / 首屏背景等，CMS 上传）
+# 官网图片静态服务（客户 LOGO / 首屏背景等，CMS 上传；转账凭证存 uploads/site/payments/）
+# 挂载 /static/site → uploads/site，与 CMS 返回的 /static/site/xxx 前缀一致
 os.makedirs("uploads/site", exist_ok=True)
-app.mount("/static", StaticFiles(directory="uploads/site"), name="static")
+app.mount("/static/site", StaticFiles(directory="uploads/site"), name="static-site")
 
 if __name__ == "__main__":
     import uvicorn
