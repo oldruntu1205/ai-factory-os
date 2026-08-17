@@ -228,7 +228,7 @@ export default function Agents() {
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {soulContent.length} 字符 · 后端路径: <code>hermes/registry/souls/company_{companyId}/{soulMeta.name}.md</code>
+                {soulContent.length} 字符
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-secondary" onClick={resetSoul}
