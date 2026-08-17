@@ -34,6 +34,10 @@ deploy.log
 **/.trash_*
 .trash_*
 
+# ===== 本地监听守护（方案 ③）运行时产物 =====
+watch-sync.log
+watch-sync.pid
+
 # ===== 根目录文档抽取产物（非源码，按需可删） =====
 _doc_*.txt
 _doc_*.json

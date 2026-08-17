@@ -124,3 +124,55 @@ ssh root@<PROD_DOMAIN_REMOVED> "systemctl stop ai-factory-backend ai-factory-wor
 
 - `deploy/sync-rag-fixes.sh`：单/少量文件热修，rsync + 重启，**与本文 git 流程互不冲突**，按需选用。
 - `deploy/git-sync/`：全量后端代码「push 即上线」的自动通道，纳入版本管理与回滚。
+
+---
+
+## 八、方案 ③（可选叠加）：本地监听自动同步（保存即上线）
+
+在方案 ② 基础上叠加一个**本地常驻守护进程**：`backend/` 下任意文件保存后，守护进程在 8 秒防抖后**自动 `git commit` + `git push prod`**，无需任何手动操作，实现真正的「零操作实时同步」。生产端逻辑与 ② 完全一致（仅后端变更才重启、语法预检兜底）。
+
+> 仅建议**单人开发/演示**场景使用。多人协作时请走 ② 的手动 `git push`，避免每个人的保存互相触发推送造成提交混乱。
+
+### 8.1 启动 / 停止
+
+```bash
+# 后台启动监听守护（日志 watch-sync.log，PID watch-sync.pid）
+bash deploy/git-sync/start-watch.sh start
+
+# 查看状态 / 停止 / 重启
+bash deploy/git-sync/start-watch.sh status
+bash deploy/git-sync/start-watch.sh stop
+bash deploy/git-sync/start-watch.sh restart
+```
+
+### 8.2 行为说明
+
+- **防抖 8s**：连续保存会合并为一次推送，避免每个按键都触发部署。
+- **范围过滤**：仅 `backend/` 下的改动会自动推送；改 `frontend/`、`docs/` 等不会触发（前端走 `deploy-prod.sh`）。如需扩大范围：
+  ```bash
+  GIT_SYNC_SCOPE="backend,deploy/git-sync" bash deploy/git-sync/start-watch.sh start
+  ```
+- **空 diff 跳过**：没有实际改动不会提交。
+- **未配置远程则只本地提交**：若还没执行「三、首推」配置 `prod` 远程，守护仅做本地自动提交，不报错退出。
+- **推送失败不退出**：prod 不可用时记录错误日志并继续监听，恢复后下次保存会重试。
+- **依赖**：纯 Python 标准库即可；若装了 `watchdog`（`pip install watchdog`）则用事件驱动更省 CPU，否则自动回退为 `git status` 轮询（默认 5s）。
+
+### 8.3 常用环境变量
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `GIT_SYNC_REMOTE` | `prod` | 推送目标远程名 |
+| `GIT_SYNC_BRANCH` | `main` | 推送分支 |
+| `GIT_SYNC_SCOPE` | `backend` | 自动同步路径前缀（逗号分隔） |
+| `GIT_SYNC_DEBOUNCE` | `8` | 防抖秒数 |
+| `GIT_SYNC_POLL` | `5` | 轮询模式间隔秒数 |
+
+### 8.4 排错
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 保存后没上线 | 改动不在 `backend/` 范围 | 检查 `GIT_SYNC_SCOPE`；或手动 `git push prod main` |
+| 日志显示「未配置远程」 | 还没跑「三、首推」 | 先配置 `prod` 远程 |
+| 日志显示「推送失败」 | prod 不可达/SSH 失效 | 查 `ssh root@<PROD_DOMAIN_REMOVED>`；恢复后下次保存自动重试 |
+| CPU 占用偏高 | 回退到了轮询模式 | `pip install watchdog` 后重启守护 |
+
