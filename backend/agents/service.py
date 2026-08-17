@@ -93,6 +93,15 @@ JSON 格式：
     try:
         parsed = _extract_json(content)
         if parsed and customer_id:
+            # RBAC Step3：销售写 CRM 前校验租户权限（crm:write）——默认集通过，revoke 后不写库
+            try:
+                from hermes.runtime import get_runtime
+                get_runtime().permission_system.assert_tool_permission(
+                    company_id, "crm.create_customer", "crm:write")
+            except PermissionError as e:
+                return f"企业未授权 CRM 写入权限（crm:write），未创建/更新线索。{e}"
+            except Exception:
+                pass  # runtime 未初始化时不拦截
             # 更新或创建 CRM 客户（线索）
             cust = db.query(Customer).filter(Customer.id == customer_id).first()
             if not cust:
@@ -129,6 +138,15 @@ JSON 格式：
     try:
         parsed = _extract_json(content)
         if parsed:
+            # RBAC Step3：报价写 Quotation 前校验租户权限（quotation:write）——默认集通过，revoke 后不写库
+            try:
+                from hermes.runtime import get_runtime
+                get_runtime().permission_system.assert_tool_permission(
+                    company_id, "quotation.create", "quotation:write")
+            except PermissionError as e:
+                return f"企业未授权报价写入权限（quotation:write），未生成报价单。{e}"
+            except Exception:
+                pass  # runtime 未初始化时不拦截
             import uuid
             cust = db.query(Customer).filter(Customer.id == customer_id).first() if customer_id else None
             quotation = Quotation(
