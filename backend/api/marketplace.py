@@ -204,7 +204,10 @@ def install_package(data: InstallIn, db: Session = Depends(get_db),
     if not company:
         raise HTTPException(status_code=404, detail="企业不存在")
     needed = len(p.agents or [])
-    used_agents = db.query(AIAgent).filter(AIAgent.company_id == data.company_id).count()
+    # 修复：席位统计仅计激活员工（卸载只置 disabled 不删行，此前停用员工虚占席位误拦安装）
+    used_agents = db.query(AIAgent).filter(
+        AIAgent.company_id == data.company_id,
+        AIAgent.status == "active").count()
     remaining = company.max_agents - used_agents
     if needed > remaining:
         raise HTTPException(
@@ -284,11 +287,9 @@ def uninstall_package(data: InstallIn, db: Session = Depends(get_db),
         for agent in (p.agents or []):
             manifest_name = role_map.get(agent.get("role"), f"{agent.get('role', 'custom')}_agent")
             runtime.permission_system.deny_agent(data.company_id, manifest_name)
-        # 修复：卸载时回收安装时授予的工具权限点（此前只 deny_agent 不回收权限）
-        for tool in (p.tools or []):
-            tool_perm = _tool_permission_of(tool)
-            if tool_perm:
-                runtime.permission_system.revoke_permission(data.company_id, tool_perm)
+        # 安全修复：卸载**不回收租户级权限点**——权限点为租户级共享集合且默认集全开，
+        # 回收会误伤其他已装包/内置 Agent 的同类工具（如卸载含 erp 的包会收掉整租户 erp:read）。
+        # Agent 级访问控制由 deny_agent + manifest 声明校验承担，已足够。
 
     install.status = "uninstalled"
     if p and p.install_count > 0:
