@@ -13,8 +13,8 @@ from pydantic import BaseModel
 from database import get_db
 from models import User, Company, SmsCode
 from auth.deps import get_current_user
-from auth.security import hash_password
-from config import SMS_MOCK_CODE
+from auth.security import hash_password, verify_password
+from utils.sms import generate_code, send_sms
 from utils.audit import log_action
 
 router = APIRouter(prefix="/account", tags=["账户设置"])
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/account", tags=["账户设置"])
 class ChangePasswordIn(BaseModel):
     mobile: str
     code: str
+    old_password: str = ""          # 安全修复：改密必须校验旧密码
     new_password: str
 
 
@@ -54,26 +55,34 @@ def send_change_password_code(mobile: str, db: Session = Depends(get_db),
         SmsCode.purpose == "change_password",
         SmsCode.used.is_(False),
     ).update({"used": True})
+    code = generate_code()
     s = SmsCode(
         company_id=current["company_id"], mobile=mobile,
-        code=SMS_MOCK_CODE, purpose="change_password",
+        code=code, purpose="change_password",
         expires_at=datetime.utcnow() + timedelta(minutes=10),
     )
     db.add(s)
     db.commit()
+    send_sms(mobile, code, purpose="change_password")
     log_action(current["company_id"], "account_send_code",
                f"修改密码验证码发送至 {mobile[:6]}***", current["user_id"], current["email"])
-    return {"message": "验证码已发送", "expires_in": 600, "mock_code": SMS_MOCK_CODE}
+    # 安全修复：接口不再回显验证码（此前 mock_code 明文返回）
+    return {"message": "验证码已发送", "expires_in": 600}
 
 
 @router.post("/change-password")
 def change_password(data: ChangePasswordIn, db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
-    """修改密码：手机验证码校验通过后更新密码"""
+    """修改密码：旧密码 + 手机验证码双因素校验通过后更新密码"""
     if not _validate_mobile(data.mobile):
         raise HTTPException(status_code=400, detail="手机号格式不正确")
     if len(data.new_password) < 6:
         raise HTTPException(status_code=400, detail="新密码至少 6 位")
+
+    user = db.query(User).filter(User.id == current["user_id"]).first()
+    # 安全修复：必须校验旧密码（此前仅凭可回显的验证码即可改密）
+    if not data.old_password or not verify_password(data.old_password, user.password):
+        raise HTTPException(status_code=400, detail="旧密码不正确")
 
     record = db.query(SmsCode).filter(
         SmsCode.company_id == current["company_id"],
@@ -90,7 +99,6 @@ def change_password(data: ChangePasswordIn, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="验证码不正确")
 
     record.used = True
-    user = db.query(User).filter(User.id == current["user_id"]).first()
     user.password = hash_password(data.new_password)
     db.commit()
     log_action(current["company_id"], "password_change",

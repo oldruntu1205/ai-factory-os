@@ -23,8 +23,9 @@ from database import get_db, SessionLocal
 from models import Company, User, SmsCode
 from auth.deps import get_current_user
 from auth.security import hash_password, verify_password
-from config import BASE_DIR, SMS_MOCK_CODE, MAX_UPLOAD_SIZE_MB
+from config import BASE_DIR, MAX_UPLOAD_SIZE_MB
 from utils.audit import log_action, list_audit_logs, require_admin
+from utils.sms import generate_code, send_sms
 from constants.industries import get_all_options
 
 router = APIRouter(prefix="/company", tags=["企业设置"])
@@ -348,14 +349,16 @@ def _validate_mobile(mobile: str) -> bool:
 @router.post("/sms/send")
 def sms_send(data: SmsSendIn, db: Session = Depends(get_db),
              current: dict = Depends(get_current_user)):
-    """发送手机验证码（演示版固定返回 123456，生产接阿里云/腾讯云 SMS）"""
+    """发送手机验证码（安全修复：随机码、接口不回显；演示模式码写服务端日志）"""
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     if not _validate_mobile(data.mobile):
         raise HTTPException(status_code=400, detail="手机号格式不正确")
+    if data.purpose not in ("verify_mobile", "change_password"):
+        raise HTTPException(status_code=400, detail="未知的验证码用途")
 
     from datetime import timedelta
-    code = SMS_MOCK_CODE  # 演示版固定验证码
+    code = generate_code()
     # 失效旧的同用途验证码
     db.query(SmsCode).filter(
         SmsCode.company_id == data.company_id,
@@ -371,13 +374,14 @@ def sms_send(data: SmsSendIn, db: Session = Depends(get_db),
     )
     db.add(s)
     db.commit()
+    send_sms(data.mobile, code, purpose=data.purpose)
     log_action(data.company_id, "sms_send",
                f"发送验证码到 {data.mobile[:6]}***（{data.purpose}）",
                current["user_id"], current["email"])
+    # 安全修复：不再回显 mock_code（此前验证码明文返回，等于无验证）
     return {"message": "验证码已发送",
             "mobile": data.mobile,
-            "expires_in": 600,
-            "mock_code": code}   # 演示版直接返回真实码，生产应去掉
+            "expires_in": 600}
 
 
 @router.post("/sms/verify")

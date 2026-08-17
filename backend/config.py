@@ -31,7 +31,20 @@ else:
     DATABASE_URL = f"sqlite:///{_sqlite_path.as_posix()}"
 
 # ---------- JWT ----------
-SECRET_KEY = os.getenv("SECRET_KEY", "industrial-ai-secret-change-in-production")
+# 安全修复：SECRET_KEY 不再硬编码默认值。未配置时自动生成并持久化到 backend/.secret_key
+# （重启不失效）；生产可用环境变量 SECRET_KEY 显式注入。
+import secrets as _secrets
+SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    _key_file = BASE_DIR / ".secret_key"
+    try:
+        if _key_file.exists():
+            SECRET_KEY = _key_file.read_text().strip()
+        if not SECRET_KEY:
+            SECRET_KEY = _secrets.token_hex(32)
+            _key_file.write_text(SECRET_KEY)
+    except Exception:
+        SECRET_KEY = SECRET_KEY or _secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "7"))
 
@@ -93,8 +106,9 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 QUEUE_MODE = os.getenv("QUEUE_MODE", "auto")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
-# ---------- SMS 验证码（演示版固定码，生产接阿里云/腾讯云）----------
-SMS_MOCK_CODE = os.getenv("SMS_MOCK_CODE", "123456")
+# ---------- SMS 验证码（安全修复：随机码、接口不回显；演示模式写服务端日志）----------
+# SMS_MOCK_MODE=1（默认）验证码写日志便于本地联调；生产置 0 并接入真实短信网关
+SMS_MOCK_MODE = os.getenv("SMS_MOCK_MODE", "1").lower() in ("1", "true", "yes", "on")
 
 # ---------- 自进化定时调度器（Phase 5 周期自进化）----------
 # 是否启用后台周期自进化守护线程（0 关闭；关闭后仍可用系统 crontab 跑 scripts/auto_evolve_cron.py）

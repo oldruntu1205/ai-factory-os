@@ -7,12 +7,16 @@ api/integrations.py —— 业务系统对接管理（平台超管）
 - PUT  /integrations/{system_type}        新增/更新某企业的某系统对接配置
 - POST /integrations/{system_type}/test   测试与该系统的连接
 
-说明：凭证（api_key / password）当前以明文落库，生产环境应加密存储；
-      连接测试为轻量级探测（GET + 超时），用于校验地址与鉴权是否可用。
+安全（2026-08 加固）：
+- 凭证（api_key / password）加密落库（Fernet，密钥派生自 SECRET_KEY），接口仅回显掩码
+- 连接测试：仅 http/https、拦截私网/回环/链路本地地址（防 SSRF）、恢复 TLS 证书校验、错误分类
 """
-import ssl
 import base64
+import ipaddress
+import socket
+import ssl
 import urllib.request
+import urllib.parse
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,6 +26,7 @@ from pydantic import BaseModel
 from database import get_db
 from models import IntegrationConfig, Company
 from auth.deps import get_current_user
+from utils.crypto import encrypt_secret, decrypt_secret
 
 router = APIRouter(prefix="/integrations", tags=["业务系统对接"])
 
@@ -84,6 +89,7 @@ class IntegrationIn(BaseModel):
 # ============ 内部工具 ============
 
 def _row_to_dict(row: IntegrationConfig) -> dict:
+    api_key_plain = decrypt_secret(row.api_key or "")
     return {
         "id": row.id,
         "company_id": row.company_id,
@@ -91,9 +97,12 @@ def _row_to_dict(row: IntegrationConfig) -> dict:
         "enabled": bool(row.enabled),
         "endpoint": row.endpoint or "",
         "auth_type": row.auth_type or "none",
-        "api_key": row.api_key or "",
+        # 安全修复：凭证仅回显掩码，不回显明文
+        "api_key": ("****" + api_key_plain[-4:]) if api_key_plain else "",
+        "api_key_set": bool(api_key_plain),
         "username": row.username or "",
-        "password": row.password or "",
+        "password": "****" if decrypt_secret(row.password or "") else "",
+        "password_set": bool(decrypt_secret(row.password or "")),
         "extra": row.extra or {},
         "status": row.status or "unconfigured",
         "last_error": row.last_error or "",
@@ -105,31 +114,64 @@ def _row_to_dict(row: IntegrationConfig) -> dict:
 def _build_headers(cfg: IntegrationConfig) -> dict:
     headers = {"User-Agent": "AI-Factory-Integration/1.0"}
     at = cfg.auth_type or "none"
-    if at == "apikey" and cfg.api_key:
-        headers["X-API-Key"] = cfg.api_key
-    elif at == "bearer" and cfg.api_key:
-        headers["Authorization"] = f"Bearer {cfg.api_key}"
-    elif at == "basic" and (cfg.username or cfg.password):
+    api_key = decrypt_secret(cfg.api_key or "")
+    password = decrypt_secret(cfg.password or "")
+    if at == "apikey" and api_key:
+        headers["X-API-Key"] = api_key
+    elif at == "bearer" and api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    elif at == "basic" and (cfg.username or password):
         token = base64.b64encode(
-            f"{cfg.username or ''}:{cfg.password or ''}".encode()).decode()
+            f"{cfg.username or ''}:{password}".encode()).decode()
         headers["Authorization"] = f"Basic {token}"
     return headers
 
 
+def _is_unsafe_host(host: str) -> bool:
+    """SSRF 防护：判断 host 是否指向私网/回环/链路本地/保留/云元数据地址"""
+    try:
+        ip = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        # 域名：DNS 解析后校验（含云元数据/内网域名解析结果）
+        try:
+            ip = ipaddress.ip_address(socket.gethostbyname(host))
+        except Exception:
+            return True  # 解析失败视为不安全
+    return (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
+
+
 def _test_connection(cfg: IntegrationConfig):
-    """轻量级连接探测，返回 (ok, message)"""
+    """轻量级连接探测（SSRF 防护 + TLS 校验），返回 (ok, message)"""
     if not cfg.endpoint:
         return False, "未配置访问地址"
     try:
+        parts = urllib.parse.urlparse(cfg.endpoint)
+        # 1) 协议白名单
+        if parts.scheme not in ("http", "https"):
+            return False, "仅支持 http/https 协议"
+        host = parts.hostname or ""
+        # 2) 私网/回环/链路本地地址拦截（含云元数据 169.254.169.254）
+        if _is_unsafe_host(host):
+            return False, "目标地址指向私网/保留地址，已拒绝（防 SSRF）"
         req = urllib.request.Request(
             cfg.endpoint, headers=_build_headers(cfg), method="GET")
+        # 3) 恢复 TLS 证书校验（此前 check_hostname=False + CERT_NONE 可被中间人截获）
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
             return True, f"连接成功（HTTP {resp.status}）"
-    except Exception as e:  # noqa: BLE001 - 连接测试需捕获所有异常
-        return False, str(e)[:300]
+    except Exception as e:  # noqa: BLE001
+        # 错误分类（不透传内部细节）
+        msg = str(e)
+        if "timed out" in msg or "timeout" in msg:
+            return False, "连接超时"
+        if "CERTIFICATE_VERIFY_FAILED" in msg or "certificate" in msg.lower():
+            return False, "TLS 证书校验失败"
+        if "Connection refused" in msg:
+            return False, "连接被拒绝"
+        if "Name or service not known" in msg or "getaddrinfo" in msg:
+            return False, "域名无法解析"
+        return False, "连接失败，请检查地址与网络"
 
 
 # ============ 接口 ============
@@ -216,9 +258,12 @@ def upsert_integration(system_type: str, payload: IntegrationIn,
     row.enabled = payload.enabled
     row.endpoint = payload.endpoint.strip()
     row.auth_type = payload.auth_type
-    row.api_key = payload.api_key
+    # 安全：空值/掩码表示保留原凭证，仅新值加密落库
+    if payload.api_key and not payload.api_key.startswith("****"):
+        row.api_key = encrypt_secret(payload.api_key)
+    if payload.password and not payload.password.startswith("****"):
+        row.password = encrypt_secret(payload.password)
     row.username = payload.username
-    row.password = payload.password
     row.extra = payload.extra or {}
     # 保存时按是否配置地址推导状态（实际连通性以 test 为准）
     if not row.endpoint:
@@ -255,9 +300,12 @@ def test_integration(system_type: str, payload: IntegrationIn,
     row.enabled = payload.enabled
     row.endpoint = payload.endpoint.strip()
     row.auth_type = payload.auth_type
-    row.api_key = payload.api_key
+    # 安全：空值/掩码表示保留原凭证，仅新值加密落库
+    if payload.api_key and not payload.api_key.startswith("****"):
+        row.api_key = encrypt_secret(payload.api_key)
+    if payload.password and not payload.password.startswith("****"):
+        row.password = encrypt_secret(payload.password)
     row.username = payload.username
-    row.password = payload.password
     row.extra = payload.extra or {}
     row.updated_at = datetime.utcnow()
 

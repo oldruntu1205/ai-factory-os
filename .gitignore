@@ -14,6 +14,8 @@ backend/venv/
 **/.env
 backend/.env
 .env
+backend/.secret_key
+.secret_key
 
 # ===== 数据库与测试残留（数据库走独立备份策略，不进版本库） =====
 *.db
