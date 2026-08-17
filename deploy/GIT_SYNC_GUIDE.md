@@ -41,9 +41,24 @@ PROD <PROD_DOMAIN_REMOVED>
 
 ## 二、生产端：创建 bare 仓库 + 钩子（在服务器执行一次）
 
+> **注意**：`setup-prod.sh` / `post-receive` 这些脚本此刻只存在于本地仓库（首次部署时服务器上还没有 git 仓库）。不要直接在服务器终端里 `bash deploy/...`，那样会报 `No such file or directory`。推荐用下面的**本地一键引导**。
+
+### 方式 A（推荐）：本地一键引导
+
+在**本地开发机**（仓库根目录）执行，脚本会自动上传 git-sync 目录并在服务器上运行 setup-prod.sh：
+
 ```bash
-# 把本仓库 deploy/git-sync/ 传到服务器，或直接在该目录执行
-bash deploy/git-sync/setup-prod.sh /www/wwwroot/<站点目录> main
+bash deploy/git-sync/bootstrap-prod.sh root@<PROD_DOMAIN_REMOVED> /www/wwwroot/<站点目录> main
+```
+
+### 方式 B：手动上传后在服务器执行
+
+```bash
+# 本地开发机：上传脚本目录
+scp -r deploy/git-sync root@<PROD_DOMAIN_REMOVED>:/root/git-sync
+
+# 服务器：执行 setup-prod.sh
+bash /root/git-sync/setup-prod.sh /www/wwwroot/<站点目录> main
 ```
 
 脚本会：
