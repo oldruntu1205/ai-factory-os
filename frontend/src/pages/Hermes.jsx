@@ -94,10 +94,12 @@ export default function Hermes() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h1 style={{ fontSize: 22 }}>Agent中台（Hermes Runtime）</h1>
-        <button className="btn btn-primary" onClick={() => setShowRegister(!showRegister)}>
-          {showRegister ? '取消' : '+ 注册 Agent'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, margin: 0 }}>Agent中台（Hermes Runtime）</h1>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowRegister(!showRegister)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>{showRegister ? '✕' : '+'}</span>
+          注册 Agent
         </button>
       </div>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
