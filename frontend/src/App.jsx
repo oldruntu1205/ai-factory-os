@@ -24,6 +24,7 @@ import SiteAdmin from './pages/SiteAdmin'
 import IntegrationAdmin from './pages/IntegrationAdmin'
 import IntegrationDetail from './pages/IntegrationDetail'
 import BusinessSystems from './pages/BusinessSystems'
+import Help from './pages/Help'
 import Layout from './components/Layout'
 
 function RequireAuth({ children }) {
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/systems" element={<BusinessSystems />} />
         <Route path="/settings" element={<CompanySettings />} />
         <Route path="/account" element={<AccountSettings />} />
+        <Route path="/help" element={<Help />} />
         <Route path="/channels" element={<Navigate to="/channels/wecom" replace />} />
         <Route path="/channels/wecom" element={<Channels section="wecom" />} />
         <Route path="/channels/whatsapp" element={<Channels section="whatsapp" />} />

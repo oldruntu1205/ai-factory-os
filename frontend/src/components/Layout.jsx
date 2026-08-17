@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
 import ThemeSwitcher from './ThemeSwitcher'
+import FloatingSupport from './FloatingSupport'
 
 // ============ 菜单配置 ============
 // 企业侧：业务 / 企业（Hermes Runtime 已从企业侧移除，仅平台超管可见）
@@ -17,6 +18,10 @@ const NAV_GROUPS = [
       { to: '/chat', label: 'AI对话', icon: '💬' },
       { to: '/drawing-chat', label: 'AI图纸助手', icon: '📐' },
       { to: '/knowledge', label: '知识库', icon: '📚' },
+      { to: '/crm', label: '客户CRM', icon: '👥' },
+      { to: '/quotations', label: '报价单', icon: '📄' },
+      { to: '/leads', label: 'AI自主销售', icon: '🎯' },
+      { to: '/systems', label: '业务系统数据', icon: '🗂️' },
       {
         label: '渠道中心', icon: '📡',
         children: [
@@ -25,10 +30,6 @@ const NAV_GROUPS = [
           { to: '/channels/email', label: '企业邮件', icon: '✉️' },
         ],
       },
-      { to: '/crm', label: '客户CRM', icon: '👥' },
-      { to: '/quotations', label: '报价单', icon: '📄' },
-      { to: '/leads', label: 'AI自主销售', icon: '🎯' },
-      { to: '/systems', label: '业务系统数据', icon: '🗂️' },
     ],
   },
   {
@@ -48,6 +49,7 @@ const NAV_GROUPS = [
       },
       { to: '/settings', label: '企业设置', icon: '⚙️' },
       { to: '/account', label: '账户设置', icon: '👤' },
+      { to: '/help', label: '使用帮助', icon: '📖' },
     ],
   },
 ]
@@ -323,6 +325,9 @@ export default function Layout() {
       <div style={{ position: 'fixed', top: 14, right: 24, zIndex: 999 }}>
         <ThemeSwitcher />
       </div>
+
+      {/* 右下角悬浮在线客服（数据来自官网内容 social/contact 配置） */}
+      <FloatingSupport />
 
       {/* 未认证守卫 modal */}
       {needVerify && (

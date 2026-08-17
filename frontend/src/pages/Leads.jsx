@@ -4,6 +4,14 @@ import PageHeader from '../components/PageHeader'
 
 const COUNTRIES = ['Germany', 'United Kingdom', 'United States', 'France', 'Sweden',
   'Japan', 'Italy', 'Australia', 'India', 'Brazil', 'Canada', 'Netherlands', 'China']
+const COUNTRY_LABELS = {
+  Germany: '德国', 'United Kingdom': '英国', 'United States': '美国', France: '法国',
+  Sweden: '瑞典', Japan: '日本', Italy: '意大利', Australia: '澳大利亚',
+  India: '印度', Brazil: '巴西', Canada: '加拿大', Netherlands: '荷兰', China: '中国',
+  DE: '德国', GB: '英国', UK: '英国', US: '美国', FR: '法国', SE: '瑞典', JP: '日本',
+  IT: '意大利', AU: '澳大利亚', IN: '印度', BR: '巴西', CA: '加拿大', NL: '荷兰', CN: '中国',
+}
+const countryLabel = v => COUNTRY_LABELS[v] || v || '—'
 const INDUSTRIES = ['实验室化学品', '科研仪器', '生物技术', '制药', '分析仪器',
   '玻璃制品', '医疗器械', '高校科研', '食品检测', '环境监测']
 
@@ -204,7 +212,7 @@ export default function Leads() {
                 border: '1px solid var(--border)', userSelect: 'none',
                 background: countries.includes(c) ? 'var(--primary)' : 'transparent',
                 color: countries.includes(c) ? '#fff' : 'var(--text)' }}>
-              {c}</span>
+              {COUNTRY_LABELS[c] || c}</span>
           ))}
         </div>
         <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-muted)' }}>行业（可多选，不选=不限）</div>
@@ -274,7 +282,7 @@ export default function Leads() {
                     <div style={{ fontWeight: 600 }}>{l.company_name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.website}</div>
                   </td>
-                  <td>{l.country}</td>
+                  <td>{countryLabel(l.country)}</td>
                   <td>{l.industry}</td>
                   <td style={{ fontSize: 12 }}>{l.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                   <td>
