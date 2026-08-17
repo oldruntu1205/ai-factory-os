@@ -105,10 +105,75 @@ class AgentRegistry:
     # ---------- 发现 ----------
 
     def get_agent(self, name: str) -> Optional[AgentManifest]:
-        return self._agents.get(name)
+        agent = self._agents.get(name)
+        if agent is not None:
+            return agent
+        # 多 worker 兜底：本 worker 内存未命中时查持久化（自定义 Agent 已在 DB），
+        # 加载后缓存进本 worker 内存，避免每次查库
+        return self._load_one_from_db(name)
+
+    def _load_one_from_db(self, name: str) -> Optional[AgentManifest]:
+        try:
+            from database import SessionLocal
+            from models import AgentManifestRecord
+            db = SessionLocal()
+            try:
+                row = db.query(AgentManifestRecord).filter(
+                    AgentManifestRecord.name == name).first()
+                if not row:
+                    return None
+                manifest = AgentManifest(
+                    name=row.name, version=row.version or "1.0",
+                    industry=row.industry or "general",
+                    label=row.label or row.name,
+                    description=row.description or "",
+                    tools=list(row.tools or []),
+                    permissions=list(row.permissions or []),
+                    system_prompt=row.system_prompt or "",
+                    status=row.status or "registered",
+                )
+                manifest.handler = self._make_custom_handler(manifest)
+                self._agents[manifest.name] = manifest
+                return manifest
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Registry: 从 DB 加载 Agent [{name}] 失败: {e}")
+            return None
 
     def list_agents(self, industry: Optional[str] = None,
                     status: Optional[str] = None) -> List[AgentManifest]:
+        # 合并持久化的自定义 Agent（多 worker 下各 worker 内存可能不全）
+        try:
+            from database import SessionLocal
+            from models import AgentManifestRecord
+            db = SessionLocal()
+            try:
+                rows = db.query(AgentManifestRecord).all()
+                db_names = {row.name for row in rows}
+                for row in rows:
+                    if row.name not in self._agents:
+                        manifest = AgentManifest(
+                            name=row.name, version=row.version or "1.0",
+                            industry=row.industry or "general",
+                            label=row.label or row.name,
+                            description=row.description or "",
+                            tools=list(row.tools or []),
+                            permissions=list(row.permissions or []),
+                            system_prompt=row.system_prompt or "",
+                            status=row.status or "registered",
+                        )
+                        manifest.handler = self._make_custom_handler(manifest)
+                        self._agents[manifest.name] = manifest
+                # 同步删除：内存中已注销（DB 无记录）的自定义 Agent，避免跨 worker 残留
+                for name in [n for n in self._agents
+                             if n not in db_names and self._is_custom(name)]:
+                    self._agents.pop(name, None)
+            finally:
+                db.close()
+        except Exception:
+            pass  # 表不存在/未初始化时忽略
+
         result = []
         for a in self._agents.values():
             if industry and a.industry != industry:
@@ -117,6 +182,14 @@ class AgentRegistry:
                 continue
             result.append(a)
         return result
+
+    @staticmethod
+    def _is_custom(name: str) -> bool:
+        """内置 Agent 名（main.py 注册）不属于自定义，不随 DB 同步删除"""
+        return name not in {
+            "customer_agent", "sales_agent", "quotation_agent",
+            "production_agent", "quality_agent", "ceo_agent", "process_agent",
+        }
 
     def discover(self, industry: str) -> List[AgentManifest]:
         """按行业发现可用 Agent"""
