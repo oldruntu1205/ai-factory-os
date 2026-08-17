@@ -24,13 +24,16 @@ celery_app.conf.update(
     timezone="Asia/Shanghai",
     enable_utc=True,
     beat_schedule={
-        "daily-follow-up": {
-            "task": "tasks.followup.daily_follow",
+        # 邮件跟进序列（新机制，含追踪像素/退订，D0/D3/D7/D14）
+        "email-follow-up-sequence": {
+            "task": "tasks.followup.email_follow_up_sequence",
             "schedule": 86400.0,  # 每天
         },
         "scheduled-discovery": {
             "task": "tasks.followup.scheduled_discovery",
             "schedule": 86400.0,
         },
+        # 注：旧机制 daily_follow（followup_day 字段、无追踪/退订）已从 beat 移除，
+        # 避免与新序列机制双轨并行对同一条线索重复发信；函数保留供兼容调用。
     },
 )

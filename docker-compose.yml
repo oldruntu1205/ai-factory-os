@@ -97,7 +97,7 @@ services:
       context: ./backend
     container_name: industrial-ai-hermes-worker
     restart: always
-    command: celery -A tasks.celery_app:celery_app worker --loglevel=info
+    command: celery -A tasks.celery_app:celery_app worker -B --loglevel=info
     environment:
       DATABASE_URL: postgresql://industrial:industrial123@postgres:5432/industrial_ai
       SECRET_KEY: ${SECRET_KEY}
