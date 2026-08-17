@@ -21,10 +21,11 @@ to_win() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) cygpath -w "$1";; *) echo
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR_W="$(to_win "$SCRIPT_DIR")"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-REPO_ROOT_W="$(to_win "$REPO_ROOT")"
+# 注意：只有传给原生 python 的参数才用 Windows 路径（WATCHER）；
+# bash 自己的重定向/读文件（LOGFILE/PIDFILE）必须用 MSYS 路径，反斜杠会被 bash 当转义符
 WATCHER="$SCRIPT_DIR_W/watch-sync.py"
-PIDFILE="$REPO_ROOT_W/watch-sync.pid"
-LOGFILE="$REPO_ROOT_W/watch-sync.log"
+PIDFILE="$REPO_ROOT/watch-sync.pid"
+LOGFILE="$REPO_ROOT/watch-sync.log"
 
 # 找一个真正可用的 Python（防止命中微软商店占位符，它启动即退出且无解释器）
 find_python() {
