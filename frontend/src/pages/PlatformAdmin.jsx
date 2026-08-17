@@ -24,6 +24,10 @@ export default function PlatformAdmin() {
   const [msg, setMsg] = useState('')
   const [rejectInput, setRejectInput] = useState({})
 
+  // 开票申请管理
+  const [invReqs, setInvReqs] = useState([])
+  const [issueNoMap, setIssueNoMap] = useState({})
+
   // 模型设置
   const [llm, setLlm] = useState(null)
   const [gateway, setGateway] = useState('deepseek')
@@ -45,6 +49,39 @@ export default function PlatformAdmin() {
   const loadFinance = async () => {
     const { data } = await api.get('/platform/finance')
     setFinance(data)
+    try {
+      const reqs = await api.get('/platform/invoice-requests')
+      setInvReqs(reqs.data.requests || [])
+    } catch (e) { /* 忽略 */ }
+  }
+
+  const issueInvoice = async (reqId) => {
+    const invoiceNo = (issueNoMap[reqId] || '').trim()
+    if (!invoiceNo) {
+      setMsg('❌ 请先填写发票号')
+      return
+    }
+    try {
+      const { data } = await api.post(`/platform/invoice-requests/${reqId}/issue`, null,
+        { params: { invoice_no: invoiceNo } })
+      setMsg(`✅ ${data.message}`)
+      loadFinance()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '操作失败'}`)
+    }
+  }
+
+  const rejectInvoice = async (reqId) => {
+    const reason = window.prompt('请输入驳回原因（客户可见）：', '开票信息有误，请联系客服')
+    if (reason === null) return
+    try {
+      const { data } = await api.post(`/platform/invoice-requests/${reqId}/reject`, null,
+        { params: { reason } })
+      setMsg(`✅ ${data.message}`)
+      loadFinance()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '操作失败'}`)
+    }
   }
   const loadLLM = async () => {
     try {
@@ -340,6 +377,71 @@ export default function PlatformAdmin() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* 开票申请（类别：服务费） */}
+          <div className="card" style={{ marginTop: 20 }}>
+            <h3 style={{ marginBottom: 12 }}>开票申请管理（类别：服务费）</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              企业客户对已支付账单提交开票申请；财务线下开具电子发票后，在此回填发票号完成闭环。
+            </p>
+            {invReqs.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>暂无开票申请</div>
+            ) : (
+              <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>申请单号</th><th>企业</th><th>账单</th><th>金额</th><th>抬头</th>
+                      <th>税号</th><th>类型</th><th>状态</th><th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invReqs.map((r) => (
+                      <tr key={r.id}>
+                        <td style={{ fontSize: 12 }}>{r.req_no}</td>
+                        <td style={{ fontSize: 12 }}>{r.company_id}</td>
+                        <td style={{ fontSize: 12 }}>{r.bill_no}</td>
+                        <td style={{ fontWeight: 600 }}>¥{r.amount.toLocaleString()}</td>
+                        <td style={{ fontSize: 12, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.title}>
+                          {r.title}
+                        </td>
+                        <td style={{ fontSize: 12 }}>{r.tax_no}</td>
+                        <td style={{ fontSize: 12 }}>{r.invoice_type === 'special' ? '电子专票' : '电子普票'}</td>
+                        <td>
+                          <span className={`badge ${r.status === 'issued' ? 'badge-green' : r.status === 'rejected' ? 'badge-red' : 'badge-yellow'}`}>
+                            {r.status === 'issued' ? '已开票' : r.status === 'rejected' ? '已驳回' : '待开票'}
+                          </span>
+                        </td>
+                        <td>
+                          {r.status === 'pending' ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <input
+                                value={issueNoMap[r.id] || ''}
+                                onChange={(e) => setIssueNoMap((m) => ({ ...m, [r.id]: e.target.value }))}
+                                placeholder="发票号"
+                                style={{ width: 110, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-strong)', fontSize: 12 }}
+                              />
+                              <button className="btn btn-success btn-sm"
+                                onClick={() => issueInvoice(r.id)} disabled={!(issueNoMap[r.id] || '').trim()}>
+                                已开
+                              </button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => rejectInvoice(r.id)}>
+                                驳回
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                              {r.status === 'issued' ? `发票号：${r.invoice_no || '—'}` : (r.reject_reason || '已驳回')}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

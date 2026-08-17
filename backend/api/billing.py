@@ -6,6 +6,9 @@ api/billing.py —— SaaS 计费系统（落地手册第22章）
 - GET  /billing/invoices         账单历史
 - POST /billing/upgrade          升级套餐（演示版直接生效）
 - POST /billing/pay              模拟支付账单
+- GET  /billing/invoice-info     获取/保存开票信息
+- POST /billing/invoice-request  对已支付账单提交开票申请（类别：服务费）
+- GET  /billing/invoice-requests 当前企业开票申请列表
 """
 import uuid
 from datetime import datetime, timedelta
@@ -16,12 +19,29 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import (Company, AIAgent, Conversation, Document, Quotation,
-                    Bill, Customer)
+                    Bill, Customer, InvoiceRequest)
 from auth.deps import get_current_user
 
 router = APIRouter(prefix="/billing", tags=["计费系统"])
 
 from constants.plans import PLANS, PLAN_DAYS
+
+# 开票类别：本平台 SaaS 订阅服务，统一按「服务费」开具
+INVOICE_CATEGORY = "服务费"
+
+
+class InvoiceInfoIn(BaseModel):
+    invoice_title: str = ""
+    invoice_tax_no: str = ""
+    invoice_bank: str = ""
+    invoice_bank_account: str = ""
+    invoice_address: str = ""
+    invoice_phone: str = ""
+    invoice_type: str = "normal"      # normal=电子普票 special=电子专票
+
+
+class InvoiceRequestIn(BaseModel):
+    bill_no: str
 
 
 def _require_admin_billing(current: dict) -> None:
@@ -201,3 +221,124 @@ def pay(bill_no: str, db: Session = Depends(get_db),
 
     return {"message": "支付成功，套餐已生效", "bill_no": bill.bill_no,
             "plan": applied_plan or bill.plan, "status": bill.status}
+
+
+@router.get("/invoice-info")
+def get_invoice_info(company_id: int, db: Session = Depends(get_db),
+                     current: dict = Depends(get_current_user)):
+    """获取企业开票信息"""
+    if company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权访问")
+    c = db.query(Company).filter(Company.id == company_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="企业不存在")
+    return {"info": {
+        "invoice_title": c.invoice_title or "",
+        "invoice_tax_no": c.invoice_tax_no or "",
+        "invoice_bank": c.invoice_bank or "",
+        "invoice_bank_account": c.invoice_bank_account or "",
+        "invoice_address": c.invoice_address or "",
+        "invoice_phone": c.invoice_phone or "",
+        "invoice_type": c.invoice_type or "normal",
+        "category": INVOICE_CATEGORY,
+    }}
+
+
+@router.put("/invoice-info")
+def save_invoice_info(data: InvoiceInfoIn, company_id: int,
+                      db: Session = Depends(get_db),
+                      current: dict = Depends(get_current_user)):
+    """保存企业开票信息（仅管理员）"""
+    _require_admin_billing(current)
+    if company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权操作")
+    c = db.query(Company).filter(Company.id == company_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="企业不存在")
+    c.invoice_title = data.invoice_title.strip()
+    c.invoice_tax_no = data.invoice_tax_no.strip()
+    c.invoice_bank = data.invoice_bank.strip()
+    c.invoice_bank_account = data.invoice_bank_account.strip()
+    c.invoice_address = data.invoice_address.strip()
+    c.invoice_phone = data.invoice_phone.strip()
+    c.invoice_type = data.invoice_type if data.invoice_type in ("normal", "special") else "normal"
+    db.commit()
+    try:
+        from utils.audit import log_action
+        log_action(company_id, "billing.invoice_info",
+                   "更新开票信息", current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+    return {"message": "开票信息已保存"}
+
+
+@router.post("/invoice-request")
+def create_invoice_request(data: InvoiceRequestIn, db: Session = Depends(get_db),
+                           current: dict = Depends(get_current_user)):
+    """对已支付账单提交开票申请（开票类别：服务费）"""
+    _require_admin_billing(current)
+    bill = db.query(Bill).filter(Bill.bill_no == data.bill_no).first()
+    if not bill or bill.company_id != current["company_id"]:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    if bill.status != "paid":
+        raise HTTPException(status_code=400, detail="仅已支付账单可申请开票")
+
+    # 同一账单不可重复申请
+    dup = db.query(InvoiceRequest).filter(
+        InvoiceRequest.bill_no == data.bill_no).first()
+    if dup:
+        raise HTTPException(status_code=400, detail=f"该账单已提交开票申请（{dup.req_no}）")
+
+    c = db.query(Company).filter(Company.id == bill.company_id).first()
+    if not c or not (c.invoice_title and c.invoice_tax_no):
+        raise HTTPException(status_code=400,
+                            detail="请先在「开票信息」中填写发票抬头与税号")
+
+    req = InvoiceRequest(
+        req_no=f"INV{uuid.uuid4().hex[:10].upper()}",
+        company_id=bill.company_id,
+        bill_no=bill.bill_no,
+        amount=bill.amount,
+        invoice_type=c.invoice_type or "normal",
+        category=INVOICE_CATEGORY,
+        title=c.invoice_title,
+        tax_no=c.invoice_tax_no,
+        bank=c.invoice_bank or "",
+        bank_account=c.invoice_bank_account or "",
+        address=c.invoice_address or "",
+        phone=c.invoice_phone or "",
+        status="pending",
+    )
+    db.add(req)
+    db.commit()
+
+    try:
+        from utils.audit import log_action
+        log_action(bill.company_id, "billing.invoice_request",
+                   f"提交开票申请 {req.req_no}（账单 {bill.bill_no}，类别：{INVOICE_CATEGORY}）",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+
+    return {"message": f"开票申请已提交（{req.req_no}），类别：{INVOICE_CATEGORY}",
+            "req_no": req.req_no, "status": req.status, "category": INVOICE_CATEGORY}
+
+
+@router.get("/invoice-requests")
+def list_invoice_requests(company_id: int, db: Session = Depends(get_db),
+                          current: dict = Depends(get_current_user)):
+    """当前企业开票申请列表"""
+    if company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权访问")
+    reqs = db.query(InvoiceRequest).filter(
+        InvoiceRequest.company_id == company_id)\
+        .order_by(InvoiceRequest.created_at.desc()).all()
+    return {"requests": [{
+        "id": r.id, "req_no": r.req_no, "bill_no": r.bill_no,
+        "amount": r.amount, "invoice_type": r.invoice_type,
+        "category": r.category, "title": r.title,
+        "status": r.status, "invoice_no": r.invoice_no,
+        "reject_reason": r.reject_reason,
+        "created_at": r.created_at.isoformat(),
+        "issued_at": r.issued_at.isoformat() if r.issued_at else None,
+    } for r in reqs]}

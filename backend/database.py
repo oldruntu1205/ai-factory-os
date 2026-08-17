@@ -67,6 +67,16 @@ _COMPANY_MIGRATIONS_V2 = [
     ("mobile_verified", "BOOLEAN DEFAULT 0"),
 ]
 
+_COMPANY_INVOICE_MIGRATIONS = [
+    ("invoice_title", "VARCHAR(200) DEFAULT ''"),
+    ("invoice_tax_no", "VARCHAR(50) DEFAULT ''"),
+    ("invoice_bank", "VARCHAR(200) DEFAULT ''"),
+    ("invoice_bank_account", "VARCHAR(50) DEFAULT ''"),
+    ("invoice_address", "VARCHAR(300) DEFAULT ''"),
+    ("invoice_phone", "VARCHAR(50) DEFAULT ''"),
+    ("invoice_type", "VARCHAR(20) DEFAULT 'normal'"),
+]
+
 _LEAD_MIGRATIONS = [
     ("follow_up_step", "INTEGER DEFAULT 0"),
     ("follow_up_at", "DATETIME"),
@@ -160,6 +170,17 @@ def _lightweight_migrate():
                                 logger.info(f"迁移: customers.{col} 新增")
                             except Exception as e:
                                 logger.debug(f"迁移跳过 customers.{col}: {e}")
+                # companies 表（开票信息，类别：服务费）
+                if "companies" in tables:
+                    existing = {c["name"] for c in inspector.get_columns("companies")}
+                    for col, sqltype in _COMPANY_INVOICE_MIGRATIONS:
+                        if col not in existing:
+                            try:
+                                conn.execute(text(
+                                    f"ALTER TABLE companies ADD COLUMN {col} {sqltype}"))
+                                logger.info(f"迁移: companies.{col} 新增")
+                            except Exception as e:
+                                logger.debug(f"迁移跳过 companies.{col}: {e}")
                 # site_contents 表（官网 CMS）
                 if "site_contents" in tables:
                     existing = {c["name"] for c in inspector.get_columns("site_contents")}
@@ -238,6 +259,8 @@ def _lightweight_migrate():
                 _PG_ALL_COLS = []
                 for col, sqltype in _COMPANY_MIGRATIONS + _COMPANY_MIGRATIONS_V2:
                     _PG_ALL_COLS.append(("companies", col, _pg_type(sqltype)))
+                for col, sqltype in _COMPANY_INVOICE_MIGRATIONS:
+                    _PG_ALL_COLS.append(("companies", col, _pg_type(sqltype)))
                 for col, sqltype in _USER_MIGRATIONS:
                     _PG_ALL_COLS.append(("users", col, _pg_type(sqltype)))
                 for col, sqltype in _LEAD_MIGRATIONS:
@@ -281,6 +304,8 @@ def _lightweight_migrate():
                 ("CREATE INDEX IF NOT EXISTS idx_quotations_company ON quotations(company_id)"),
                 ("CREATE INDEX IF NOT EXISTS idx_leads_company ON leads(company_id)"),
                 ("CREATE INDEX IF NOT EXISTS idx_documents_company ON documents(company_id)"),
+                ("CREATE INDEX IF NOT EXISTS idx_invoice_requests_company ON invoice_requests(company_id)"),
+                ("CREATE INDEX IF NOT EXISTS idx_invoice_requests_bill ON invoice_requests(bill_no)"),
             ]
             for stmt in _INDEX_MIGRATIONS:
                 try:

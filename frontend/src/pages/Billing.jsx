@@ -13,6 +13,8 @@ export default function Billing() {
   const [invoices, setInvoices] = useState([])
   const [installed, setInstalled] = useState([])
   const [msg, setMsg] = useState('')
+  const [invInfo, setInvInfo] = useState(null)
+  const [invReqs, setInvReqs] = useState([])
   const companyId = Number(localStorage.getItem('company_id'))
 
   const load = async () => {
@@ -28,7 +30,18 @@ export default function Billing() {
     setInstalled(inst.data.installed || [])
   }
 
-  useEffect(() => { load() }, [])
+  const loadInvoice = async () => {
+    try {
+      const [info, reqs] = await Promise.all([
+        api.get('/billing/invoice-info', { params: { company_id: companyId } }),
+        api.get('/billing/invoice-requests', { params: { company_id: companyId } }),
+      ])
+      setInvInfo(info.data.info)
+      setInvReqs(reqs.data.requests || [])
+    } catch (e) { /* 忽略 */ }
+  }
+
+  useEffect(() => { load(); loadInvoice() }, [])
 
   const upgrade = async (planKey) => {
     if (!window.confirm(`确认升级到 ${plans[planKey].name} 套餐？`)) return
@@ -48,6 +61,32 @@ export default function Billing() {
     await api.post(`/billing/pay?bill_no=${billNo}`)
     setMsg('✅ 支付成功')
     load()
+  }
+
+  const saveInvoiceInfo = async () => {
+    if (!invInfo.invoice_title || !invInfo.invoice_tax_no) {
+      setMsg('❌ 请填写发票抬头与纳税人识别号')
+      return
+    }
+    try {
+      const { data } = await api.put('/billing/invoice-info', invInfo,
+        { params: { company_id: companyId } })
+      setMsg(`✅ ${data.message}`)
+      loadInvoice()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '保存失败'}`)
+    }
+  }
+
+  const applyInvoice = async (billNo) => {
+    if (!window.confirm('对该已支付账单提交开票申请？（开票类别：服务费）')) return
+    try {
+      const { data } = await api.post('/billing/invoice-request', { bill_no: billNo })
+      setMsg(`✅ ${data.message}`)
+      loadInvoice()
+    } catch (e) {
+      setMsg(`❌ ${e.response?.data?.detail || '申请失败'}`)
+    }
   }
 
   if (!usage) return <div>加载中...</div>
@@ -219,31 +258,130 @@ export default function Billing() {
         <table className="table">
           <thead><tr><th>账单号</th><th>套餐</th><th>金额</th><th>状态</th><th>日期</th><th>操作</th></tr></thead>
           <tbody>
-            {invoices.map((b) => (
-              <tr key={b.id}>
-                <td style={{ fontSize: 12 }}>{b.bill_no}</td>
-                <td><span className="badge badge-blue">{b.plan}</span></td>
-                <td style={{ fontWeight: 600 }}>{b.currency} {b.amount.toLocaleString()}</td>
-                <td>
-                  <span className={`badge ${b.status === 'paid' ? 'badge-green' : 'badge-yellow'}`}>
-                    {b.status === 'paid' ? '已支付' : '待支付'}
-                  </span>
-                </td>
-                <td style={{ fontSize: 12 }}>{new Date(b.created_at).toLocaleDateString('zh-CN')}</td>
-                <td>
-                  {b.status !== 'paid' && (
-                    <button className="btn btn-success btn-sm" onClick={() => pay(b.bill_no)}>
-                      模拟支付
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {invoices.map((b) => {
+              const hasReq = invReqs.some((r) => r.bill_no === b.bill_no)
+              return (
+                <tr key={b.id}>
+                  <td style={{ fontSize: 12 }}>{b.bill_no}</td>
+                  <td><span className="badge badge-blue">{b.plan}</span></td>
+                  <td style={{ fontWeight: 600 }}>{b.currency} {b.amount.toLocaleString()}</td>
+                  <td>
+                    <span className={`badge ${b.status === 'paid' ? 'badge-green' : 'badge-yellow'}`}>
+                      {b.status === 'paid' ? '已支付' : '待支付'}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{new Date(b.created_at).toLocaleDateString('zh-CN')}</td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    {b.status !== 'paid' && (
+                      <button className="btn btn-success btn-sm" onClick={() => pay(b.bill_no)}>
+                        模拟支付
+                      </button>
+                    )}
+                    {b.status === 'paid' && !hasReq && (
+                      <button className="btn btn-primary btn-sm" onClick={() => applyInvoice(b.bill_no)}>
+                        申请开票
+                      </button>
+                    )}
+                    {b.status === 'paid' && hasReq && (
+                      <span className="badge badge-gray" style={{ alignSelf: 'center' }}>已申请开票</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
             {invoices.length === 0 && (
               <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>暂无账单，升级套餐后生成</td></tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* 开票信息（类别：服务费） */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <h3 style={{ marginBottom: 6 }}>开票信息</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+          开票类别：<b>服务费</b>（SaaS 订阅服务）。填写企业开票信息后，可对已支付账单提交开票申请；电子发票开具后发送至企业邮箱。
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          <div className="form-group">
+            <label>发票抬头（企业全称）*</label>
+            <input value={invInfo?.invoice_title || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_title: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>纳税人识别号 *</label>
+            <input value={invInfo?.invoice_tax_no || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_tax_no: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>开户银行</label>
+            <input value={invInfo?.invoice_bank || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_bank: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>银行账号</label>
+            <input value={invInfo?.invoice_bank_account || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_bank_account: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>注册地址</label>
+            <input value={invInfo?.invoice_address || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_address: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>注册电话</label>
+            <input value={invInfo?.invoice_phone || ''}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_phone: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>发票类型</label>
+            <select value={invInfo?.invoice_type || 'normal'}
+              onChange={(e) => setInvInfo({ ...invInfo, invoice_type: e.target.value })}>
+              <option value="normal">电子普通发票</option>
+              <option value="special">电子专票（需一般纳税人）</option>
+            </select>
+          </div>
+        </div>
+        <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={saveInvoiceInfo}>
+          保存开票信息
+        </button>
+      </div>
+
+      {/* 开票申请记录 */}
+      <div className="card">
+        <h3 style={{ marginBottom: 16 }}>开票申请记录</h3>
+        {invReqs.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            暂无开票申请。对已支付账单点击「申请开票」即可提交。
+          </div>
+        ) : (
+          <table className="table">
+            <thead><tr><th>申请单号</th><th>关联账单</th><th>金额</th><th>类别</th><th>发票类型</th><th>状态</th><th>发票号</th><th>申请时间</th></tr></thead>
+            <tbody>
+              {invReqs.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontSize: 12 }}>{r.req_no}</td>
+                  <td style={{ fontSize: 12 }}>{r.bill_no}</td>
+                  <td style={{ fontWeight: 600 }}>¥{r.amount.toLocaleString()}</td>
+                  <td><span className="badge badge-blue">{r.category}</span></td>
+                  <td style={{ fontSize: 12 }}>{r.invoice_type === 'special' ? '电子专票' : '电子普票'}</td>
+                  <td>
+                    <span className={`badge ${r.status === 'issued' ? 'badge-green' : r.status === 'rejected' ? 'badge-red' : 'badge-yellow'}`}>
+                      {r.status === 'issued' ? '已开票' : r.status === 'rejected' ? '已驳回' : '待开票'}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{r.invoice_no || '—'}</td>
+                  <td style={{ fontSize: 12 }}>{new Date(r.created_at).toLocaleDateString('zh-CN')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {invReqs.some((r) => r.status === 'rejected' && r.reject_reason) && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#b91c1c' }}>
+            驳回原因：{invReqs.filter((r) => r.status === 'rejected' && r.reject_reason).map((r) => r.reject_reason).join('；')}
+          </div>
+        )}
       </div>
     </div>
   )

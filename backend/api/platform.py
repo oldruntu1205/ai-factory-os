@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from config import LLM_GATEWAY, LLM_FALLBACK
 from database import get_db, SessionLocal
-from models import Company, User, Bill, Conversation, AIAgent, PlatformLLMConfig
+from models import Company, User, Bill, Conversation, AIAgent, PlatformLLMConfig, InvoiceRequest
 from auth.deps import get_current_user
 from ai.llm import GATEWAY_ROUTES, set_config_override, get_config_override
 
@@ -356,3 +356,73 @@ def platform_finance(db: Session = Depends(get_db),
             "status": b.status, "created_at": b.created_at.isoformat(),
         } for b in recent],
     }
+
+
+# ============ 开票管理（财务）============
+
+@router.get("/invoice-requests")
+def platform_invoice_requests(db: Session = Depends(get_db),
+                              current: dict = Depends(get_current_user)):
+    """平台全部开票申请（财务侧）"""
+    _require_platform(current)
+    reqs = db.query(InvoiceRequest).order_by(InvoiceRequest.created_at.desc()).limit(200).all()
+    return {"requests": [{
+        "id": r.id, "req_no": r.req_no, "company_id": r.company_id,
+        "bill_no": r.bill_no, "amount": r.amount, "invoice_type": r.invoice_type,
+        "category": r.category, "title": r.title, "tax_no": r.tax_no,
+        "bank": r.bank, "bank_account": r.bank_account,
+        "address": r.address, "phone": r.phone,
+        "status": r.status, "invoice_no": r.invoice_no,
+        "reject_reason": r.reject_reason,
+        "created_at": r.created_at.isoformat(),
+        "issued_at": r.issued_at.isoformat() if r.issued_at else None,
+    } for r in reqs]}
+
+
+@router.post("/invoice-requests/{req_id}/issue")
+def issue_invoice(req_id: int, invoice_no: str = "",
+                  db: Session = Depends(get_db),
+                  current: dict = Depends(get_current_user)):
+    """财务标记开票完成（回填发票号）"""
+    _require_platform(current)
+    req = db.query(InvoiceRequest).filter(InvoiceRequest.id == req_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="开票申请不存在")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail="该申请已处理")
+    req.status = "issued"
+    req.invoice_no = invoice_no.strip()
+    req.issued_at = datetime.utcnow()
+    db.commit()
+    try:
+        from utils.audit import log_action
+        log_action(req.company_id, "finance.invoice_issue",
+                   f"开票完成 {req.req_no}（发票号 {invoice_no}）",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+    return {"message": f"已标记开票完成：{req.req_no}", "status": "issued"}
+
+
+@router.post("/invoice-requests/{req_id}/reject")
+def reject_invoice(req_id: int, reason: str = "",
+                   db: Session = Depends(get_db),
+                   current: dict = Depends(get_current_user)):
+    """财务驳回开票申请"""
+    _require_platform(current)
+    req = db.query(InvoiceRequest).filter(InvoiceRequest.id == req_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="开票申请不存在")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail="该申请已处理")
+    req.status = "rejected"
+    req.reject_reason = reason.strip()[:300]
+    db.commit()
+    try:
+        from utils.audit import log_action
+        log_action(req.company_id, "finance.invoice_reject",
+                   f"驳回开票申请 {req.req_no}：{req.reject_reason}",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+    return {"message": f"已驳回：{req.req_no}", "status": "rejected"}

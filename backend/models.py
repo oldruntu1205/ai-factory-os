@@ -49,6 +49,15 @@ class Company(Base):
     business_license_path = Column(String(500), default="")   # 营业执照照片路径
     license_verified = Column(Boolean, default=False)         # 是否通过平台审核
 
+    # 开票信息（客户后台「套餐与账单 → 开票信息」维护，开票类别：服务费）
+    invoice_title = Column(String(200), default="")           # 发票抬头（企业全称）
+    invoice_tax_no = Column(String(50), default="")           # 纳税人识别号
+    invoice_bank = Column(String(200), default="")            # 开户银行
+    invoice_bank_account = Column(String(50), default="")     # 银行账号
+    invoice_address = Column(String(300), default="")         # 注册地址
+    invoice_phone = Column(String(50), default="")            # 注册电话
+    invoice_type = Column(String(20), default="normal")       # normal=电子普通发票 special=电子专票
+
     # 外部渠道绑定（WhatsApp / 企业微信）
     whatsapp_phone = Column(String(50), default="")           # WhatsApp 业务号（客户来消息路由到本企业）
     wecom_user_map = Column(String(500), default="")          # 企微用户映射 JSON {"userid":"company_id"}
@@ -575,6 +584,30 @@ class Bill(Base):
     period_end = Column(DateTime, nullable=True)
     status = Column(String(20), default="unpaid")          # unpaid/paid/refunded
     paid_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class InvoiceRequest(Base):
+    """开票申请（开票类别：服务费；状态：pending 待开 / issued 已开 / rejected 已驳回）"""
+    __tablename__ = "invoice_requests"
+
+    id = Column(Integer, primary_key=True)
+    req_no = Column(String(50), unique=True, index=True)   # 申请单号 INV...
+    company_id = Column(Integer, index=True)
+    bill_no = Column(String(50), index=True)               # 关联账单
+    amount = Column(Float, default=0.0)                    # 开票金额
+    invoice_type = Column(String(20), default="normal")    # normal/special
+    category = Column(String(50), default="服务费")         # 开票类别（本平台固定：服务费）
+    title = Column(String(200), default="")                # 发票抬头快照
+    tax_no = Column(String(50), default="")
+    bank = Column(String(200), default="")
+    bank_account = Column(String(50), default="")
+    address = Column(String(300), default="")
+    phone = Column(String(50), default="")
+    status = Column(String(20), default="pending")         # pending/issued/rejected
+    invoice_no = Column(String(50), default="")            # 开具后回填发票号码
+    reject_reason = Column(String(300), default="")
+    issued_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
