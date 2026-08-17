@@ -19,7 +19,7 @@ PROD <PROD_DOMAIN_REMOVED>
         └─ 语法预检失败    → 保留旧服务运行，不重启
 ```
 
-- **同步范围**：仅 `backend/` 代码自动同步并重启。前端（3800+ 文件，需 `npm build`）走 `deploy-prod.sh` 独立发布，不进自动同步。
+- **同步范围**：仅 `backend/` 代码自动同步并重启。前端（3800+ 文件，需 `npm build`）走 `deploy/deploy-frontend.sh` 独立发布，不进自动同步。
 - **安全机制**：推送前 `py_compile` 语法预检，坏代码不会把线上打挂；`.env` / `venv` / `*.db` 被 `.gitignore` 排除，不会污染生产。
 - **可回滚**：`git revert HEAD && git push prod main` 即可一键回退。
 
@@ -132,7 +132,7 @@ ssh root@<PROD_DOMAIN_REMOVED> "systemctl stop ai-factory-backend ai-factory-wor
 | `Permission denied (publickey)` | 未配置 SSH 免密 | 回看「前置条件 1」 |
 | `Could not resolve hostname <PROD_DOMAIN_REMOVED>` | 域名未解析/未指向生产机 | 用公网 IP 替换主机名：服务器上 `curl -s ifconfig.me` 获取公网 IP |
 | 首次推送后页面异常 | 本地与 prod 代码差异大 | 用「五、回滚」整盘回退，再比对差异 |
-| 想同步前端 | 前端不在自动同步范围 | 走 `deploy-prod.sh` 独立发布 |
+| 想同步前端 | 前端不在自动同步范围 | 走 `deploy/deploy-frontend.sh` 独立发布 |
 
 ---
 
@@ -164,7 +164,7 @@ bash deploy/git-sync/start-watch.sh restart
 ### 8.2 行为说明
 
 - **防抖 8s**：连续保存会合并为一次推送，避免每个按键都触发部署。
-- **范围过滤**：仅 `backend/` 下的改动会自动推送；改 `frontend/`、`docs/` 等不会触发（前端走 `deploy-prod.sh`）。如需扩大范围：
+- **范围过滤**：仅 `backend/` 下的改动会自动推送；改 `frontend/`、`docs/` 等不会触发（前端走 `deploy/deploy-frontend.sh`）。如需扩大范围：
   ```bash
   GIT_SYNC_SCOPE="backend,deploy/git-sync" bash deploy/git-sync/start-watch.sh start
   ```
