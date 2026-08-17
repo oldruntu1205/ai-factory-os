@@ -1,0 +1,42 @@
+# ===== 核心 Web 框架 =====
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+email-validator>=2.1.0  # EmailStr 字段依赖；缺则后端启动即 ImportError
+
+# ===== 数据库（第二阶段：SaaS 多租户）=====
+SQLAlchemy>=2.0.30
+psycopg2-binary>=2.9.9
+alembic>=1.13.0
+passlib[bcrypt]>=1.7.4
+bcrypt<4.1
+python-jose[cryptography]>=3.3.0
+
+# ===== RAG 知识库（第三阶段）=====
+langchain-community>=0.2.0
+langchain-text-splitters>=0.2.0
+fastembed>=0.3.0
+qdrant-client>=1.9.0
+pymupdf>=1.24.0
+docx2txt>=0.8
+pandas>=2.2.0
+openpyxl>=3.1.0
+ezdxf>=1.1.0
+
+# ===== Agent 系统（第四阶段）=====
+langgraph>=0.1.0
+langchain-openai>=0.1.0
+langchain-core>=0.2.0
+
+# ===== 商业化（第五阶段）=====
+reportlab>=4.2.0
+requests>=2.32.0
+
+# ===== 任务调度（V2.1）=====
+celery>=5.4.0
+redis>=5.0.0
+
+# ===== 企业微信智能机器人（长连接 AI Bot）=====
+websockets>=12.0

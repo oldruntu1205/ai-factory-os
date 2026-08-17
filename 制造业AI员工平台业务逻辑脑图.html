@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>制造业 AI 员工平台 · 全功能业务逻辑脑图</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111c33; --line:#334155; --text:#e2e8f0; --muted:#94a3b8;
+    --c-root:#6366f1; --c-base:#0ea5e9; --c-cust:#10b981; --c-sales:#f59e0b;
+    --c-quote:#ef4444; --c-prod:#8b5cf6; --c-qual:#ec4899; --c-ceo:#22d3ee;
+    --c-sup:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:linear-gradient(160deg,#0b1220,#0f172a 60%);color:var(--text);min-height:100vh;}
+  header{padding:22px 28px 8px;}
+  h1{margin:0;font-size:22px;font-weight:800;letter-spacing:.5px;}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px;}
+  .hint{color:var(--muted);font-size:12px;margin:8px 0 0;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;padding:6px 28px 14px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  .canvas{padding:10px 28px 60px;overflow:auto;}
+  /* 横向树 */
+  .tree{display:flex;align-items:flex-start;}
+  .root{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;
+        padding:14px 20px;border-radius:14px;min-width:240px;box-shadow:0 8px 24px rgba(99,102,241,.4);font-size:15px;
+        flex:0 0 auto;position:sticky;left:0;z-index:5;}
+  .root small{display:block;font-weight:500;opacity:.85;font-size:12px;margin-top:4px;}
+  .branches{display:flex;flex-direction:column;gap:14px;padding-left:34px;position:relative;}
+  .branches::before{content:"";position:absolute;left:14px;top:24px;bottom:24px;width:2px;background:var(--line);}
+  .branch{border-left:3px solid var(--bcolor);background:var(--panel);border-radius:0 12px 12px 0;
+          padding:10px 14px;min-width:300px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  .branch>.node{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;font-size:15px;}
+  .branch>.node .tag{font-size:11px;background:var(--bcolor);color:#fff;border-radius:6px;padding:1px 7px;font-weight:600;}
+  .toggle{margin-left:auto;color:var(--muted);font-size:12px;user-select:none;}
+  .children{margin-left:14px;padding-left:16px;border-left:1px dashed var(--line);margin-top:8px;display:none;}
+  .branch.open>.children{display:block;}
+  .leaf{margin:7px 0;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+        border-radius:8px;font-size:13px;line-height:1.5;}
+  .leaf b{color:#fbbf24;}
+  .leaf .k{color:var(--c-base);font-weight:600;}
+  .leaf .sub2{color:var(--muted);font-size:12px;margin-top:3px;}
+  .grp{margin:6px 0;}
+  .grp>.gh{font-weight:600;color:var(--c-sup);font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .grp>.gh::before{content:"▸";color:var(--muted);transition:transform .15s;}
+  .grp.open>.gh::before{transform:rotate(90deg);}
+  .grp>.gh+.gc{display:none;margin:6px 0 4px 14px;border-left:1px dashed var(--line);padding-left:12px;}
+  .grp.open>.gh+.gc{display:block;}
+  .pill{display:inline-block;background:rgba(99,102,241,.18);color:#c7d2fe;border-radius:6px;padding:0 6px;font-size:11px;margin:1px 2px;}
+  footer{padding:0 28px 30px;color:var(--muted);font-size:12px;}
+  @media (max-width:760px){.branches{padding-left:18px}.branch{min-width:0}.root{min-width:180px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>制造业 AI 员工平台 · 全功能业务逻辑脑图</h1>
+  <div class="sub">基于 Hermes Agent Runtime（AI 员工操作系统内核）· 6 大内置 AI 员工 + 支撑系统 · 节点可点击展开/收起</div>
+  <div class="hint">👉 点击任意带「▾ / ▸」的标题可展开或收起；右侧为各 AI 功能的全程业务逻辑。</div>
+</header>
+
+<div class="legend">
+  <span><i class="dot" style="background:var(--c-root)"></i>平台内核</span>
+  <span><i class="dot" style="background:var(--c-base)"></i>平台底座</span>
+  <span><i class="dot" style="background:var(--c-cust)"></i>AI客服</span>
+  <span><i class="dot" style="background:var(--c-sales)"></i>AI销售</span>
+  <span><i class="dot" style="background:var(--c-quote)"></i>AI报价</span>
+  <span><i class="dot" style="background:var(--c-prod)"></i>AI生产</span>
+  <span><i class="dot" style="background:var(--c-qual)"></i>AI质量</span>
+  <span><i class="dot" style="background:var(--c-ceo)"></i>CEO大脑</span>
+  <span><i class="dot" style="background:var(--c-sup)"></i>支撑系统</span>
+</div>
+
+<div class="canvas">
+  <div class="tree">
+    <div class="root">制造业 AI 员工平台
+      <small>Hermes Agent Runtime · 一键部署 7×24 智能团队</small>
+    </div>
+    <div class="branches">
+
+      <!-- 平台底座 -->
+      <div class="branch" style="--bcolor:var(--c-base)">
+        <div class="node" onclick="toggle(this)"><span class="tag">底座</span> 平台底座 · Hermes Agent Runtime <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><span class="k">Agent 注册中心</span>：6 大内置 Agent（customer/sales/quotation/production/quality/ceo）启动自动注册，企业可再自建（受套餐 max_agents 限制）。</div>
+          <div class="leaf"><span class="k">Tool 工具系统</span>：Agent 调工具<b>双重校验</b>——manifest 声明 + 租户权限点，越权返回 403。</div>
+          <div class="leaf"><span class="k">三层记忆</span>：短期 / 长期 / 用户级，跨会话沉淀上下文。</div>
+          <div class="leaf"><span class="k">RBAC 权限</span>：所有业务表带 company_id，所有 API 经 require_company 校验，<b>多租户隔离</b>（跨企业 403）。</div>
+          <div class="leaf"><span class="k">消息队列</span>：Celery + Redis；RabbitMQ 企业版，<b>QUEUE_MODE=auto</b> 自动降级（rabbitmq→redis→内存）。</div>
+          <div class="leaf"><span class="k">编排引擎</span>：LangGraph StateGraph 意图路由（router→customer/sales/quotation），无 agent_id 时自动分流。</div>
+          <div class="leaf"><span class="k">Soul 人设</span>：企业自定义 system prompt，注入每个 Agent 头部（语气/边界/专业度）。</div>
+        </div>
+      </div>
+
+      <!-- AI客服 -->
+      <div class="branch" style="--bcolor:var(--c-cust)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工1</span> AI 客服 · customer_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><b>入口</b>：web / WhatsApp / 企业微信 / 邮件 多渠道路由到本企业。</div>
+          <div class="leaf"><b>意图路由</b>：intent_router → 判定为 customer（产品咨询/售后/用法）。</div>
+          <div class="leaf"><span class="k">RAG 检索</span>：knowledge.rag.search 检索企业知识库（top5）→ 注入上下文。</div>
+          <div class="leaf"><span class="k">生成规则</span>：仅依据资料回答，<b>不编造</b>；资料无答案则礼貌说明并转人工客服。</div>
+          <div class="leaf"><span class="k">记录</span>：对话存 Conversation，按 company_id 隔离，供经营大脑统计 AI 对话量。</div>
+        </div>
+      </div>
+
+      <!-- AI销售 -->
+      <div class="branch" style="--bcolor:var(--c-sales)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工2</span> AI 销售 · sales_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><b>意图路由</b>：→ sales（有明确采购意向/数量/询价）。</div>
+          <div class="leaf"><span class="k">结构化分析</span>：LLM 输出 产品/数量/国家/购买意向/建议。</div>
+          <div class="leaf"><span class="k">线索落库</span>：_sales_with_lead 自动创建/更新 CRM 客户（source=agent）。</div>
+
+          <div class="grp">
+            <div class="gh" onclick="gtoggle(this)">V2.1 AI 自主销售（全自动获客）</div>
+            <div class="gc">
+              <div class="leaf"><span class="k">① 客户发现</span>：关键词→模拟搜索→企业识别→网站分析→联系方式→写入 leads 表。</div>
+              <div class="leaf"><span class="k">② 线索评分</span>：行业匹配30 + 采购能力30 + 规模20 + 联系方式20 = 0~100；
+                <span class="pill">≥90 A级</span><span class="pill">70-89 B级</span><span class="pill">&lt;70 C级</span></div>
+              <div class="leaf"><span class="k">③ 邮件跟进序列</span>：D0 首封 / D3 跟进 / D7 提醒；中英文模板 + LLM 生成，首封自动带<b>报价 PDF 附件</b>。</div>
+              <div class="leaf"><span class="k">④ 跟进节奏</span>：discovered → contacted → replied → qualified → won / lost。</div>
+              <div class="leaf"><span class="k">自动化</span>：run_due_follow_ups（Celery beat 每日扫描到期线索发下一封）。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI报价 -->
+      <div class="branch" style="--bcolor:var(--c-quote)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工3</span> AI 报价 · quotation_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><b>意图路由</b>：→ quotation（要求报价/价格/交期/付款方式）。</div>
+          <div class="leaf"><span class="k">生成</span>：LLM 输出 JSON（产品/数量/单价/总价/交期/付款方式/币种）。</div>
+          <div class="leaf"><span class="k">落库</span>：_quotation_with_record 自动建 Quotation，单号 <b>QT{company_id}{8位}</b>，total = 数量×单价。</div>
+          <div class="leaf"><span class="k">PDF</span>：/quotation/create 调用 quote_pdf 自动生成报价单 PDF。</div>
+          <div class="leaf"><span class="k">状态机</span>：draft → sent → accepted（已成交）/ rejected（已拒绝）。
+            <span class="pill">注：截图中"待审"尚未接入后端</span></div>
+          <div class="leaf"><span class="k">联动</span>：报价后客户状态置为 <b>quoted</b>。</div>
+        </div>
+      </div>
+
+      <!-- AI生产 -->
+      <div class="branch" style="--bcolor:var(--c-prod)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工4</span> AI 生产计划 · production_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><span class="k">数据源</span>：MES 连接器（mes_api）拉取生产订单 / 产线负载 / 进度。</div>
+          <div class="leaf"><span class="k">分析维度</span>：① 是否延期 ② 生产瓶颈 ③ 优化建议。</div>
+          <div class="leaf"><span class="k">对接</span>：企业自有的 MES / ERP 系统（CRM·ERP·MES·QMS 集成）。</div>
+        </div>
+      </div>
+
+      <!-- AI质量 -->
+      <div class="branch" style="--bcolor:var(--c-qual)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工5</span> AI 质量工程师 · quality_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><span class="k">数据源</span>：QualityReport 质量报告（产线/不良率/缺陷类型）。</div>
+          <div class="leaf"><span class="k">分析维度</span>：① 是否存在异常 ② 可能原因 ③ 整改建议。</div>
+          <div class="leaf"><span class="k">对接</span>：企业自有的 QMS 质量管理系统。</div>
+          <div class="leaf"><span class="k">经营联动</span>：平均不良率被 CEO 日报聚合统计。</div>
+        </div>
+      </div>
+
+      <!-- CEO大脑 -->
+      <div class="branch" style="--bcolor:var(--c-ceo)">
+        <div class="node" onclick="toggle(this)"><span class="tag">员工6</span> CEO 企业大脑 · ceo_agent <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><span class="k">数据聚合</span>：询盘(Customer)、报价单(Quotation)、成交(accepted)、生产订单/风险(delay)、平均不良率、AI 对话量(Conversation)。</div>
+          <div class="leaf"><span class="k">日报产出</span>：销售情况 / 生产情况 / 质量情况 / 风险提示 / 明日建议。</div>
+          <div class="leaf"><span class="k">价值</span>：7×24 自动生成经营日报，管理者一眼掌握全局。</div>
+        </div>
+      </div>
+
+      <!-- 支撑系统 -->
+      <div class="branch" style="--bcolor:var(--c-sup)">
+        <div class="node" onclick="toggle(this)"><span class="tag">支撑</span> 支撑系统与能力 <span class="toggle">▾</span></div>
+        <div class="children">
+          <div class="leaf"><span class="k">知识库 RAG</span>：企业资料向量化（Qdrant），客服/各 Agent 检索增强。</div>
+          <div class="leaf"><span class="k">多渠道接入</span>：web / WhatsApp / 企业微信 / 邮件，客户消息统一路由。</div>
+          <div class="leaf"><span class="k">CRM 客户管理</span>：状态机 new→following→quoted→won→lost；含客户 WhatsApp 字段。</div>
+          <div class="leaf"><span class="k">业务系统对接</span>：企业自有 CRM / ERP / MES / QMS（企业配，超管看总览）。</div>
+          <div class="leaf"><span class="k">计费套餐</span>：starter(1) / professional(5) / enterprise(自定义) → 限制 max_agents。</div>
+          <div class="leaf"><span class="k">官网 CMS</span>：对外介绍页（轮播/Hero/功能/客户/价格）+ 右侧悬浮客服（热线/QQ/微信）。</div>
+          <div class="leaf"><span class="k">权限分层</span>：企业管理用户配自有系统；平台超管只看哪家接通。</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  数据来源：backend/agents/* · api/* · sales/* · channels/email/* · connectors/mes · hermes/ · constants/status.py ·
+  生成于 2026-08-08，覆盖平台六大 AI 员工及支撑系统的全程业务逻辑。
+</footer>
+
+<script>
+  function toggle(el){ el.closest('.branch').classList.toggle('open');
+    const t=el.querySelector('.toggle'); if(t) t.textContent = el.closest('.branch').classList.contains('open')?'▾':'▸'; }
+  function gtoggle(el){ el.closest('.grp').classList.toggle('open'); }
+  // 默认展开全部
+  document.querySelectorAll('.branch').forEach(b=>{b.classList.add('open'); const t=b.querySelector('.toggle'); if(t)t.textContent='▾';});
+</script>
+</body>
+</html>

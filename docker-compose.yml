@@ -1,0 +1,136 @@
+# 工业 AI 员工平台 - 生产编排（全栈）
+# 启动: docker compose up -d --build
+# 变量: 项目根目录 .env（由 deploy/prod.env 复制而来）提供 SECRET_KEY / LLM_API_KEY 等
+version: "3.8"
+
+services:
+  # PostgreSQL 主数据库
+  postgres:
+    image: postgres:16-alpine
+    container_name: industrial-ai-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: industrial
+      POSTGRES_PASSWORD: industrial123
+      POSTGRES_DB: industrial_ai
+    # 不暴露公网端口，仅 docker 内部网络可访问（备份用 docker compose exec）
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U industrial"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存 + 队列
+  redis:
+    image: redis:7-alpine
+    container_name: industrial-ai-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+  # RabbitMQ 企业版消息队列
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: industrial-ai-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: hermes
+      RABBITMQ_DEFAULT_PASS: hermes123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Qdrant 向量数据库
+  qdrant:
+    image: qdrant/qdrant:v1.9.7
+    container_name: industrial-ai-qdrant
+    restart: always
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # 后端 API
+  backend:
+    build:
+      context: ./backend
+    container_name: industrial-ai-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://industrial:industrial123@postgres:5432/industrial_ai
+      SECRET_KEY: ${SECRET_KEY}
+      SEED_DEMO: "${SEED_DEMO:-0}"
+      APP_PUBLIC_URL: "${APP_PUBLIC_URL:-http://localhost:8000}"
+      QDRANT_HOST: qdrant
+      REDIS_URL: redis://redis:6379/0
+      QUEUE_MODE: "${QUEUE_MODE:-auto}"
+      RABBITMQ_URL: amqp://hermes:hermes123@rabbitmq:5672/
+      LLM_GATEWAY: ${LLM_GATEWAY:-deepseek}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-zh-v1.5}
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_output:/app/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # Hermes Worker（异步任务消费）
+  hermes-worker:
+    build:
+      context: ./backend
+    container_name: industrial-ai-hermes-worker
+    restart: always
+    command: celery -A tasks.celery_app:celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://industrial:industrial123@postgres:5432/industrial_ai
+      SECRET_KEY: ${SECRET_KEY}
+      QDRANT_HOST: qdrant
+      REDIS_URL: redis://redis:6379/0
+      QUEUE_MODE: "${QUEUE_MODE:-auto}"
+      RABBITMQ_URL: amqp://hermes:hermes123@rabbitmq:5672/
+      LLM_GATEWAY: ${LLM_GATEWAY:-deepseek}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_output:/app/output
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # 前端（nginx 托管 + 反代 /api 到 backend）
+  frontend:
+    build:
+      context: ./frontend
+    container_name: industrial-ai-web
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+  redis_data:
+  rabbitmq_data:
+  qdrant_data:
+  backend_uploads:
+  backend_output:

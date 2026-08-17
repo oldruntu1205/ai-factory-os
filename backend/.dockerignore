@@ -1,0 +1,29 @@
+# ===== 不要把机密/本地数据带进镜像 =====
+.env
+.env.*
+!.env.example
+
+# 本地 SQLite 数据库（生产用 PostgreSQL，且镜像内不持久化）
+*.db
+*.sqlite
+*.sqlite3
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# 运行时生成目录（由 compose 卷挂载持久化）
+uploads/*
+output/*
+backups/
+!uploads/.gitkeep
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store

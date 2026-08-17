@@ -1,0 +1,219 @@
+/* ========== 主题变量（CSS Custom Properties）========== */
+:root {
+  /* 浅色主题（默认） */
+  --bg: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f8fafc;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-inverse: #0f172a;       /* 浅色主题侧边栏为白底，反色使用深色 */
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --hover: #f1f5f9;
+
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #334155;
+  --sidebar-text-muted: #64748b;
+  --sidebar-active: #dbeafe;
+  --sidebar-active-text: #1d4ed8;
+  --sidebar-hover: #f1f5f9;
+
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #dbeafe;
+  --primary-ring: rgba(37, 99, 235, 0.15);
+
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 深色主题（dark） */
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --bg-elevated: #111c2e;
+  --bg-subtle: #0f172a;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-inverse: #f1f5f9;       /* 暗色主题下的反色应为浅色（侧边栏 Logo 等） */
+  --border: #1e293b;
+  --border-strong: #334155;
+  --hover: #1e293b;
+
+  --sidebar-bg: #060a14;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-muted: #64748b;
+  --sidebar-active: #1e3a8a;
+  --sidebar-active-text: #ffffff;
+  --sidebar-hover: #0f172a;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-soft: #1e3a8a;
+  --primary-ring: rgba(59, 130, 246, 0.25);
+
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* 主色变化 */
+[data-color="blue"]   { --primary: #2563eb; --primary-hover: #1d4ed8; --primary-soft: #dbeafe; --primary-ring: rgba(37, 99, 235, 0.15); }
+[data-color="green"]  { --primary: #16a34a; --primary-hover: #15803d; --primary-soft: #dcfce7; --primary-ring: rgba(22, 163, 74, 0.15); }
+[data-color="purple"] { --primary: #9333ea; --primary-hover: #7e22ce; --primary-soft: #f3e8ff; --primary-ring: rgba(147, 51, 234, 0.15); }
+[data-color="orange"] { --primary: #ea580c; --primary-hover: #c2410c; --primary-soft: #ffedd5; --primary-ring: rgba(234, 88, 12, 0.15); }
+
+[data-theme="dark"][data-color="blue"]   { --primary: #3b82f6; --primary-hover: #60a5fa; --primary-soft: #1e3a8a; --primary-ring: rgba(59, 130, 246, 0.25); }
+[data-theme="dark"][data-color="green"]  { --primary: #22c55e; --primary-hover: #4ade80; --primary-soft: #14532d; --primary-ring: rgba(34, 197, 94, 0.25); }
+[data-theme="dark"][data-color="purple"] { --primary: #a855f7; --primary-hover: #c084fc; --primary-soft: #581c87; --primary-ring: rgba(168, 85, 247, 0.25); }
+[data-theme="dark"][data-color="orange"] { --primary: #f97316; --primary-hover: #fb923c; --primary-soft: #7c2d12; --primary-ring: rgba(249, 115, 22, 0.25); }
+
+/* ========== 基础样式 ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.25s, color 0.25s;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 通用卡片 */
+.card {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: background 0.25s, border-color 0.25s;
+}
+
+/* 表单 */
+.form-group { margin-bottom: 16px; }
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* 按钮 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { background: var(--border-strong); cursor: not-allowed; }
+
+.btn-secondary { background: var(--bg-subtle); color: var(--text); border: 1px solid var(--border-strong); }
+.btn-secondary:hover { background: var(--hover); }
+
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+
+.btn-success { background: #16a34a; color: #fff; }
+.btn-success:hover { background: #15803d; }
+
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* 表格 */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left;
+  padding: 12px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.table tr:hover td { background: var(--bg-subtle); }
+
+/* 徽章 */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-blue { background: var(--primary-soft); color: var(--primary); }
+.badge-green { background: #dcfce7; color: #15803d; }
+.badge-yellow { background: #fef9c3; color: #a16207; }
+.badge-red { background: #fee2e2; color: #b91c1c; }
+.badge-gray { background: var(--bg-subtle); color: var(--text-muted); }
+[data-theme="dark"] .badge-green { background: #14532d; color: #4ade80; }
+[data-theme="dark"] .badge-yellow { background: #422006; color: #facc15; }
+[data-theme="dark"] .badge-red { background: #450a0a; color: #f87171; }
+.badge-gold { background: #fef3c7; color: #b45309; }
+.badge-purple { background: #ede9fe; color: #6d28d9; }
+[data-theme="dark"] .badge-gold { background: #422006; color: #fbbf24; }
+[data-theme="dark"] .badge-purple { background: #2e1065; color: #c4b5fd; }
+
+/* 提示 */
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+.alert-error { background: #fee2e2; color: #b91c1c; }
+.alert-success { background: #dcfce7; color: #15803d; }
+.alert-info { background: var(--primary-soft); color: var(--primary); }
+[data-theme="dark"] .alert-error { background: #450a0a; color: #f87171; }
+[data-theme="dark"] .alert-success { background: #052e16; color: #4ade80; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }

@@ -1,0 +1,196 @@
+// src/pages/Hermes.jsx
+import React, { useEffect, useState } from "react";
+
+// src/api.js
+import axios from "axios";
+var api = axios.create({
+  baseURL: "/api",
+  timeout: 12e4
+});
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response && err.response.status === 401) {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+var api_default = api;
+
+// src/pages/Hermes.jsx
+var roleEmoji = {
+  customer_agent: "\u{1F4AC}",
+  sales_agent: "\u{1F4C8}",
+  quotation_agent: "\u{1F4C4}",
+  production_agent: "\u2699\uFE0F",
+  quality_agent: "\u{1F52C}",
+  process_agent: "\u{1F4D0}",
+  ceo_agent: "\u{1F9E0}"
+};
+function Hermes() {
+  const [agents, setAgents] = useState([]);
+  const [tools, setTools] = useState([]);
+  const [selected, setSelected] = useState("sales_agent");
+  const [message, setMessage] = useState("");
+  const [result, setResult] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [memory, setMemory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [newAgent, setNewAgent] = useState({
+    name: "",
+    version: "1.0",
+    industry: "glassware",
+    label: "",
+    description: "",
+    tools: "crm.get_customer, knowledge.search"
+  });
+  const companyId = Number(localStorage.getItem("company_id"));
+  const load = async () => {
+    const [a, t] = await Promise.all([
+      api_default.get("/hermes/agent/list"),
+      api_default.get("/hermes/tool/list")
+    ]);
+    setAgents(a.data.agents);
+    setTools(t.data.tools);
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  const execute = async () => {
+    setLoading(true);
+    setResult("");
+    try {
+      const { data } = await api_default.post("/hermes/execute", {
+        agent_name: selected,
+        message,
+        company_id: companyId
+      });
+      setResult(data.result);
+      setSessionId(data.session_id);
+      const mem = await api_default.get("/hermes/memory/short", {
+        params: { session_id: data.session_id }
+      });
+      setMemory(mem.data.entries);
+    } catch (e) {
+      setResult(`\u26A0\uFE0F ${e.response?.data?.detail || "\u6267\u884C\u5931\u8D25"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const registerAgent = async () => {
+    try {
+      await api_default.post("/hermes/agent/register", {
+        ...newAgent,
+        tools: newAgent.tools.split(",").map((t) => t.trim()).filter(Boolean)
+      });
+      setShowRegister(false);
+      setNewAgent({
+        name: "",
+        version: "1.0",
+        industry: "glassware",
+        label: "",
+        description: "",
+        tools: "crm.get_customer, knowledge.search"
+      });
+      load();
+    } catch (e) {
+      alert(e.response?.data?.detail || "\u6CE8\u518C\u5931\u8D25");
+    }
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 22 } }, "Hermes Agent Runtime"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary", onClick: () => setShowRegister(!showRegister) }, showRegister ? "\u53D6\u6D88" : "+ \u6CE8\u518C Agent")), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "var(--text-muted)", marginBottom: 24 } }, "AI \u5458\u5DE5\u64CD\u4F5C\u7CFB\u7EDF\u5185\u6838\uFF1AAgent \u6CE8\u518C\u4E2D\u5FC3 / Tool \u8C03\u7528 / \u4E09\u5C42\u8BB0\u5FC6 / RBAC \u6743\u9650 / \u6D88\u606F\u961F\u5217"), showRegister && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: 12 } }, "\u6CE8\u518C\u65B0 AI \u5458\u5DE5 Agent\uFF08\u52A8\u6001\u52A0\u8F7D\uFF09"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { className: "form-group" }, /* @__PURE__ */ React.createElement("label", null, "Agent \u540D\u79F0"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: newAgent.name,
+      onChange: (e) => setNewAgent({ ...newAgent, name: e.target.value }),
+      placeholder: "\u5982 procurement_agent"
+    }
+  )), /* @__PURE__ */ React.createElement("div", { className: "form-group" }, /* @__PURE__ */ React.createElement("label", null, "\u5C55\u793A\u540D"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: newAgent.label,
+      onChange: (e) => setNewAgent({ ...newAgent, label: e.target.value }),
+      placeholder: "\u5982 AI\u91C7\u8D2D"
+    }
+  )), /* @__PURE__ */ React.createElement("div", { className: "form-group" }, /* @__PURE__ */ React.createElement("label", null, "\u884C\u4E1A"), /* @__PURE__ */ React.createElement("input", { value: newAgent.industry, onChange: (e) => setNewAgent({ ...newAgent, industry: e.target.value }) })), /* @__PURE__ */ React.createElement("div", { className: "form-group" }, /* @__PURE__ */ React.createElement("label", null, "Tools\uFF08\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ React.createElement("input", { value: newAgent.tools, onChange: (e) => setNewAgent({ ...newAgent, tools: e.target.value }) }))), /* @__PURE__ */ React.createElement("div", { className: "form-group" }, /* @__PURE__ */ React.createElement("label", null, "\u63CF\u8FF0"), /* @__PURE__ */ React.createElement("input", { value: newAgent.description, onChange: (e) => setNewAgent({ ...newAgent, description: e.target.value }) })), /* @__PURE__ */ React.createElement("button", { className: "btn btn-success", onClick: registerAgent }, "\u6CE8\u518C\u5230 Hermes")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "3fr 2fr", gap: 24 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: 12 } }, "Agent \u6267\u884C\u63A7\u5236\u53F0"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" } }, agents.map((a) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: a.name,
+      onClick: () => setSelected(a.name),
+      style: {
+        padding: "8px 14px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: selected === a.name ? "var(--primary)" : "#fff",
+        color: selected === a.name ? "#fff" : "var(--text)",
+        fontSize: 13,
+        cursor: "pointer"
+      }
+    },
+    roleEmoji[a.name] || "\u{1F916}",
+    " ",
+    a.label || a.name
+  )), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      disabled: true,
+      style: {
+        padding: "8px 14px",
+        borderRadius: 8,
+        border: "1px dashed #cbd5e1",
+        background: "var(--bg-subtle)",
+        color: "var(--text-muted)",
+        fontSize: 13,
+        cursor: "not-allowed"
+      }
+    },
+    "\u{1F512} \u66F4\u591A Agent \u5347\u7EA7\u4E2D..."
+  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12, alignItems: "stretch" } }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: message,
+      onChange: (e) => setMessage(e.target.value),
+      placeholder: "\u793A\u4F8B\uFF1A\u6211\u4EEC\u9700\u8981\u91C7\u8D2D 1000 \u4E2A 500ml \u73BB\u7483\u70E7\u676F",
+      style: { flex: 1 }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "btn btn-primary",
+      onClick: execute,
+      disabled: loading,
+      style: { marginLeft: "auto" }
+    },
+    loading ? "Hermes \u6267\u884C\u4E2D..." : "\u{1F680} \u6267\u884C"
+  )), result && /* @__PURE__ */ React.createElement("pre", { style: {
+    background: "var(--bg-subtle)",
+    padding: 16,
+    borderRadius: 8,
+    fontSize: 13,
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.8
+  } }, result)), /* @__PURE__ */ React.createElement("div", { className: "card" }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: 12 } }, "Tool \u8C03\u7528\u7CFB\u7EDF\uFF08", tools.length, "\uFF09"), /* @__PURE__ */ React.createElement("table", { className: "table" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "Tool"), /* @__PURE__ */ React.createElement("th", null, "\u6743\u9650\u70B9"), /* @__PURE__ */ React.createElement("th", null, "\u8BF4\u660E"))), /* @__PURE__ */ React.createElement("tbody", null, tools.map((t) => /* @__PURE__ */ React.createElement("tr", { key: t.name }, /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement("code", null, t.name)), /* @__PURE__ */ React.createElement("td", null, t.permissions.map((p) => /* @__PURE__ */ React.createElement("span", { key: p, className: "badge badge-blue", style: { marginRight: 4 } }, p))), /* @__PURE__ */ React.createElement("td", { style: { fontSize: 12 } }, t.description))))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: 12 } }, "Agent \u6CE8\u518C\u4E2D\u5FC3\uFF08", agents.length, "\uFF09"), agents.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.name, style: {
+    padding: 12,
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    marginBottom: 8
+  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, roleEmoji[a.name] || "\u{1F916}", " ", a.label), /* @__PURE__ */ React.createElement("span", { className: "badge badge-gray" }, "v", a.version), /* @__PURE__ */ React.createElement("span", { className: "badge badge-green", style: { marginLeft: "auto" } }, a.status)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-muted)", marginTop: 4 } }, a.name, " \xB7 ", a.industry), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, marginTop: 6 } }, a.tools.map((t) => /* @__PURE__ */ React.createElement("span", { key: t, className: "badge badge-blue", style: { marginRight: 4 } }, t)))))), /* @__PURE__ */ React.createElement("div", { className: "card" }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: 12 } }, "\u77ED\u671F\u8BB0\u5FC6\uFF08\u5F53\u524D\u5BF9\u8BDD\uFF09"), memory.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "var(--text-muted)", fontSize: 13, padding: 12 } }, "\u6267\u884C Agent \u540E\u5C55\u793A\u5BF9\u8BDD\u8BB0\u5FC6"), memory.map((m, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
+    background: "var(--bg-subtle)",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    fontSize: 13
+  } }, /* @__PURE__ */ React.createElement("span", { className: "badge badge-gray", style: { marginRight: 6 } }, m.user ? "\u5BA2\u6237" : "AI"), String(m.user || m.agent).slice(0, 80), "..."))))));
+}
+export {
+  Hermes as default
+};

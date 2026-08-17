@@ -1,0 +1,58 @@
+# ============================================================
+# 制造业 AI 员工平台 —— 根 .gitignore（模板）
+# 由 deploy/git-sync/setup-local.sh 在仓库根缺少 .gitignore 时复制使用。
+# 与仓库根 .gitignore 内容保持一致。
+# ============================================================
+
+# ===== 依赖 / 虚拟环境 =====
+backend/venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ===== 密钥与配置（含 API Key，严禁入库） =====
+**/.env
+backend/.env
+.env
+
+# ===== 数据库与测试残留 =====
+*.db
+*.sqlite3
+**/uploads/*
+!**/uploads/.gitkeep
+output/
+
+# ===== 日志 / 运行时 =====
+**/logs/
+backend/logs/
+*.log
+deploy.log
+
+# ===== 临时文件 / 垃圾清理残留 =====
+*.tmp
+.trash_*
+**/.trash_*
+.trash_*
+
+# ===== 根目录文档抽取产物（非源码，按需可删） =====
+_doc_*.txt
+_doc_*.json
+_manual_*.txt
+_manual_*.json
+
+# ===== 前端（前端独立构建发布，不进自动同步范围） =====
+frontend/node_modules/
+frontend/dist/
+
+# ===== 归档 / 大型产物 =====
+*.tar.gz
+*.tgz
+*.zip
+
+# ===== 编辑器 / 系统 =====
+.idea/
+.vscode/
+.DS_Store
+
+# ===== 工作台内部目录（非项目代码，含本地记忆） =====
+.workbuddy/
