@@ -7,6 +7,8 @@ ai/llm.py —— LLM Gateway（模型路由）
 未配置 API Key 时自动降级为内置 MockLLM，保证全链路可演示。
 """
 import logging
+import os
+import base64
 
 from config import (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_FALLBACK,
                     LLM_GATEWAY, FIREWORKS_API_KEY, FIREWORKS_MODEL)

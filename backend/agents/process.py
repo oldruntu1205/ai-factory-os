@@ -37,9 +37,11 @@ def _gather_live_data(tools, company_id: int) -> str:
     return "\n".join(parts)
 
 
-def process_agent(message: str, company_id: int, tools=None, db=None) -> str:
+def process_agent(message: str, company_id: int, tools=None, db=None,
+                   extra_context: str = None) -> str:
     """message: 用户问题；company_id: 企业隔离（必传，禁止默认值，防止跨企业检索）；
-    tools: ToolCenter；db: 可选会话。
+    tools: ToolCenter；db: 可选会话；extra_context: 本次对话随附的图纸/文件内容
+    （仅本次对话有效，不进入 RAG 知识库检索）。
     """
     if not company_id:
         raise ValueError("process_agent 需要显式传入 company_id，禁止缺失（防止跨企业检索）")
@@ -84,6 +86,11 @@ def process_agent(message: str, company_id: int, tools=None, db=None) -> str:
 
     # 实时数据块提前构造：f-string 表达式内不允许反斜杠（Python 3.11 语法限制）
     live_block = f"# 实时工业数据（MES / ERP）\n{live}" if live else ""
+    # 随附文件上下文（本次对话上传的图纸/文件，仅本次有效，不进 RAG）
+    extra_block = (
+        "# 本次对话随附的图纸/文件内容（仅本次对话有效，不进入知识库）\n"
+        + extra_context
+    ) if extra_context else ""
     prompt = f"""
 你是制造企业「工艺/图纸助手」，服务车间、工艺与质检人员。
 你的首要职责是**防范工人误操作**：必须基于图纸真实参数给出公差范围、材质标准，
@@ -97,6 +104,7 @@ def process_agent(message: str, company_id: int, tools=None, db=None) -> str:
 
 # 混合检索上下文（自由描述类补充）
 {rag_text}
+{extra_block}
 {live_block}
 
 # 回答要求
