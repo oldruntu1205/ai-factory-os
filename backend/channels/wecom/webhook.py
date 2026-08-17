@@ -10,6 +10,7 @@ import json
 import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.responses import PlainTextResponse
 
 from agents.service import execute_agent
 from auth.deps import get_current_user
@@ -37,7 +38,8 @@ async def verify(request: Request):
 
     if not verify_callback(signature, timestamp, nonce, echostr):
         raise HTTPException(status_code=403, detail="签名校验失败")
-    return {"echostr": echostr}
+    # 安全修复：企微要求响应体必须是 echostr 原文（JSON 包装会导致 URL 验证握手失败）
+    return PlainTextResponse(echostr)
 
 
 @router.post("/callback")

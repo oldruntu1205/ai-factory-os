@@ -31,6 +31,10 @@ def get_current_user(
 
     # 平台超级管理员（不属于任何企业）
     if user.role == "platform_admin":
+        # 安全修复：platform_admin 必须不属于任何企业（company_id 为空），
+        # 防止通过成员邀请越权构造出的伪超管获得平台权限
+        if user.company_id is not None:
+            raise HTTPException(status_code=403, detail="平台超管不应属于任何企业，账号异常")
         return {
             "user_id": user.id, "company_id": 0, "role": "platform_admin",
             "email": user.email, "company": "平台管理",

@@ -65,6 +65,9 @@ def invite_member(data: InviteIn, db: Session = Depends(get_db),
     _require_admin(current)
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
+    # 安全修复：role 白名单校验（此前可传 platform_admin 直接越权升级为平台超管）
+    if data.role not in ("admin", "staff"):
+        raise HTTPException(status_code=400, detail="角色无效，仅支持 admin/staff")
 
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:

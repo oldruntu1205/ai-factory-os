@@ -15,6 +15,7 @@ import os
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -22,7 +23,7 @@ from database import get_db, SessionLocal
 from models import Company, User, SmsCode
 from auth.deps import get_current_user
 from auth.security import hash_password, verify_password
-from config import BASE_DIR, SMS_MOCK_CODE
+from config import BASE_DIR, SMS_MOCK_CODE, MAX_UPLOAD_SIZE_MB
 from utils.audit import log_action, list_audit_logs, require_admin
 from constants.industries import get_all_options
 
@@ -159,7 +160,7 @@ def upload_license(
     """
     上传营业执照照片：
     - 限制 jpg/png/pdf，最大 5MB
-    - 提交后 status 进入 pending（演示版自动 1 秒后转 approved 模拟 AI 审核）
+    - 提交后 status 进入 pending，等待平台超管人工审核（不再自动通过）
     """
     if company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作其他企业")
@@ -167,6 +168,12 @@ def upload_license(
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".jpg", ".jpeg", ".png", ".pdf"):
         raise HTTPException(status_code=400, detail="仅支持 JPG/PNG/PDF 格式")
+
+    # 大小限制：先整块限长读取（> max_bytes+1 即超限），避免大文件先吃满内存
+    max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    content = file.file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"文件过大，最大 {MAX_UPLOAD_SIZE_MB}MB")
 
     c = db.query(Company).filter(Company.id == company_id).first()
     if not c:
@@ -176,41 +183,42 @@ def upload_license(
     safe_name = f"company_{company_id}_license{ext}"
     path = os.path.join(LICENSE_DIR, safe_name)
     with open(path, "wb") as f:
-        f.write(file.file.read())
+        f.write(content)
 
     c.business_license_path = path
     c.license_status = "pending"
     c.license_uploaded_at = datetime.utcnow()
     db.commit()
 
-    # 演示版：异步 1 秒后自动通过审核（真实环境接入人工/OCR 审核）
-    _schedule_auto_approve(company_id, delay=1)
+    # 安全修复：移除演示版 1 秒自动通过——认证门必须由平台超管人工审核
+    # （见 /platform/companies/{id}/verify 与 /company/license/approve）
 
+    log_action(company_id, "license_upload", "上传营业执照，等待平台审核",
+               current.get("user_id", 0), current.get("email", ""))
     return {
-        "message": "营业执照已上传，AI 审核中（约 1 秒）",
+        "message": "营业执照已上传，等待平台审核",
         "license_status": "pending",
-        "license_path": path,
-        "file_size": os.path.getsize(path),
+        "file_name": safe_name,
+        "file_size": len(content),
     }
 
 
+@router.get("/license/download")
+def download_license(company_id: int, db: Session = Depends(get_db),
+                     current: dict = Depends(get_current_user)):
+    """下载本企业营业执照（鉴权：仅本企业成员可访问，防匿名/跨租户枚举下载）"""
+    if company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权操作")
+    c = db.query(Company).filter(Company.id == company_id).first()
+    if not c or not c.business_license_path or not os.path.exists(c.business_license_path):
+        raise HTTPException(status_code=404, detail="营业执照不存在")
+    return FileResponse(c.business_license_path,
+                        filename=os.path.basename(c.business_license_path))
+
+
 def _schedule_auto_approve(company_id: int, delay: int = 1):
-    """演示版：异步自动审核（生产替换为人工审核队列 / OCR）"""
-    import threading, time
-    def _run():
-        time.sleep(delay)
-        s = SessionLocal()
-        try:
-            c = s.query(Company).filter(Company.id == company_id).first()
-            if c and c.license_status == "pending":
-                c.license_status = "approved"
-                c.license_verified = True
-                c.license_verified_at = datetime.utcnow()
-                s.commit()
-        finally:
-            s.close()
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+    """（已废弃）演示版自动审核——安全修复后移除自动通过，保留函数避免历史引用报错"""
+    return
 
 
 @router.post("/license/approve")

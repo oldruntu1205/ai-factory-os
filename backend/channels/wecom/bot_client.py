@@ -112,7 +112,9 @@ class WeComAIBotClient:
                 "headers": {"req_id": _req_id()},
                 "body": {"bot_id": self.bot_id, "secret": self.secret},
             }
-            logger.info(f"[wecom-bot:{self.bot_id}] 发送鉴权: {json.dumps(auth_req, ensure_ascii=False)}")
+            # 安全修复：禁止完整打印订阅帧（含 bot secret），仅输出非敏感信息
+            logger.info(f"[wecom-bot:{self.bot_id}] 发送鉴权: cmd={SUBSCRIBE_CMD} "
+                        f"bot_id={self.bot_id} secret_len={len(self.secret)}")
             await ws.send(json.dumps(auth_req))
             # 2) 启动应用层心跳
             heartbeat_task = asyncio.create_task(self._heartbeat_loop())

@@ -11,7 +11,8 @@ from channels.wecom.config import (WECOM_BASE, WECOM_CORP_ID, WECOM_AGENT_ID,
                                    WECOM_SECRET, is_app_configured)
 from channels.config_utils import resolve
 
-_token_cache = {"token": None, "expires": 0}
+# 安全修复：access_token 缓存按 (company_id, corp_id) 分键，杜绝跨租户串用
+_token_cache: dict = {}
 
 
 def _app_creds(company_id=None) -> tuple:
@@ -22,22 +23,32 @@ def _app_creds(company_id=None) -> tuple:
     return corp, agent, secret, bool(corp and agent and secret)
 
 
+def _cache_key(company_id, corp: str) -> str:
+    return f"{company_id or 'global'}:{corp}"
+
+
 def get_access_token(company_id: int = None) -> str:
-    """获取应用 access_token（7000s 缓存）"""
-    global _token_cache
+    """获取应用 access_token（7000s 缓存，按企业+corpid 分键）"""
     corp, agent, secret, configured = _app_creds(company_id)
     if not configured:
         return ""
+    key = _cache_key(company_id, corp)
     now = time.time()
-    if _token_cache["token"] and _token_cache["expires"] > now + 120:
-        return _token_cache["token"]
-    resp = requests.get(
-        f"{WECOM_BASE}/gettoken",
-        params={"corpid": corp, "corpsecret": secret},
-        timeout=10,
-    ).json()
+    cached = _token_cache.get(key)
+    if cached and cached.get("token") and cached["expires"] > now + 120:
+        return cached["token"]
+    try:
+        resp = requests.get(
+            f"{WECOM_BASE}/gettoken",
+            params={"corpid": corp, "corpsecret": secret},
+            timeout=10,
+        ).json()
+    except Exception as e:
+        return ""
     token = resp.get("access_token", "")
-    _token_cache = {"token": token, "expires": now + resp.get("expires_in", 7200)}
+    # 仅缓存非空 token（errcode != 0 时不缓存，避免缓存空值）
+    if token:
+        _token_cache[key] = {"token": token, "expires": now + resp.get("expires_in", 7200)}
     return token
 
 

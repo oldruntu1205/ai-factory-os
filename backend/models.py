@@ -14,7 +14,7 @@ models.py —— 全量数据模型（覆盖第二~V2.1 阶段全部业务表）
 """
 from sqlalchemy import (
     Column, Integer, String, ForeignKey, DateTime, Text, Float,
-    Boolean, JSON, BigInteger, UniqueConstraint,
+    Boolean, JSON, BigInteger, UniqueConstraint, CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -67,6 +67,11 @@ class Company(Base):
 class User(Base):
     """用户（企业管理员）"""
     __tablename__ = "users"
+    # 安全修复：角色 DB 层约束（防止绕过 API 白名单写入非法角色，如 platform_admin 越权）
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'staff', 'platform_admin')",
+                        name="ck_users_role"),
+    )
 
     id = Column(Integer, primary_key=True)
     email = Column(String(100), unique=True, index=True, nullable=False)

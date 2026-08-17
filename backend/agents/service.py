@@ -102,11 +102,12 @@ JSON 格式：
                 return f"企业未授权 CRM 写入权限（crm:write），未创建/更新线索。{e}"
             except Exception:
                 pass  # runtime 未初始化时不拦截
-            # 更新或创建 CRM 客户（线索）
-            cust = db.query(Customer).filter(Customer.id == customer_id).first()
+            # 更新或创建 CRM 客户（线索）——安全修复：customer_id 必须属于当前企业
+            cust = db.query(Customer).filter(
+                Customer.id == customer_id,
+                Customer.company_id == company_id).first()
             if not cust:
-                cust = Customer(company_id=company_id)
-                db.add(cust)
+                return "客户不存在或不属于当前企业，未更新客户"
             cust.name = parsed.get("name") or cust.name or "未命名客户"
             cust.country = parsed.get("country") or cust.country or ""
             cust.email = parsed.get("email") or cust.email or ""
@@ -148,7 +149,14 @@ JSON 格式：
             except Exception:
                 pass  # runtime 未初始化时不拦截
             import uuid
-            cust = db.query(Customer).filter(Customer.id == customer_id).first() if customer_id else None
+            # 安全修复：customer_id 必须属于当前企业（防跨租户读客户名/改状态）
+            cust = None
+            if customer_id:
+                cust = db.query(Customer).filter(
+                    Customer.id == customer_id,
+                    Customer.company_id == company_id).first()
+                if not cust:
+                    return "客户不存在或不属于当前企业，未生成报价单"
             quotation = Quotation(
                 quotation_no=f"QT{company_id}{uuid.uuid4().hex[:8].upper()}",
                 customer_id=customer_id,
