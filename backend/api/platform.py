@@ -505,35 +505,137 @@ def platform_invoice_requests(db: Session = Depends(get_db),
         "bank": r.bank, "bank_account": r.bank_account,
         "address": r.address, "phone": r.phone,
         "status": r.status, "invoice_no": r.invoice_no,
+        "pdf_url": r.pdf_url or "", "provider": r.provider or "",
         "reject_reason": r.reject_reason,
         "created_at": r.created_at.isoformat(),
         "issued_at": r.issued_at.isoformat() if r.issued_at else None,
     } for r in reqs]}
 
 
+@router.get("/invoice-config")
+def get_invoice_config(db: Session = Depends(get_db),
+                       current: dict = Depends(get_current_user)):
+    """平台财务：发票平台配置（API Key 脱敏）"""
+    _require_platform(current)
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    cfg = dict(row.invoice_config or {}) if row else {}
+    # 脱敏展示
+    masked = {}
+    for k in ("api_key", "api_secret", "app_key", "app_secret"):
+        v = cfg.get(k, "")
+        masked[k] = v[:6] + "****" + v[-2:] if len(v) > 8 else ("已配置" if v else "")
+    return {
+        "config": {
+            "provider": cfg.get("provider", "mock"),
+            "seller_name": cfg.get("seller_name", ""),
+            "seller_tax_no": cfg.get("seller_tax_no", ""),
+            "seller_bank": cfg.get("seller_bank", ""),
+            "seller_bank_account": cfg.get("seller_bank_account", ""),
+            **masked,
+        }
+    }
+
+
+class InvoiceConfigIn(BaseModel):
+    provider: str = "mock"
+    seller_name: str = ""
+    seller_tax_no: str = ""
+    seller_bank: str = ""
+    seller_bank_account: str = ""
+    api_key: str = ""          # 百望云
+    api_secret: str = ""       # 百望云
+    app_key: str = ""          # 诺诺
+    app_secret: str = ""       # 诺诺
+
+
+@router.put("/invoice-config")
+def save_invoice_config(data: InvoiceConfigIn, db: Session = Depends(get_db),
+                        current: dict = Depends(get_current_user)):
+    """平台财务：保存发票平台配置（provider/销售方/API 凭据）"""
+    _require_platform(current)
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    if not row:
+        row = SiteContent(id=1)
+        db.add(row)
+    old = dict(row.invoice_config or {})
+    cfg = {
+        "provider": data.provider if data.provider in
+            ("mock", "baiwang", "nuonuo") else "mock",
+        "seller_name": data.seller_name.strip(),
+        "seller_tax_no": data.seller_tax_no.strip(),
+        "seller_bank": data.seller_bank.strip(),
+        "seller_bank_account": data.seller_bank_account.strip(),
+    }
+    # 凭据：新值非空则覆盖；留空则保留旧值（避免每次保存清空密钥）
+    for k in ("api_key", "api_secret", "app_key", "app_secret"):
+        v = getattr(data, k, "").strip()
+        cfg[k] = v if v else old.get(k, "")
+    row.invoice_config = cfg
+    db.commit()
+    try:
+        from utils.audit import log_action
+        log_action(0, "finance.invoice_config",
+                   f"更新发票平台配置（provider={cfg['provider']}）",
+                   current.get("user_id", 0), current.get("email", ""))
+    except Exception:
+        pass
+    return {"message": "发票平台配置已保存"}
+
+
 @router.post("/invoice-requests/{req_id}/issue")
-def issue_invoice(req_id: int, invoice_no: str = "",
-                  db: Session = Depends(get_db),
+def issue_invoice(req_id: int, db: Session = Depends(get_db),
                   current: dict = Depends(get_current_user)):
-    """财务标记开票完成（回填发票号）"""
+    """自动开票：调发票平台 Provider 开具电子发票，回填发票号 + PDF 链接。
+
+    - provider=mock：本地生成演示 PDF（不产生真实发票）
+    - provider=baiwang/nuonuo：调第三方平台（凭据未配置时明确报错，先到发票平台设置补齐）
+    """
     _require_platform(current)
     req = db.query(InvoiceRequest).filter(InvoiceRequest.id == req_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="开票申请不存在")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="该申请已处理")
+
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    cfg = dict(row.invoice_config or {}) if row else {}
+    provider_name = cfg.get("provider", "mock")
+
+    from utils.invoice_provider import get_provider, InvoiceProviderError
+    provider = get_provider(provider_name)
+    req_dict = {
+        "req_no": req.req_no, "bill_no": req.bill_no,
+        "amount": req.amount, "invoice_type": req.invoice_type,
+        "category": req.category, "title": req.title, "tax_no": req.tax_no,
+        "bank": req.bank, "bank_account": req.bank_account,
+        "address": req.address, "phone": req.phone,
+    }
+    try:
+        result = provider.issue(req_dict, cfg)
+    except InvoiceProviderError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"开票调用失败：{e}")
+
     req.status = "issued"
-    req.invoice_no = invoice_no.strip()
+    req.invoice_no = result.get("invoice_no", "")
+    req.pdf_url = result.get("pdf_url", "")
+    req.provider = result.get("provider", provider_name)
+    req.provider_req_no = result.get("provider_req_no", "")
     req.issued_at = datetime.utcnow()
     db.commit()
+
     try:
         from utils.audit import log_action
         log_action(req.company_id, "finance.invoice_issue",
-                   f"开票完成 {req.req_no}（发票号 {invoice_no}）",
+                   f"自动开票完成 {req.req_no}（{req.provider}，发票号 {req.invoice_no}）",
                    current.get("user_id", 0), current.get("email", ""))
     except Exception:
         pass
-    return {"message": f"已标记开票完成：{req.req_no}", "status": "issued"}
+
+    return {"message": f"开票成功：{req.req_no}", "status": "issued",
+            "invoice_no": req.invoice_no, "pdf_url": req.pdf_url,
+            "provider": req.provider}
 
 
 @router.post("/invoice-requests/{req_id}/reject")

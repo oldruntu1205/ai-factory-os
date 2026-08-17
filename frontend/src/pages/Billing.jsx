@@ -357,6 +357,12 @@ export default function Billing() {
                         {inv.invoice_no}
                       </div>
                     )}
+                    {inv.status === 'issued' && inv.pdf_url && (
+                      <div style={{ marginTop: 2 }}>
+                        <a href={inv.pdf_url} target="_blank" rel="noreferrer"
+                          style={{ color: 'var(--primary)', fontSize: 11 }}>下载电子发票</a>
+                      </div>
+                    )}
                     {inv.status === 'rejected' && inv.reject_reason && (
                       <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, maxWidth: 140 }}>
                         {inv.reject_reason}
@@ -469,7 +475,15 @@ export default function Billing() {
                       {r.status === 'issued' ? '已开票' : r.status === 'rejected' ? '已驳回' : '待开票'}
                     </span>
                   </td>
-                  <td style={{ fontSize: 12 }}>{r.invoice_no || '—'}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {r.invoice_no || '—'}
+                    {r.status === 'issued' && r.pdf_url && (
+                      <div style={{ marginTop: 2 }}>
+                        <a href={r.pdf_url} target="_blank" rel="noreferrer"
+                          style={{ color: 'var(--primary)', fontSize: 11 }}>下载电子发票</a>
+                      </div>
+                    )}
+                  </td>
                   <td style={{ fontSize: 12 }}>{new Date(r.created_at).toLocaleDateString('zh-CN')}</td>
                 </tr>
               ))}

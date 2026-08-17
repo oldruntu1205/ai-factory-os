@@ -27,6 +27,9 @@ export default function PlatformAdmin() {
   // 开票申请管理
   const [invReqs, setInvReqs] = useState([])
   const [issueNoMap, setIssueNoMap] = useState({})
+  const [invConfig, setInvConfig] = useState(null)
+  const [invCfgSaving, setInvCfgSaving] = useState(false)
+  const [invCfgMsg, setInvCfgMsg] = useState('')
 
   // 对公转账凭证审核
   const [payBills, setPayBills] = useState([])
@@ -61,6 +64,10 @@ export default function PlatformAdmin() {
     try {
       const reqs = await api.get('/platform/invoice-requests')
       setInvReqs(reqs.data.requests || [])
+    } catch (e) { /* 忽略 */ }
+    try {
+      const ic = await api.get('/platform/invoice-config')
+      setInvConfig(ic.data.config || {})
     } catch (e) { /* 忽略 */ }
     try {
       const pb = await api.get('/platform/bills/pending-review')
@@ -104,18 +111,30 @@ export default function PlatformAdmin() {
   }
 
   const issueInvoice = async (reqId) => {
-    const invoiceNo = (issueNoMap[reqId] || '').trim()
-    if (!invoiceNo) {
-      setMsg('❌ 请先填写发票号')
-      return
-    }
+    if (!window.confirm('确认自动开具该发票？将调用已配置的发票平台生成电子发票。')) return
     try {
-      const { data } = await api.post(`/platform/invoice-requests/${reqId}/issue`, null,
-        { params: { invoice_no: invoiceNo } })
-      setMsg(`✅ ${data.message}`)
+      const { data } = await api.post(`/platform/invoice-requests/${reqId}/issue`)
+      setMsg(`✅ ${data.message}（发票号 ${data.invoice_no}）`)
       loadFinance()
     } catch (e) {
-      setMsg(`❌ ${e.response?.data?.detail || '操作失败'}`)
+      setMsg(`❌ ${e.response?.data?.detail || '开票失败'}`)
+    }
+  }
+
+  const saveInvoiceConfig = async () => {
+    if (!invConfig?.seller_name || !invConfig?.seller_tax_no) {
+      setInvCfgMsg('❌ 请填写销售方名称与税号')
+      return
+    }
+    setInvCfgSaving(true)
+    try {
+      const { data } = await api.put('/platform/invoice-config', invConfig)
+      setInvCfgMsg(`✅ ${data.message}`)
+      loadFinance()
+    } catch (e) {
+      setInvCfgMsg(`❌ ${e.response?.data?.detail || '保存失败'}`)
+    } finally {
+      setInvCfgSaving(false)
     }
   }
 
@@ -537,11 +556,90 @@ export default function PlatformAdmin() {
             )}
           </div>
 
+          {/* 发票平台设置 */}
+          <div className="card" style={{ marginTop: 20 }}>
+            <h3 style={{ marginBottom: 6 }}>发票平台设置（开票全自动）</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              选择电子发票开具平台。默认「演示开票」：本地生成 PDF 演示发票（不产生真实税务发票）。
+              正式收费后对接真实平台（百望云/诺诺发票），填入平台账号与销售方信息即可自动开具。
+            </p>
+            {invCfgMsg && (
+              <div style={{ marginBottom: 10 }}>
+                {invCfgMsg.startsWith('✅')
+                  ? <div className="alert alert-success">{invCfgMsg}</div>
+                  : <div className="alert alert-error">{invCfgMsg}</div>}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+              <div className="form-group">
+                <label>开票平台</label>
+                <select value={invConfig?.provider || 'mock'}
+                  onChange={(e) => setInvConfig({ ...invConfig, provider: e.target.value })}>
+                  <option value="mock">演示开票（本地 PDF）</option>
+                  <option value="baiwang">百望云（需账号）</option>
+                  <option value="nuonuo">诺诺发票（需账号）</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>销售方名称（开票主体）*</label>
+                <input value={invConfig?.seller_name || ''}
+                  onChange={(e) => setInvConfig({ ...invConfig, seller_name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>销售方税号 *</label>
+                <input value={invConfig?.seller_tax_no || ''}
+                  onChange={(e) => setInvConfig({ ...invConfig, seller_tax_no: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>销售方开户银行</label>
+                <input value={invConfig?.seller_bank || ''}
+                  onChange={(e) => setInvConfig({ ...invConfig, seller_bank: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>销售方银行账号</label>
+                <input value={invConfig?.seller_bank_account || ''}
+                  onChange={(e) => setInvConfig({ ...invConfig, seller_bank_account: e.target.value })} />
+              </div>
+              {invConfig?.provider === 'baiwang' && (
+                <>
+                  <div className="form-group">
+                    <label>百望云 API Key{invConfig.api_key ? '（已配置）' : ''}</label>
+                    <input type="password" placeholder={invConfig.api_key ? '已配置，留空保持不变' : '填写 API Key'}
+                      onChange={(e) => setInvConfig({ ...invConfig, api_key: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>百望云 API Secret{invConfig.api_secret ? '（已配置）' : ''}</label>
+                    <input type="password" placeholder={invConfig.api_secret ? '已配置，留空保持不变' : '填写 API Secret'}
+                      onChange={(e) => setInvConfig({ ...invConfig, api_secret: e.target.value })} />
+                  </div>
+                </>
+              )}
+              {invConfig?.provider === 'nuonuo' && (
+                <>
+                  <div className="form-group">
+                    <label>诺诺 AppKey{invConfig.app_key ? '（已配置）' : ''}</label>
+                    <input type="password" placeholder={invConfig.app_key ? '已配置，留空保持不变' : '填写 AppKey'}
+                      onChange={(e) => setInvConfig({ ...invConfig, app_key: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>诺诺 AppSecret{invConfig.app_secret ? '（已配置）' : ''}</label>
+                    <input type="password" placeholder={invConfig.app_secret ? '已配置，留空保持不变' : '填写 AppSecret'}
+                      onChange={(e) => setInvConfig({ ...invConfig, app_secret: e.target.value })} />
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 12 }}
+              onClick={saveInvoiceConfig} disabled={invCfgSaving}>
+              {invCfgSaving ? '保存中...' : '保存发票平台设置'}
+            </button>
+          </div>
+
           {/* 开票申请（类别：服务费） */}
           <div className="card" style={{ marginTop: 20 }}>
             <h3 style={{ marginBottom: 12 }}>开票申请管理（类别：服务费）</h3>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-              企业客户对已支付账单提交开票申请；财务线下开具电子发票后，在此回填发票号完成闭环。
+              企业客户对已支付账单提交开票申请；点击「自动开票」调用发票平台开具电子发票（演示模式本地生成 PDF）。
             </p>
             {invReqs.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>暂无开票申请</div>
@@ -574,24 +672,25 @@ export default function PlatformAdmin() {
                         <td>
                           {r.status === 'pending' ? (
                             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <input
-                                value={issueNoMap[r.id] || ''}
-                                onChange={(e) => setIssueNoMap((m) => ({ ...m, [r.id]: e.target.value }))}
-                                placeholder="发票号"
-                                style={{ width: 110, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-strong)', fontSize: 12 }}
-                              />
-                              <button className="btn btn-success btn-sm"
-                                onClick={() => issueInvoice(r.id)} disabled={!(issueNoMap[r.id] || '').trim()}>
-                                已开
+                              <button className="btn btn-success btn-sm" onClick={() => issueInvoice(r.id)}>
+                                ⚡ 自动开票
                               </button>
                               <button className="btn btn-secondary btn-sm" onClick={() => rejectInvoice(r.id)}>
                                 驳回
                               </button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                              {r.status === 'issued' ? `发票号：${r.invoice_no || '—'}` : (r.reject_reason || '已驳回')}
-                            </span>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                              {r.status === 'issued' ? (
+                                <>
+                                  <div>发票号：{r.invoice_no || '—'}</div>
+                                  {r.pdf_url && (
+                                    <a href={r.pdf_url} target="_blank" rel="noreferrer"
+                                      style={{ color: 'var(--primary)' }}>查看发票 PDF</a>
+                                  )}
+                                </>
+                              ) : (r.reject_reason || '已驳回')}
+                            </div>
                           )}
                         </td>
                       </tr>

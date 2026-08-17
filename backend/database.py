@@ -106,7 +106,14 @@ _SITE_CONTENT_MIGRATIONS = [
     ("pricing", "JSON DEFAULT '{}'"),
     ("social", "JSON DEFAULT '{}'"),
     ("pay_account", "JSON DEFAULT '{}'"),
+    ("invoice_config", "JSON DEFAULT '{}'"),
     ("translations", "JSON DEFAULT '{}'"),
+]
+
+_INVOICE_REQ_MIGRATIONS = [
+    ("pdf_url", "VARCHAR(500) DEFAULT ''"),
+    ("provider", "VARCHAR(20) DEFAULT ''"),
+    ("provider_req_no", "VARCHAR(100) DEFAULT ''"),
 ]
 
 _CUSTOMER_MIGRATIONS = [
@@ -205,6 +212,17 @@ def _lightweight_migrate():
                                 logger.info(f"迁移: bills.{col} 新增")
                             except Exception as e:
                                 logger.debug(f"迁移跳过 bills.{col}: {e}")
+                # invoice_requests 表（发票平台：PDF/平台/流水号）
+                if "invoice_requests" in tables:
+                    existing = {c["name"] for c in inspector.get_columns("invoice_requests")}
+                    for col, sqltype in _INVOICE_REQ_MIGRATIONS:
+                        if col not in existing:
+                            try:
+                                conn.execute(text(
+                                    f"ALTER TABLE invoice_requests ADD COLUMN {col} {sqltype}"))
+                                logger.info(f"迁移: invoice_requests.{col} 新增")
+                            except Exception as e:
+                                logger.debug(f"迁移跳过 invoice_requests.{col}: {e}")
                 # site_contents 表（官网 CMS）
                 if "site_contents" in tables:
                     existing = {c["name"] for c in inspector.get_columns("site_contents")}
@@ -287,6 +305,8 @@ def _lightweight_migrate():
                     _PG_ALL_COLS.append(("companies", col, _pg_type(sqltype)))
                 for col, sqltype in _BILL_PAY_MIGRATIONS:
                     _PG_ALL_COLS.append(("bills", col, _pg_type(sqltype)))
+                for col, sqltype in _INVOICE_REQ_MIGRATIONS:
+                    _PG_ALL_COLS.append(("invoice_requests", col, _pg_type(sqltype)))
                 for col, sqltype in _USER_MIGRATIONS:
                     _PG_ALL_COLS.append(("users", col, _pg_type(sqltype)))
                 for col, sqltype in _LEAD_MIGRATIONS:

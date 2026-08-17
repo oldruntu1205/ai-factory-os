@@ -215,12 +215,13 @@ def list_invoices(company_id: int, db: Session = Depends(get_db),
                 "status_label": inv_status,
                 "req_no": req.req_no,
                 "invoice_no": req.invoice_no,
+                "pdf_url": req.pdf_url or "",
                 "reject_reason": req.reject_reason,
             }
         else:
             inv_detail = {"applied": False, "status": "none",
                           "status_label": "未申请", "req_no": "",
-                          "invoice_no": "", "reject_reason": ""}
+                          "invoice_no": "", "pdf_url": "", "reject_reason": ""}
         result.append({
             "id": b.id, "bill_no": b.bill_no, "plan": b.plan,
             "amount": b.amount, "currency": b.currency, "status": b.status,
@@ -497,6 +498,7 @@ def list_invoice_requests(company_id: int, db: Session = Depends(get_db),
         "amount": r.amount, "invoice_type": r.invoice_type,
         "category": r.category, "title": r.title,
         "status": r.status, "invoice_no": r.invoice_no,
+        "pdf_url": r.pdf_url or "", "provider": r.provider or "",
         "reject_reason": r.reject_reason,
         "created_at": r.created_at.isoformat(),
         "issued_at": r.issued_at.isoformat() if r.issued_at else None,

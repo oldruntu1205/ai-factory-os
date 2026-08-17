@@ -625,6 +625,9 @@ class InvoiceRequest(Base):
     phone = Column(String(50), default="")
     status = Column(String(20), default="pending")         # pending/issued/rejected
     invoice_no = Column(String(50), default="")            # 开具后回填发票号码
+    pdf_url = Column(String(500), default="")              # 电子发票 PDF 下载链接
+    provider = Column(String(20), default="")              # 开具平台：mock/baiwang/nuonuo
+    provider_req_no = Column(String(100), default="")      # 第三方平台流水号
     reject_reason = Column(String(300), default="")
     issued_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -653,6 +656,7 @@ class SiteContent(Base):
     pricing = Column(JSON, default=dict)        # 套餐价格（标题/副标题/方案列表）
     social = Column(JSON, default=dict)         # 悬浮客服（热线电话/客服QQ/微信二维码）
     pay_account = Column(JSON, default=dict)    # 对公收款账户（付款弹窗展示，平台超管维护）
+    invoice_config = Column(JSON, default=dict) # 发票平台配置（provider/销售方/API 凭据）
     translations = Column(JSON, default=dict)   # 多语言翻译覆盖 {"en": {...}, "de": {...}}，仅存与默认(zh)不同的字段
     updated_at = Column(DateTime, nullable=True)
 

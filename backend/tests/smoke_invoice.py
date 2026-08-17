@@ -136,7 +136,7 @@ r = client.get(f"/billing/invoice-requests?company_id={company_id}", headers=H)
 assert r.status_code == 200 and len(r.json()["requests"]) == 1, r.text
 print("[OK] 企业侧申请列表 1 条, status:", r.json()["requests"][0]["status"])
 
-# 14. 平台侧查看并开具
+# 14. 平台侧查看并自动开票（mock provider 生成 PDF）
 r = client.get("/platform/invoice-requests", headers=HP)
 assert r.status_code == 200, f"platform list: {r.status_code} {r.text}"
 reqs = r.json()["requests"]
@@ -146,16 +146,30 @@ assert target, f"平台侧未见 {req_no}"
 rid = target[0]["id"]
 print("[OK] 平台侧看到申请:", req_no, "status:", target[0]["status"])
 
-# 开具
-r = client.post(f"/platform/invoice-requests/{rid}/issue", headers=HP, params={"invoice_no": "2026080012345678"})
+# 自动开票（无 invoice_no 参数，provider 生成发票号 + PDF）
+r = client.post(f"/platform/invoice-requests/{rid}/issue", headers=HP)
 assert r.status_code == 200, f"issue: {r.status_code} {r.text}"
-print("[OK] 平台开具:", r.json()["message"])
+inv_no = r.json()["invoice_no"]
+assert inv_no and r.json()["pdf_url"].endswith(".pdf"), r.text
+assert r.json()["provider"] == "mock", r.text
+print("[OK] 自动开票成功:", inv_no, "| PDF:", r.json()["pdf_url"])
 
-# 企业侧确认状态
+# 企业侧确认状态 + PDF 链接
 r = client.get(f"/billing/invoice-requests?company_id={company_id}", headers=H)
 rr = r.json()["requests"][0]
-assert rr["status"] == "issued" and rr["invoice_no"] == "2026080012345678", r.text
-print("[OK] 企业侧看到已开票 + 发票号:", rr["invoice_no"])
+assert rr["status"] == "issued" and rr["invoice_no"] == inv_no, r.text
+assert rr["pdf_url"], r.text
+print("[OK] 企业侧看到已开票 + 发票号 + PDF:", rr["pdf_url"])
+
+# 发票 PDF 可访问
+r = client.get(rr["pdf_url"])
+assert r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf"), r.text
+print("[OK] 发票 PDF 可下载")
+
+# 已开具不可重复开
+r = client.post(f"/platform/invoice-requests/{rid}/issue", headers=HP)
+assert r.status_code == 400, f"expect 400: {r.text}"
+print("[OK] 已开具不可重复开票")
 
 # 驳回流程（对已开票的不允许重复操作）
 r = client.post(f"/platform/invoice-requests/{rid}/reject", headers=HP, params={"reason": "x"})
