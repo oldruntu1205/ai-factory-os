@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -29,6 +29,13 @@ function RequireAuth({ children }) {
   const token = localStorage.getItem('token')
   if (!token) return <Navigate to="/login" replace />
   return children
+}
+
+// 平台管理员路由守卫（前端 UX 层；后端 _require_platform 仍为最终防线）
+function RequireAdmin() {
+  const role = localStorage.getItem('role')
+  if (role !== 'platform_admin') return <Navigate to="/dashboard" replace />
+  return <Outlet />
 }
 
 function useApplyStoredTheme() {
@@ -70,13 +77,15 @@ export default function App() {
         <Route path="/channels/wecom" element={<Channels section="wecom" />} />
         <Route path="/channels/whatsapp" element={<Channels section="whatsapp" />} />
         <Route path="/channels/email" element={<Channels section="email" />} />
-        <Route path="/admin" element={<PlatformAdmin />} />
-        <Route path="/admin/verify" element={<PlatformAdmin />} />
-        <Route path="/admin/finance" element={<PlatformAdmin />} />
-        <Route path="/admin/stats" element={<PlatformAdmin />} />
-        <Route path="/admin/llm" element={<PlatformAdmin />} />
-        <Route path="/admin/site" element={<SiteAdmin />} />
-        <Route path="/admin/integrations" element={<IntegrationAdmin />} />
+        <Route element={<RequireAdmin />}>
+          <Route path="/admin" element={<PlatformAdmin />} />
+          <Route path="/admin/verify" element={<PlatformAdmin />} />
+          <Route path="/admin/finance" element={<PlatformAdmin />} />
+          <Route path="/admin/stats" element={<PlatformAdmin />} />
+          <Route path="/admin/llm" element={<PlatformAdmin />} />
+          <Route path="/admin/site" element={<SiteAdmin />} />
+          <Route path="/admin/integrations" element={<IntegrationAdmin />} />
+        </Route>
       </Route>
       {/* 大数据看板：独立全屏页，无侧边栏，新标签页打开 */}
       <Route path="/bigdata" element={<RequireAuth><BigData /></RequireAuth>} />

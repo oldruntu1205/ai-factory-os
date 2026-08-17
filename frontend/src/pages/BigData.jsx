@@ -4,12 +4,12 @@ import * as echarts from 'echarts'
 
 /* ============================================================
  * 腾讯地图 Key（合规要求：必须用腾讯/高德/百度/天地图）
- * 默认是占位符 —— 上线前请到 https://lbs.qq.com 申请「JavaScript API」
- * 密钥，把下面这行替换成你的真实 key（前端明文 key 建议配置 Referer 白名单）。
- * 若仍是占位符，看板会显示提示框而非报错。
+ * 安全：不再在源码中写死 Key —— 从构建环境注入 VITE_TENCENT_MAP_KEY
+ * （部署时在 frontend/.env 或构建环境配置；前端明文 key 建议配置 Referer 白名单）。
+ * 未配置时看板显示提示框而非报错。
  * ============================================================ */
-const TENCENT_MAP_KEY = 'J56BZ-JVECV-2NVP3-5LWVL-7COMH-N7FE2'
-const MAP_KEY_CONFIGURED = !TENCENT_MAP_KEY.startsWith('Please apply')
+const TENCENT_MAP_KEY = import.meta.env.VITE_TENCENT_MAP_KEY || ''
+const MAP_KEY_CONFIGURED = Boolean(TENCENT_MAP_KEY)
 
 const C = {
   bg: '#060b1f',
@@ -108,7 +108,7 @@ function ChinaMap() {
   }, [])
   if (!MAP_KEY_CONFIGURED)
     return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 1.8 }}>
-      请在 <code>BigData.jsx</code> 顶部配置腾讯地图 Key<br />（lbs.qq.com 申请 JavaScript API 密钥后替换 TENCENT_MAP_KEY）
+      请在构建环境配置 <code>VITE_TENCENT_MAP_KEY</code><br />（lbs.qq.com 申请 JavaScript API 密钥后注入，勿写死在源码）
     </div>
   if (err)
     return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.warn, fontSize: 13 }}>腾讯地图加载失败，请检查 Key 是否有效</div>

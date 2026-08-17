@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [reportLoading, setReportLoading] = useState(false)
   const [verified, setVerified] = useState(false)
+  const [message, setMessage] = useState('')
 
   const navigate = useNavigate()
   const companyId = Number(localStorage.getItem('company_id'))
@@ -128,6 +129,9 @@ export default function Dashboard() {
               </span>
             )}
           </div>
+          {message && (
+            <div style={{ marginTop: 12, fontSize: 13, color: 'var(--danger, #dc2626)' }}>{message}</div>
+          )}
           {report && (
             <pre style={{
               marginTop: 16, background: 'var(--bg-subtle)', padding: 16, borderRadius: 8,

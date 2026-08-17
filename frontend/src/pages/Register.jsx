@@ -28,6 +28,10 @@ export default function Register() {
         localStorage.setItem('company_id', data.company_id)
         localStorage.setItem('company', '我的企业')
         localStorage.setItem('role', data.role || 'staff')
+        try {
+          const me = await api.get('/auth/me')
+          localStorage.setItem('user_id', me.data.user_id)
+        } catch { /* 拿不到 user_id 不阻塞注册流程 */ }
         navigate('/dashboard')
         return
       }
@@ -36,6 +40,10 @@ export default function Register() {
       localStorage.setItem('company_id', data.company_id)
       localStorage.setItem('company', form.company)
       localStorage.setItem('role', data.role || 'admin')
+      try {
+        const me = await api.get('/auth/me')
+        localStorage.setItem('user_id', me.data.user_id)
+      } catch { /* 同上 */ }
       navigate('/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || '注册失败')

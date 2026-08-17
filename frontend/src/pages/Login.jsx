@@ -20,6 +20,7 @@ export default function Login() {
       localStorage.setItem('company', '我的企业')
       localStorage.setItem('role', data.role || 'admin')
       localStorage.setItem('email', data.email || email)
+      localStorage.setItem('user_id', data.user_id)
       navigate(data.role === 'platform_admin' ? '/admin' : '/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || '登录失败')
