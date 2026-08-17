@@ -127,16 +127,6 @@ class TaskQueue:
     # ---------- 出队 / 执行 ----------
 
     def _pop(self) -> dict:
-        if self._mode == "rabbitmq":
-            # 同步模式：从 RabbitMQ 拉取一条（消费确认）
-            try:
-                from hermes.queue.rabbitmq import EXCHANGE_TASKS
-                ch = self._rabbit._get_channel()
-                method, props, body = ch.basic_get(
-                    queue=f"hermes.task.{_current_task_name()}") if False else (None, None, None)
-                return None
-            except Exception:
-                return None
         if self._mode == "redis":
             raw = self._redis.lpop("hermes:queue")
             return json.loads(raw) if raw else None
@@ -162,7 +152,8 @@ class TaskQueue:
         return self._run(task)
 
     def _run(self, task: dict) -> dict:
-        handler = self._workers.get(task["task"])
+        # 精确匹配优先，未注册任务回退 __default__ 兜底 handler（如 worker 脚本的日志 handler）
+        handler = self._workers.get(task["task"]) or self._workers.get("__default__")
         if not handler:
             logger.warning(f"Queue: 无 worker 处理任务 [{task['task']}]")
             return {"task_id": task["task_id"], "status": "no_worker"}
