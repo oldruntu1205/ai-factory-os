@@ -517,6 +517,9 @@ export default function Billing() {
                     onClick={copyAccount}>
                     {copied ? '✅ 已复制' : '📋 复制付款账号'}
                   </button>
+                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                    当前为<b>演示收款账户</b>，正式收费启用前不会产生真实扣款；请按平台通知使用。
+                  </div>
                 </>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>付款账户信息加载中...</div>
