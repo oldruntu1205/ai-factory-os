@@ -35,6 +35,11 @@ export default function Leads() {
   const [gradeFilter, setGradeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [detail, setDetail] = useState(null)
+  // 真实询盘导入（出口型 AI 应用）
+  const [showImport, setShowImport] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importAutoFollow, setImportAutoFollow] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -56,6 +61,34 @@ export default function Leads() {
 
   const toggleChip = (list, setList, v) =>
     setList(list.includes(v) ? list.filter(x => x !== v) : [...list, v])
+
+  // 真实询盘导入：支持 JSON 数组 或 "公司名|邮箱|国家|需求" 每行一条
+  const importLeads = async () => {
+    if (!importText.trim()) { setMsg('⚠️ 请粘贴询盘内容'); return }
+    setImporting(true); setMsg('')
+    let items = []
+    try {
+      const arr = JSON.parse(importText.trim())
+      if (Array.isArray(arr)) items = arr
+    } catch { /* 行格式 */ }
+    if (!items.length) {
+      items = importText.split('\n').filter(l => l.trim()).map(l => {
+        const [company_name, email, country, ...rest] = l.split('|').map(s => s.trim())
+        return { company_name: company_name || '', email: email || '',
+                 country: country || '', requirement: rest.join('|') || '' }
+      })
+    }
+    try {
+      const { data } = await api.post('/leads/import', {
+        company_id: companyId, leads: items, auto_follow: importAutoFollow,
+      })
+      setMsg(`✅ 已导入 ${data.count} 条询盘（自动首封 ${data.followed} 条），AI 已解析并评分`)
+      setShowImport(false); setImportText('')
+      load()
+    } catch (e) {
+      setMsg(`❌ 导入失败：${e.response?.data?.detail || e.message}`)
+    } finally { setImporting(false) }
+  }
 
   const discover = async () => {
     setLoading(true); setMsg('')
@@ -109,9 +142,41 @@ export default function Leads() {
   return (
     <div>
       <PageHeader title="AI 自主销售（全自动获客）">
+        <button className="btn btn-sm" style={{ fontSize: 13 }} onClick={() => setShowImport(true)}>📥 导入真实询盘</button>
         <button className="btn btn-primary btn-sm" onClick={runSequence}>🤖 运行自动跟进</button>
         <button className="btn btn-sm" onClick={load}>刷新</button>
       </PageHeader>
+
+      {/* 真实询盘导入弹窗 */}
+      {showImport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowImport(false)}>
+          <div className="card" style={{ width: 640, maxWidth: '92vw', padding: 20 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <b style={{ fontSize: 16 }}>导入真实询盘（AI 解析 + 评分）</b>
+              <button className="btn btn-sm" onClick={() => setShowImport(false)}>✕</button>
+            </div>
+            <textarea rows={8} value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={'支持两种格式：\n1) JSON 数组：[{"company_name":"XX GmbH","email":"a@x.de","country":"DE","requirement":"We need 1000 glass beakers CIF Hamburg"}]  \n2) 每行一条：公司名|邮箱|国家|需求'} 
+              style={{ width: '100%', boxSizing: 'border-box', fontSize: 13, padding: 10,
+                border: '1px solid #cbd5e1', borderRadius: 6, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0' }}>
+              <input type="checkbox" id="af" checked={importAutoFollow}
+                onChange={(e) => setImportAutoFollow(e.target.checked)} />
+              <label htmlFor="af" style={{ fontSize: 13 }}>导入后自动发送首封开发信（按客户国家语言）</label>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-sm" onClick={() => setShowImport(false)}>取消</button>
+              <button className="btn btn-primary btn-sm" onClick={importLeads} disabled={importing}>
+                {importing ? '导入解析中...' : '导入并 AI 解析'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {msg && <div className="card" style={{ marginBottom: 16, padding: 12, background: 'var(--bg-subtle)' }}>{msg}</div>}
 

@@ -20,6 +20,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 import base64
+import uuid
+import logging
 
 from database import get_db
 from models import Lead, Customer
@@ -28,6 +30,8 @@ from api.company import require_verified
 from sales.discovery import discover_leads
 from sales.scoring import score_lead, grade_of
 from channels.email.sequence import send_follow_up, run_due_follow_ups
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/leads", tags=["AI自主销售"])
 
@@ -63,6 +67,89 @@ class SendSeqIn(BaseModel):
 
 class CompanyIn(BaseModel):
     company_id: int
+
+
+class ImportLeadItem(BaseModel):
+    company_name: str = ""
+    email: str = ""
+    country: str = ""
+    contact: str = ""
+    phone: str = ""
+    website: str = ""
+    requirement: str = ""
+    source: str = "import"
+
+
+class ImportIn(BaseModel):
+    company_id: int
+    leads: list[ImportLeadItem] = []
+    auto_follow: bool = False   # 导入后自动发送首封（按国家语言）
+
+
+# ---------------- 真实询盘导入（出口型制造业 AI 应用 第3项） ----------------
+@router.post("/import")
+def import_leads(data: ImportIn, db: Session = Depends(get_db),
+                 current: dict = Depends(get_current_user)):
+    """批量导入真实询盘 -> AI 解析 -> 评分 -> （可选）自动首封
+
+    区别于 /discover（Mock 生成），本端点面向真实询盘源（独立站表单/展会/业务手动录入）。
+    """
+    require_company(data.company_id, current)
+    require_verified(current.get("license_verified", False))
+    from sales.parse_inquiry import parse_inquiry
+    from sales.scoring import score_lead
+    from utils.trade import COUNTRY_LANGUAGES
+
+    items = (data.leads or [])[:200]  # 单次上限 200
+    created = []
+    followed = 0
+    for item in items:
+        parsed = parse_inquiry(item.requirement) if item.requirement else {}
+        country = (parsed.get("country") or item.country or "").upper()
+        lead = Lead(
+            company_name=item.company_name or parsed.get("product") or "未命名客户",
+            website=item.website or "",
+            country=country,
+            email=item.email or "",
+            industry=parsed.get("product") or "",
+            status="discovered",
+            followup_day=1,
+            follow_up_step=0,
+            source=item.source or "import",
+            enriched={
+                **parsed,
+                "contact": item.contact or "", "phone": item.phone or "",
+                "raw_inquiry": (item.requirement or "")[:1000],
+            },
+            track_id=uuid.uuid4().hex[:16],
+            company_id=data.company_id,
+        )
+        score_lead(lead)  # LLM 评分（失败回退规则）
+        db.add(lead)
+        db.flush()
+        created.append({
+            "id": lead.id, "company_name": lead.company_name,
+            "country": country, "score": lead.score, "grade": lead.grade,
+            "product": parsed.get("product", ""),
+            "intent": parsed.get("intent", "medium"),
+        })
+    db.commit()
+
+    # 自动首封（按国家语言；同一会话内发送）
+    if data.auto_follow:
+        from channels.email.sequence import send_follow_up
+        for item in created:
+            try:
+                lang = COUNTRY_LANGUAGES.get(item["country"], "en")
+                send_follow_up(item["id"], data.company_id, step=1,
+                               language=lang, variant="A",
+                               track_id="")
+                followed += 1
+            except Exception as e:
+                db.rollback()
+                logger.error(f"导入自动首封失败 lead={item['id']}: {e}")
+    return {"message": f"已导入 {len(created)} 条询盘（自动首封 {followed} 条）",
+            "leads": created, "count": len(created), "followed": followed}
 
 
 # ---------------- 发现 ----------------
