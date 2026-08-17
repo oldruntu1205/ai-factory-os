@@ -7,11 +7,13 @@ POST /agent/chat 支持两种调用：
 
 所有对话记录按企业隔离存储。
 """
+import os
 import uuid
+import tempfile
 
-from typing import Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -19,6 +21,7 @@ from database import get_db
 from models import AIAgent, Conversation, Customer
 from auth.deps import get_current_user, require_company
 from agents.service import execute_agent, execute_specialized
+from agents.drawing_chat import drawing_chat as run_drawing_chat
 from ai.llm import is_mock
 from api.company import require_verified
 
@@ -92,4 +95,97 @@ def list_conversations(company_id: int, page: int = 1, page_size: int = 100,
             "channel": c.channel, "created_at": c.created_at.isoformat(),
         } for c in convs],
         "total": total, "page": page, "page_size": page_size,
+    }
+
+
+# ---------- AI 图纸助手：对话级附件（不进 RAG） ----------
+# 支持的文件类型（前端 accept 与之对应）
+_ALLOWED_EXTS = {
+    ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".txt", ".md", ".csv",
+    ".dxf", ".dwg",
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
+}
+_MAX_UPLOAD_MB = 20
+
+
+@router.post("/drawing-chat")
+async def drawing_chat(
+    message: str = Form(""),
+    company_id: int = Form(...),
+    files: List[UploadFile] = File(default=[]),
+    customer_id: Optional[int] = Form(None),
+    session_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current: dict = Depends(get_current_user),
+):
+    """AI 图纸助手：上传图片/CAD/PDF/文本，结合提问由工艺/图纸助手作答。
+
+    ⚠️ 关键约定：附件属于**当前对话逻辑**，**绝不写入 RAG 知识库**
+    （不调用 knowledge 上传 / 解析入库），仅作为本次对话的随附上下文。
+    """
+    require_company(company_id, current)
+    require_verified(current.get("license_verified", False))
+
+    session_id = session_id or uuid.uuid4().hex[:16]
+
+    saved: List[str] = []
+    ok_files: List[tuple] = []   # (path, ext, original_name)
+    try:
+        for up in files:
+            if not up.filename:
+                continue
+            ext = os.path.splitext(up.filename)[1].lower()
+            if ext not in _ALLOWED_EXTS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"不支持的文件类型：{ext}（支持 PDF/Word/Excel/文本/CAD/图片）")
+            content = await up.read()
+            if not content:
+                continue
+            if len(content) > _MAX_UPLOAD_MB * 1024 * 1024:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"文件过大（上限 {_MAX_UPLOAD_MB}MB）：{up.filename}")
+            suffix = ext or ".bin"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+            tmp.close()
+            with open(tmp.name, "wb") as f:
+                f.write(content)
+            saved.append(tmp.name)
+            ok_files.append((tmp.name, ext, up.filename))
+
+        result = run_drawing_chat(
+            message or "", company_id, ok_files, db=db, customer_id=customer_id)
+    finally:
+        # 无论成败都清理临时文件（不落盘、不进 RAG）
+        for p in saved:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+    answer = result["answer"]
+    user_msg = (message or "").strip()
+    if ok_files:
+        names = "、".join(n for (_, _, n) in ok_files)
+        user_msg = (user_msg + f"\n[随附文件: {names}]").strip()
+
+    conv = Conversation(
+        session_id=session_id,
+        agent_id=None,            # 图纸助手为会话级，无固定 agent_id
+        user_message=user_msg,
+        agent_answer=answer,
+        channel="drawing_chat",
+        company_id=company_id,
+    )
+    db.add(conv)
+    db.commit()
+
+    return {
+        "answer": answer,
+        "session_id": session_id,
+        "agent": "工艺/图纸助手",
+        "mock_mode": result.get("mock_mode", is_mock()),
+        "vision_used": result.get("vision_used", False),
+        "parsed_files": result.get("parsed_files", []),
     }
