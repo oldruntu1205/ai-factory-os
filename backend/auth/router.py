@@ -48,6 +48,14 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
 
+    # 为新租户初始化 Hermes RBAC 权限（默认权限集，与演示企业一致；
+    # 便于后续租户级权限管理与审计有据可依）
+    try:
+        from hermes.runtime import get_runtime
+        get_runtime().permission_system.init_tenant(company.id)
+    except Exception:
+        pass
+
     token = create_token(user.id, company.id, user.role)
     return {
         "message": "register success",
