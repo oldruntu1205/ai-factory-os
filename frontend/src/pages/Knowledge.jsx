@@ -60,16 +60,36 @@ export default function Knowledge() {
         {/* 左侧：文档管理 */}
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>上传企业知识文档</span>
               <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer' }}>
                 {uploading ? '处理中...' : '选择文件上传'}
                 <input type="file" style={{ display: 'none' }} onChange={upload}
-                  accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv" />
+                  accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv,.dxf,.dwg" />
               </label>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>支持 PDF / Word / Excel / TXT</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>支持 PDF / Word / Excel / TXT / CAD(DXF·DWG)</span>
             </div>
           </div>
+
+          {docs.length === 0 && (
+            <div className="card" style={{
+              marginBottom: 16, borderStyle: 'dashed', borderColor: 'var(--primary)',
+              background: 'var(--primary-soft)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 24 }}>📐</span>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                    开通「工艺/图纸助手」？上传 CAD/PDF 图纸即可
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    上传 CAD(DXF/DWG) 或 PDF 图纸后，可在「<a href="#/agents" style={{ color: 'var(--primary)' }}>AI 员工管理</a>」创建
+                    「工艺/图纸助手」，即可查询型号公差、材质标准与防误操作要点。
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <table className="table">

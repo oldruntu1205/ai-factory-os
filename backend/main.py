@@ -80,10 +80,8 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         _run_alembic_upgrade()
         # 演示种子默认开启（SEED_DEMO=0 关闭，生产环境不注入演示数据）
-        if config.SEED_DEMO:
-            _seed_demo_data()
-            _seed_business_data()
-            _seed_marketplace()
+        # 商城包是平台内容（非演示数据），始终幂等写入，保证新行业包可达
+        _seed_marketplace()
         _seed_cms()          # 官网默认内容（CMS）
         _init_hermes()
         _bootstrap_default_souls()
@@ -125,11 +123,10 @@ def _bootstrap_default_souls():
 
 
 def _seed_marketplace():
-    """写入 Agent 商城种子包（第24章 行业 Agent 商城）"""
+    """写入 Agent 商城种子包（第24章 行业 Agent 商城），按 name 幂等增量写入"""
     db = SessionLocal()
     try:
-        if db.query(AgentPackage).first():
-            return
+        existing = {p[0] for p in db.query(AgentPackage.name).all()}
         packages = [
             AgentPackage(
                 name="industry_sales_pack", title="AI销售包",
@@ -171,21 +168,25 @@ def _seed_marketplace():
                 tools=["mes.get_production", "dashboard.snapshot"],
             ),
             AgentPackage(
-                name="factory_brain_pack", title="企业大脑·CEO 经营包",
-                industry="general", version="1.0", price=2999,
-                icon="🧠",
-                description="自动生成经营日报，汇总销售/生产/质量/库存，输出 AI 决策建议。",
+                name="industry_drawing_pack", title="工艺/图纸助手包",
+                industry="general", version="1.0", price=899,
+                icon="📐",
+                description="解析 CAD/PDF 图纸，查询型号公差/材质标准，提示防误操作要点。",
                 agents=[
-                    {"name": "Brain", "role": "ceo", "label": "CEO企业大脑",
-                     "description": "经营日报、风险预警、决策建议"},
+                    {"name": "花花", "role": "process", "label": "工艺/图纸助手",
+                     "description": "解析 CAD/PDF 图纸，回答型号公差、材质标准与防误操作要点"},
                 ],
-                tools=["crm.get_customer", "dashboard.snapshot", "quotation.create",
-                       "email.send", "knowledge.search"],
+                tools=["knowledge.search"],
             ),
         ]
-        db.add_all(packages)
-        db.commit()
-        logger.info("Agent 商城种子数据写入完成（4 个行业包）")
+        # 幂等：仅插入 name 不存在的包，避免重复 / 唯一键冲突
+        to_add = [p for p in packages if p.name not in existing]
+        if to_add:
+            db.add_all(to_add)
+            db.commit()
+            logger.info("Agent 商城种子数据新增 %d 个行业包", len(to_add))
+        else:
+            logger.info("Agent 商城种子数据已存在，跳过")
     finally:
         db.close()
 
