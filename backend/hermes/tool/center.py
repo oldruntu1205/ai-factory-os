@@ -60,13 +60,36 @@ class ToolCenter:
         return out
 
     def execute(self, tool_name: str, params: dict, company_id: int,
-                permission_checker=None) -> dict:
-        """执行 Tool（含可选权限校验），并把调用步骤回写到当前执行轨迹"""
+                permission_checker=None, agent_name: str = None) -> dict:
+        """执行 Tool（含权限校验），并把调用步骤回写到当前执行轨迹。
+
+        安全加固（RBAC 深度改造 Step1/2）：
+        - 未显式传入 permission_checker 时，自动使用全局 Hermes RBAC 校验：
+          * 传了 agent_name → 完整校验（manifest 工具声明 + 租户权限点）
+          * 未传 agent_name → 租户权限点校验
+        - 默认权限集下行为不变；租户 revoke 后调用即被拦截。
+        - runtime 未初始化（启动早期/单元测试）时保持不拦截，避免启动失败。
+        """
         tool = self.get_tool(tool_name)
         if not tool:
             return {"ok": False, "tool": tool_name, "error": f"Tool [{tool_name}] 不存在"}
 
-        # 权限校验
+        # 权限校验：显式 checker 优先；否则回退全局 RBAC
+        if permission_checker is None and tool.permissions:
+            try:
+                from hermes.runtime import get_runtime
+                perm_sys = get_runtime().permission_system
+                if perm_sys is not None:
+                    if agent_name:
+                        def _full_check(perm):
+                            perm_sys.assert_tool_allowed(company_id, agent_name, tool_name)
+                        permission_checker = _full_check
+                    else:
+                        permission_checker = lambda perm: perm_sys.assert_tool_permission(
+                            company_id, tool_name, perm)
+            except Exception:
+                permission_checker = None  # runtime 未初始化时不拦截
+
         if permission_checker:
             for perm in tool.permissions:
                 permission_checker(perm)

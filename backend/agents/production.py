@@ -15,13 +15,15 @@ def _gather_production_data(tools, company_id: int) -> str:
     """多步：先查 MES 产线/工单、ERP 库存，拼成实时数据块。"""
     parts = []
     try:
-        mes = tools.execute("mes.get_production", {"order_id": ""}, company_id)
+        mes = tools.execute("mes.get_production", {"order_id": ""}, company_id,
+                            agent_name="production_agent")
         if mes.get("ok"):
             parts.append(f"[MES 产线/工单状态] {mes.get('data')}")
     except Exception as e:
         parts.append(f"[MES 调用失败] {e}")
     try:
-        stock = tools.execute("erp.get_stock", {"product_id": ""}, company_id)
+        stock = tools.execute("erp.get_stock", {"product_id": ""}, company_id,
+                              agent_name="production_agent")
         if stock.get("ok"):
             parts.append(f"[ERP 库存] {stock.get('data')}")
     except Exception as e:

@@ -98,6 +98,16 @@ class RBACSystem:
                     raise PermissionError(
                         f"企业 {tenant_id} 未授权权限点 [{perm}]，Tool [{tool_name}] 被拒绝")
 
+    def assert_tool_permission(self, tenant_id: int, tool_name: str, permission: str) -> None:
+        """校验租户是否授权某 Tool 的某个权限点（供 ToolCenter 无 Agent 上下文时使用）。
+
+        未配置租户回退默认权限集；权限点缺失即拒绝（fail-closed）。
+        """
+        granted = self._tenant_permissions.get(tenant_id, set(self._default_permissions))
+        if permission not in granted:
+            raise PermissionError(
+                f"企业 {tenant_id} 未授权权限点 [{permission}]，Tool [{tool_name}] 被拒绝")
+
     def check(self, tenant_id: int, agent_name: str, tool_name: str) -> bool:
         """校验（不抛异常版本）"""
         try:

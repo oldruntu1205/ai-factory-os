@@ -15,19 +15,22 @@ def _gather_quality_data(tools, company_id: int) -> str:
     """多步：先查 MES 实时生产状态、经营快照、ERP 物料库存，拼成实时数据块。"""
     parts = []
     try:
-        mes = tools.execute("mes.get_production", {"order_id": ""}, company_id)
+        mes = tools.execute("mes.get_production", {"order_id": ""}, company_id,
+                            agent_name="quality_agent")
         if mes.get("ok"):
             parts.append(f"[MES 实时生产状态] {mes.get('data')}")
     except Exception as e:
         parts.append(f"[MES 调用失败] {e}")
     try:
-        snap = tools.execute("dashboard.snapshot", {}, company_id)
+        snap = tools.execute("dashboard.snapshot", {}, company_id,
+                             agent_name="quality_agent")
         if snap.get("ok"):
             parts.append(f"[经营快照] {snap.get('data')}")
     except Exception as e:
         parts.append(f"[经营快照调用失败] {e}")
     try:
-        stock = tools.execute("erp.get_stock", {"product_id": ""}, company_id)
+        stock = tools.execute("erp.get_stock", {"product_id": ""}, company_id,
+                              agent_name="quality_agent")
         if stock.get("ok"):
             parts.append(f"[ERP 物料库存] {stock.get('data')}")
     except Exception as e:

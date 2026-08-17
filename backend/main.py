@@ -459,8 +459,7 @@ def _init_hermes():
                              "quotation.create"]),
         AgentManifest(name="process_agent", version="1.0", industry="general",
                       label="工艺/图纸助手", description="CAD/PDF 图纸参数抽取 + 混合检索，查询公差/材质标准，防范误操作",
-                      tools=["drawing.search", "knowledge.search",
-                             "mes.get_process", "erp.get_material_std"]),
+                      tools=["knowledge.search"]),
     ]
     registry = runtime.agent_registry
     for manifest in builtin_agents:

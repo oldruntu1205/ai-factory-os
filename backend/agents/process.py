@@ -22,21 +22,6 @@ from knowledge.hybrid import hybrid_search, search_drawing_params
 from knowledge.cad_parser import extract_product_models
 
 
-def _gather_live_data(tools, company_id: int) -> str:
-    """可选多步：查 MES 工艺参数 / ERP 物料标准，拼成实时数据块。"""
-    if not tools:
-        return ""
-    parts = []
-    for tool_name in ("mes.get_process", "erp.get_material_std"):
-        try:
-            res = tools.execute(tool_name, {}, company_id)
-            if res.get("ok"):
-                parts.append(f"[{tool_name}] {res.get('data')}")
-        except Exception as e:
-            parts.append(f"[{tool_name} 调用失败] {e}")
-    return "\n".join(parts)
-
-
 def process_agent(message: str, company_id: int, tools=None, db=None,
                    extra_context: str = None) -> str:
     """message: 用户问题；company_id: 企业隔离（必传，禁止默认值，防止跨企业检索）；
@@ -69,9 +54,6 @@ def process_agent(message: str, company_id: int, tools=None, db=None,
         f"[来源: {r.get('source') or '知识库'}]\n{r['text']}" for r in rag
     ) if rag else "（知识库无相关片段）"
 
-    # 3) 可选实时数据
-    live = _gather_live_data(tools, company_id)
-
     # 组织结构化参数上下文
     if structured:
         param_lines = []
@@ -84,8 +66,6 @@ def process_agent(message: str, company_id: int, tools=None, db=None,
     else:
         param_block = "结构化图纸参数：未匹配到精确参数（已转混合检索）。"
 
-    # 实时数据块提前构造：f-string 表达式内不允许反斜杠（Python 3.11 语法限制）
-    live_block = f"# 实时工业数据（MES / ERP）\n{live}" if live else ""
     # 随附文件上下文（本次对话上传的图纸/文件，仅本次有效，不进 RAG）
     extra_block = (
         "# 本次对话随附的图纸/文件内容（仅本次对话有效，不进入知识库）\n"
@@ -105,7 +85,6 @@ def process_agent(message: str, company_id: int, tools=None, db=None,
 # 混合检索上下文（自由描述类补充）
 {rag_text}
 {extra_block}
-{live_block}
 
 # 回答要求
 1. 若问具体型号的参数：先给「精确值」（公差范围 / 材质牌号 / 执行标准），并标注来源文件。
