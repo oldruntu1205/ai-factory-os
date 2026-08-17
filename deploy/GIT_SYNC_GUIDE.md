@@ -130,6 +130,7 @@ ssh root@<PROD_DOMAIN_REMOVED> "systemctl stop ai-factory-backend ai-factory-wor
 | 推送后服务没重启 | 本次提交只动了前端/文档 | 正常，仅 backend/ 变更会重启 |
 | 推送后 `deploy.log` 记「语法检查失败」 | 本地漏跑 `py_compile` | 修语法后重新 commit+push；旧服务仍在跑 |
 | `Permission denied (publickey)` | 未配置 SSH 免密 | 回看「前置条件 1」 |
+| `Could not resolve hostname <PROD_DOMAIN_REMOVED>` | 域名未解析/未指向生产机 | 用公网 IP 替换主机名：服务器上 `curl -s ifconfig.me` 获取公网 IP |
 | 首次推送后页面异常 | 本地与 prod 代码差异大 | 用「五、回滚」整盘回退，再比对差异 |
 | 想同步前端 | 前端不在自动同步范围 | 走 `deploy-prod.sh` 独立发布 |
 
