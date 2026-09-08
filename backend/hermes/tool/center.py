@@ -74,24 +74,26 @@ class ToolCenter:
         if not tool:
             return {"ok": False, "tool": tool_name, "error": f"Tool [{tool_name}] 不存在"}
 
-        # 权限校验：显式 checker 优先；否则回退全局 RBAC
-        if permission_checker is None and tool.permissions:
+        # 权限校验：显式 checker 优先；否则回退全局 RBAC。
+        # fail-closed 修复：agent 上下文无条件执行完整校验（manifest 工具白名单 + 租户权限点），
+        # 不再因 tool.permissions 为空而跳过 manifest 声明校验（原『空清单=放行』漏洞路径）。
+        if permission_checker is None:
             try:
                 from hermes.runtime import get_runtime
                 perm_sys = get_runtime().permission_system
                 if perm_sys is not None:
                     if agent_name:
-                        def _full_check(perm):
+                        def _full_check(_perm):
                             perm_sys.assert_tool_allowed(company_id, agent_name, tool_name)
                         permission_checker = _full_check
-                    else:
+                    elif tool.permissions:
                         permission_checker = lambda perm: perm_sys.assert_tool_permission(
                             company_id, tool_name, perm)
             except Exception:
                 permission_checker = None  # runtime 未初始化时不拦截
 
         if permission_checker:
-            for perm in tool.permissions:
+            for perm in (tool.permissions or [None]):
                 permission_checker(perm)
 
         import time as _time

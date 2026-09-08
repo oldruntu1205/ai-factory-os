@@ -142,22 +142,43 @@ class RBACSystem:
     # ---------- 校验 ----------
 
     def assert_agent_allowed(self, tenant_id: int, agent_name: str) -> None:
-        """企业是否有权运行该 Agent"""
+        """企业是否有权运行该 Agent。
+
+        语义（fail-closed 收紧，修复『未配置=全放行』）：
+        - 平台级公共 Agent（company_id=0：内置 / 平台注册公共 / 商城包级）→ 所有租户可执行；
+        - 租户私有自定义 Agent → 必须已授权（register 时自动 allow_agent，名单含之）；
+        - 其他（他企私有 / 未注册名）→ 拒绝。
+        """
         self._ensure_loaded(tenant_id)
         allowed = self._tenant_agents.get(tenant_id, set())
-        if not allowed:
-            return  # 未配置限制时默认放行（兼容旧版）
-        if agent_name not in allowed:
-            raise PermissionError(f"企业 {tenant_id} 无权运行 Agent [{agent_name}]")
+        if agent_name in allowed or agent_name in self.DEFAULT_AGENT_NAMES:
+            return
+        # 平台级公共 Agent 放行（内置名之外的公共自定义/商城包级）
+        try:
+            from hermes.runtime import get_runtime
+            manifest = get_runtime().agent_registry.resolve_agent(agent_name, tenant_id)
+            if manifest is not None and int(manifest.company_id or 0) == 0:
+                return
+        except Exception:
+            pass
+        raise PermissionError(
+            f"企业 {tenant_id} 无权运行 Agent [{agent_name}]（未授权）")
 
     def assert_tool_allowed(self, tenant_id: int, agent_name: str, tool_name: str) -> None:
         """Agent 是否被允许调用该 Tool（双重校验：manifest 声明 + 租户权限）"""
         self._ensure_loaded(tenant_id)
-        # 1) Agent manifest 声明校验（按租户解析实际生效 manifest：私有优先、回退平台级）
+        # 1) Agent manifest 声明校验（fail-closed：无 manifest / tools 空清单 = 拒绝调用
+        #    任意 Tool——修复『tools=[] 时白名单整体短路放行』的越权工具调用漏洞）
         from hermes.runtime import get_runtime
         registry = get_runtime().agent_registry
         manifest = registry.resolve_agent(agent_name, tenant_id)
-        if manifest and manifest.tools and tool_name not in manifest.tools:
+        if manifest is None:
+            raise PermissionError(
+                f"Agent [{agent_name}] 未注册，拒绝调用 Tool [{tool_name}]")
+        if not manifest.tools:
+            raise PermissionError(
+                f"Agent [{agent_name}] 未声明任何 Tool（tools 为空），拒绝调用 [{tool_name}]")
+        if tool_name not in manifest.tools:
             raise PermissionError(
                 f"Agent [{agent_name}] 未声明 Tool [{tool_name}]，拒绝调用")
 
