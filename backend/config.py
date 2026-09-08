@@ -133,6 +133,12 @@ EVOLUTION_SCHEDULER_TARGET_TYPES = tuple(
 # 生产环境建议 SEED_DEMO=0，避免自动注入演示企业/AI 员工/商城包
 SEED_DEMO = os.getenv("SEED_DEMO", "1").lower() in ("1", "true", "yes", "on")
 
+# ---------- 计费生产门禁（安全修复：防演示数据被真实环境误用）----------
+# BILLING_ENFORCE_LIVE=1（正式收费时置 1）：收款账户未配置（回退演示账号）时拒绝
+# upgrade/pay；发票平台为 mock 时拒绝一键开票（防客户打款到演示账号 / 开出 DEMO 假票）。
+# 默认 0 保持本地/试运营演示流程畅通。
+BILLING_ENFORCE_LIVE = os.getenv("BILLING_ENFORCE_LIVE", "0").lower() in ("1", "true", "yes", "on")
+
 # ---------- 邮件追踪/退订外链基础地址 ----------
 # 跟踪像素与退订页需要的公网可访问地址；部署时设为真实域名
 APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://localhost:8000").rstrip("/")

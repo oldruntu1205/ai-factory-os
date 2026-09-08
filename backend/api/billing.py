@@ -57,6 +57,23 @@ def _get_pay_account(db: Session) -> dict:
             merged[k] = v
     return merged
 
+
+def _pay_account_is_demo(db: Session) -> bool:
+    """收款账户是否仍是演示数据（平台未配置真实对公账户）"""
+    from models import SiteContent
+    row = db.query(SiteContent).filter(SiteContent.id == 1).first()
+    return not bool(row and row.pay_account and any(row.pay_account.values()))
+
+
+def _enforce_live_account(db: Session) -> None:
+    """生产计费门禁（BILLING_ENFORCE_LIVE=1）：收款账户未配置时拒绝收款流程，
+    防客户真实打款到演示账号（安全修复）"""
+    from config import BILLING_ENFORCE_LIVE
+    if BILLING_ENFORCE_LIVE and _pay_account_is_demo(db):
+        raise HTTPException(
+            status_code=503,
+            detail="收款账户尚未配置，暂不支持收款（请联系平台完成对公账户配置）")
+
 # 转账凭证保存目录（安全修复：移出匿名静态挂载 uploads/site → uploads/private，
 # 与发票 PDF 同属敏感财务文件，一律经鉴权下载端点 /billing/files/* 访问）
 PRIVATE_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "private")
@@ -257,6 +274,7 @@ def upgrade(data: UpgradeIn, db: Session = Depends(get_db),
             current: dict = Depends(get_current_user)):
     """升级套餐（仅管理员）：生成待支付账单（对公转账），提交凭证后临时生效"""
     _require_admin_billing(current)
+    _enforce_live_account(db)   # 生产门禁：演示收款账户未配置时拒绝
     if data.company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     if data.plan not in PLANS:
@@ -338,6 +356,7 @@ async def pay(bill_no: str = Form(...),
     24h 内未获审核通过 → 自动取消升级（回退套餐）。
     """
     _require_admin_billing(current)
+    _enforce_live_account(db)   # 生产门禁：演示收款账户未配置时拒绝收款
     bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
     if not bill or bill.company_id != current["company_id"]:
         raise HTTPException(status_code=404, detail="账单不存在")

@@ -634,6 +634,12 @@ def issue_invoice(req_id: int, db: Session = Depends(get_db),
     row = db.query(SiteContent).filter(SiteContent.id == 1).first()
     cfg = dict(row.invoice_config or {}) if row else {}
     provider_name = cfg.get("provider", "mock")
+    # 生产门禁（BILLING_ENFORCE_LIVE=1）：禁止 mock 静默开出 DEMO 假发票并回填 issued
+    from config import BILLING_ENFORCE_LIVE
+    if BILLING_ENFORCE_LIVE and provider_name == "mock":
+        raise HTTPException(
+            status_code=400,
+            detail="正式收费模式禁止演示开票：请先在「财务管理 → 发票平台设置」配置真实发票平台")
 
     from utils.invoice_provider import get_provider, InvoiceProviderError
     provider = get_provider(provider_name)
