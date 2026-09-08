@@ -32,6 +32,12 @@ def _require_admin(current: dict) -> None:
         raise HTTPException(status_code=403, detail="需要管理员权限")
 
 
+def _require_platform(current: dict) -> None:
+    """平台级运维（全平台周期自进化）仅允许平台超管"""
+    if current["role"] != "platform_admin":
+        raise HTTPException(status_code=403, detail="仅平台超管可执行该操作")
+
+
 # ============ 请求模型 ============
 
 class ToolOverrideIn(BaseModel):
@@ -283,7 +289,8 @@ def get_scheduler_status(current: dict = Depends(get_current_user)):
 
 @router.post("/scheduler/trigger")
 def trigger_scheduler(current: dict = Depends(get_current_user)):
-    """手动触发一轮「全企业周期自进化」（仅管理员；仅产出 pending 候选）。"""
-    _require_admin(current)
+    """手动触发一轮「全企业周期自进化」（仅平台超管——修复：此前任何企业管理员可触发，
+    跨租户写 candidates 表 + 平台级 LLM 费用 DoS；仅产出 pending 候选）。"""
+    _require_platform(current)
     from hermes.evolution.scheduler import get_scheduler
     return get_scheduler().run_once()

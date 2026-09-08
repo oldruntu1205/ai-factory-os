@@ -75,8 +75,10 @@ QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 # 现为每租户向量集合名的前缀：实际集合名为 {QDRANT_COLLECTION}_{company_id}
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "company_docs")
-# 未配置 Qdrant 时自动降级为内存向量库（重启丢失，仅供演示）
-QDRANT_FALLBACK_MEMORY = True
+# 未配置 Qdrant 时自动降级为内存向量库（重启丢失，仅供演示）。
+# 安全修复：改为 env 可配——生产置 0 则 Qdrant 不可用时显式报错（不静默吞数据）；
+# 置 1（默认）保留演示降级，且降级期间周期性重连（vector.py 实现）。
+QDRANT_FALLBACK_MEMORY = os.getenv("QDRANT_FALLBACK_MEMORY", "1").lower() in ("1", "true", "yes", "on")
 
 # ---------- Embedding ----------
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")

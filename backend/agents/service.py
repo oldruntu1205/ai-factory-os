@@ -17,7 +17,8 @@ from agents.production import production_agent
 from agents.quality import quality_agent
 from agents.process import process_agent
 from agents.ceo import build_daily_report
-from ai.llm import get_llm
+from ai.llm import get_llm, is_mock
+from services.llm_parse import safe_int, safe_float
 from models import (Customer, AIAgent, Conversation, Quotation,
                     ProductionOrder, QualityReport)
 from hermes.registry.soul import read_soul
@@ -92,6 +93,9 @@ JSON 格式：
     content = result.content
     try:
         parsed = _extract_json(content)
+        if is_mock():
+            # 安全修复：MockLLM 演示输出不得落库（防生产误配置产生假 CRM/线索数据）
+            return content + "\n\n[演示模式：LLM 未接入真实服务，未写入 CRM 线索]"
         if parsed and customer_id:
             # RBAC Step3：销售写 CRM 前校验租户权限（crm:write）——默认集通过，revoke 后不写库
             try:
@@ -115,8 +119,9 @@ JSON 格式：
             cust.source = "agent"
             db.commit()
         return content
-    except Exception:
-        return content
+    except Exception as e:
+        # 安全修复：不再静默吞错
+        return content + f"\n\n[CRM 写入失败：{e}]（未更新线索）"
 
 
 def _quotation_with_record(message: str, company_id: int, db: Session, customer_id: int = None) -> str:
@@ -140,6 +145,9 @@ JSON 格式：
     content = result.content
     try:
         parsed = _extract_json(content)
+        if is_mock():
+            # 安全修复：MockLLM 演示输出不得落库（防生产误配置开出假报价单/PDF）
+            return content + "\n\n[演示模式：LLM 未接入真实服务，未生成报价单]"
         if parsed:
             # RBAC Step3：报价写 Quotation 前校验租户权限（quotation:write）——默认集通过，revoke 后不写库
             try:
@@ -167,8 +175,9 @@ JSON 格式：
             currency = str(parsed.get("currency", "USD")).upper() or "USD"
             incoterms = str(parsed.get("incoterms", "FOB")).upper() or "FOB"
             fx = get_fx_rate("USD", currency) if currency != "USD" else {"rate": 1.0}
-            qty = int(parsed.get("quantity", 1) or 1)
-            price = float(parsed.get("unit_price", 0) or 0)
+            # 安全修复：LLM 输出不可信——safe_* 容错（负值/非数值回落默认，杜绝脏报价落库）
+            qty = safe_int(parsed.get("quantity"), 1)
+            price = safe_float(parsed.get("unit_price"), 0.0)
             freight = estimate_freight(volume_cbm=max(1.0, qty * 0.005),
                                        destination_country=country)
             tariff = estimate_tariff(hs.get("hs_code", ""), country)
@@ -187,7 +196,7 @@ JSON 格式：
                 unit_price=price,
                 total_amount=round(total_amount, 2),
                 currency=currency,
-                delivery_days=int(parsed.get("delivery_days", 30) or 30),
+                delivery_days=safe_int(parsed.get("delivery_days"), 30),
                 payment_terms=str(parsed.get("payment_terms", "T/T 30% deposit")),
                 hs_code=hs.get("hs_code", ""),
                 incoterms=incoterms,
@@ -195,7 +204,7 @@ JSON 格式：
                 freight_amount=round(freight["freight_usd"], 2),
                 tariff_amount=round(goods_total * (tariff["tariff_pct"] / 100.0), 2),
                 tariff_pct=tariff["tariff_pct"],
-                moq=int(parsed.get("moq", 1) or 1),
+                moq=safe_int(parsed.get("moq"), 1),
                 packaging=str(parsed.get("packaging", "Standard export carton")),
                 status="draft",
                 company_id=company_id,
@@ -207,8 +216,9 @@ JSON 格式：
                 db.commit()
             content += f"\n\n[已生成报价单: {quotation.quotation_no}（{incoterms}，HS {quotation.hs_code or '待核验'}）]"
         return content
-    except Exception:
-        return content
+    except Exception as e:
+        # 安全修复：不再静默吞错（此前用户看到"成功"实际未落库）
+        return content + f"\n\n[报价单写入失败：{e}]（未生成记录）"
 
 
 def _extract_json(content: str) -> dict:
