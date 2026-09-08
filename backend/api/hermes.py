@@ -174,20 +174,28 @@ def register_agent(data: AgentRegisterIn, current: dict = Depends(get_current_us
 
 @router.delete("/agent/{name}")
 def unregister_agent(name: str, current: dict = Depends(get_current_user)):
-    """注销自定义 Agent（内置 Agent 不可注销）"""
+    """注销自定义 Agent（仅本企业私有；内置 Agent 不可注销）。
+
+    安全修复：注销按属主定位——企业管理员只能注销本企业自定义 Agent，
+    平台超管（company_id=0）可注销平台级（如商城包级）Agent；他企私有不可注销。
+    """
     _require_admin(current)
     if name in _BUILTIN_AGENT_NAMES:
         raise HTTPException(status_code=400, detail="内置 Agent 不可注销")
+    cid = current["company_id"]  # 企业 admin > 0；平台超管 = 0
     reg = get_runtime().agent_registry
-    reg.unregister(name)
-    # 删除持久化记录
+    if not reg.unregister(name, company_id=cid):
+        raise HTTPException(status_code=404,
+                            detail="本企业无此自定义 Agent（仅可注销本企业注册的 Agent）")
+    # 删除持久化记录（同样按属主定位，避免误删他企同名行）
     try:
         from database import SessionLocal
         from models import AgentManifestRecord
         db = SessionLocal()
         try:
             row = db.query(AgentManifestRecord).filter(
-                AgentManifestRecord.name == name).first()
+                AgentManifestRecord.name == name,
+                AgentManifestRecord.company_id == cid).first()
             if row:
                 db.delete(row)
                 db.commit()
@@ -200,16 +208,19 @@ def unregister_agent(name: str, current: dict = Depends(get_current_user)):
 
 @router.get("/agent/list")
 def list_agents(industry: str = None, current: dict = Depends(get_current_user)):
-    """发现 Agent（第5章）"""
+    """发现 Agent（第5章）——安全修复：仅返回平台级(0) + 本企业私有，
+    他企自定义 Agent（含 system_prompt）不可见。"""
     reg = get_runtime().agent_registry
-    agents = reg.list_agents(industry=industry)
+    agents = reg.list_agents(industry=industry, company_id=current["company_id"])
     return {"agents": [a.to_dict() for a in agents], "count": len(agents)}
 
 
 @router.get("/agent/{name}")
 def get_agent(name: str, current: dict = Depends(get_current_user)):
+    """Agent 详情——安全修复：本企业私有优先、回退平台级；
+    他企私有 Agent 恒 404（不泄露 system_prompt）。"""
     reg = get_runtime().agent_registry
-    agent = reg.get_agent(name)
+    agent = reg.resolve_agent(name, current["company_id"])
     if not agent:
         raise HTTPException(status_code=404, detail="Agent 未注册")
     return agent.to_dict()

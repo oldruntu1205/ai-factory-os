@@ -358,5 +358,19 @@ def _lightweight_migrate():
                     conn.execute(text(stmt))
                 except Exception as e:
                     logger.debug(f"索引迁移跳过: {e}")
+            # ---------- Agent 属主化（跨租户同名覆盖修复）：(company_id, name) 复合唯一 ----------
+            # 旧版 agent_manifests.name 全局唯一索引 → 替换为复合唯一，
+            # 允许不同企业注册同名自定义 Agent。DROP 旧索引需先于/伴随新索引，幂等容错。
+            if "agent_manifests" in tables:
+                for stmt in [
+                    "DROP INDEX IF EXISTS ix_agent_manifests_name",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_manifests_company_name "
+                    "ON agent_manifests(company_id, name)",
+                ]:
+                    try:
+                        conn.execute(text(stmt))
+                        logger.info(f"Agent 属主化迁移: {stmt}")
+                    except Exception as e:
+                        logger.warning(f"Agent 属主化迁移跳过（{stmt}）: {e}")
     except Exception as e:
         logger.warning(f"轻量迁移失败: {e}")

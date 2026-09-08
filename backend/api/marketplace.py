@@ -151,8 +151,8 @@ def _install_package_to_hermes(company_id: int, package: AgentPackage):
 
     for agent in (package.agents or []):
         manifest_name = role_map.get(agent.get("role"), f"{agent.get('role', 'custom')}_agent")
-        # 注册平台级 Agent（若未注册）
-        if not runtime.agent_registry.get_agent(manifest_name):
+        # 注册平台级 Agent（company_id=0，所有租户共享；若未注册）
+        if not runtime.agent_registry.get_agent(manifest_name, company_id=0):
             manifest = AgentManifest(
                 name=manifest_name, version=package.version,
                 industry=package.industry,

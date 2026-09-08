@@ -41,4 +41,5 @@ class AgentManifest:
             "system_prompt": self.system_prompt,
             "workflow": self.workflow,
             "status": self.status,
+            "company_id": self.company_id,
         }

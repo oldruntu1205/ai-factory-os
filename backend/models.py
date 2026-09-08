@@ -718,9 +718,14 @@ class PlatformLLMConfig(Base):
 class AgentManifestRecord(Base):
     """自定义注册的 Hermes Agent manifest（持久化，重启不丢；内置 Agent 不入此表）"""
     __tablename__ = "agent_manifests"
+    # 安全修复（跨租户同名覆盖）：name 全局唯一 → (company_id, name) 复合唯一，
+    # 允许不同企业各自注册同名自定义 Agent；同企业内同名仍唯一（upsert 语义）。
+    __table_args__ = (
+        UniqueConstraint("company_id", "name", name="uq_agent_manifests_company_name"),
+    )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, index=True)
+    name = Column(String(100), index=True)
     version = Column(String(20), default="1.0")
     industry = Column(String(50), default="general")
     label = Column(String(100), default="")

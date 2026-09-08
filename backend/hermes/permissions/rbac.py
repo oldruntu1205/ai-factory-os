@@ -153,10 +153,10 @@ class RBACSystem:
     def assert_tool_allowed(self, tenant_id: int, agent_name: str, tool_name: str) -> None:
         """Agent 是否被允许调用该 Tool（双重校验：manifest 声明 + 租户权限）"""
         self._ensure_loaded(tenant_id)
-        # 1) Agent manifest 声明校验
+        # 1) Agent manifest 声明校验（按租户解析实际生效 manifest：私有优先、回退平台级）
         from hermes.runtime import get_runtime
         registry = get_runtime().agent_registry
-        manifest = registry.get_agent(agent_name)
+        manifest = registry.resolve_agent(agent_name, tenant_id)
         if manifest and manifest.tools and tool_name not in manifest.tools:
             raise PermissionError(
                 f"Agent [{agent_name}] 未声明 Tool [{tool_name}]，拒绝调用")

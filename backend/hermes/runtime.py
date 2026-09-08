@@ -41,7 +41,9 @@ class HermesRuntime:
     def start_agent(self, agent_name: str, tenant_id: int,
                     company_id: int, session_id: Optional[str] = None) -> dict:
         """启动一个 AI 员工会话（创建运行上下文）"""
-        agent = self.agent_registry.get_agent(agent_name)
+        # 安全修复：按运行企业解析属主（私有优先，回退平台级），
+        # 杜绝执行到被其他企业同名覆盖/注册的 manifest
+        agent = self.agent_registry.resolve_agent(agent_name, company_id)
         if not agent:
             raise ValueError(f"Agent [{agent_name}] 未注册")
 
