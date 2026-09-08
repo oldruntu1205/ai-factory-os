@@ -40,6 +40,54 @@ def _run_alembic_upgrade():
         logger.warning("Alembic 迁移跳过: %s", e)
 
 
+def _migrate_sensitive_files():
+    """安全修复（财务凭证/发票匿名暴露）：把 uploads/site/payments|invoices 存量文件
+    迁至 uploads/private/ 对应目录，并把 DB 中旧 /static/site/... 引用改写为相对 key
+    （此后凭证/发票仅经鉴权下载端点 /billing/files/* 可访问）。幂等：目录不存在即跳过。"""
+    import shutil
+    try:
+        from database import SessionLocal as SL
+        from models import Bill, InvoiceRequest
+        site_dir = BASE_DIR / "uploads" / "site"
+        priv_dir = BASE_DIR / "uploads" / "private"
+        db = SL()
+        try:
+            for sub, model, colname in [("payments", Bill, "voucher_path"),
+                                        ("invoices", InvoiceRequest, "pdf_url")]:
+                src = site_dir / sub
+                dst = priv_dir / sub
+                if not src.is_dir():
+                    continue
+                dst.mkdir(parents=True, exist_ok=True)
+                moved = 0
+                for f in list(src.iterdir()):
+                    if not f.is_file():
+                        continue
+                    target = dst / f.name
+                    if not target.exists():
+                        shutil.move(str(f), str(target))
+                    else:
+                        f.unlink(missing_ok=True)  # 目标已存在（修复后新写入）→ 删旧
+                    moved += 1
+                # DB 引用更新：/static/site/{sub}/xxx → {sub}/xxx（相对 key）
+                rows = db.query(model).filter(
+                    getattr(model, colname).like(f"/static/site/{sub}/%")).all()
+                for r in rows:
+                    setattr(r, colname, getattr(r, colname)
+                            .replace(f"/static/site/{sub}/", f"{sub}/"))
+                try:
+                    src.rmdir()  # 子目录已空则移除 → 匿名静态 URL 404
+                except OSError:
+                    pass
+                if moved or rows:
+                    logger.info(f"敏感文件迁移: {sub} 迁 {moved} 文件 / DB 改写 {len(rows)} 条")
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"敏感文件迁移跳过: {e}")
+
+
 def _acquire_init_lock():
     """PostgreSQL advisory lock：保证多 worker 时仅首个进程执行 DB 初始化，
     避免并发建表 / alembic / 种子写入相互冲突。非 Postgres 环境返回 None。"""
@@ -77,6 +125,7 @@ async def lifespan(app: FastAPI):
     _init_lock = _acquire_init_lock()
     try:
         _lightweight_migrate()
+        _migrate_sensitive_files()   # 凭证/发票迁出匿名静态目录（幂等）
         Base.metadata.create_all(bind=engine)
         _run_alembic_upgrade()
         # 演示种子默认开启（SEED_DEMO=0 关闭，生产环境不注入演示数据）

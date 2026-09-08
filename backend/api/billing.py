@@ -57,9 +57,21 @@ def _get_pay_account(db: Session) -> dict:
             merged[k] = v
     return merged
 
-# 转账凭证保存目录（与官网图片同挂载：/static/site/payments/...）
-VOUCHER_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "site", "payments")
+# 转账凭证保存目录（安全修复：移出匿名静态挂载 uploads/site → uploads/private，
+# 与发票 PDF 同属敏感财务文件，一律经鉴权下载端点 /billing/files/* 访问）
+PRIVATE_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "private")
+VOUCHER_DIR = os.path.join(PRIVATE_DIR, "payments")
 os.makedirs(VOUCHER_DIR, exist_ok=True)
+
+
+def voucher_download_url(bill_no: str) -> str:
+    """凭证下载端点 URL（前端经鉴权 fetch 后展示/下载）"""
+    return f"/billing/files/vouchers/{bill_no}"
+
+
+def invoice_pdf_download_url(req_no: str) -> str:
+    """发票 PDF 下载端点 URL（含 .pdf 后缀便于识别）"""
+    return f"/billing/files/invoices/{req_no}.pdf"
 
 # 支付状态 → 中文标签
 PAY_STATUS_LABELS = {
@@ -215,7 +227,8 @@ def list_invoices(company_id: int, db: Session = Depends(get_db),
                 "status_label": inv_status,
                 "req_no": req.req_no,
                 "invoice_no": req.invoice_no,
-                "pdf_url": req.pdf_url or "",
+                "pdf_url": (invoice_pdf_download_url(req.req_no)
+                            if req.pdf_url else ""),
                 "reject_reason": req.reject_reason,
             }
         else:
@@ -228,7 +241,8 @@ def list_invoices(company_id: int, db: Session = Depends(get_db),
             "status_label": PAY_STATUS_LABELS.get(b.status, b.status),
             "paid_at": b.paid_at.isoformat() if b.paid_at else None,
             "created_at": b.created_at.isoformat(),
-            "voucher_path": b.voucher_path or "",
+            "voucher_path": (voucher_download_url(b.bill_no)
+                             if b.voucher_path else ""),
             "voucher_note": b.voucher_note or "",
             "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
             "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
@@ -361,7 +375,7 @@ async def pay(bill_no: str = Form(...),
                Bill.company_id == current["company_id"],
                Bill.status == "unpaid")
         .values(status="pending_review",
-                voucher_path=f"/static/site/payments/{filename}",
+                voucher_path=f"payments/{filename}",
                 voucher_note=(note or "").strip()[:300],
                 submitted_at=now,
                 grace_expires_at=grace_at))
@@ -397,7 +411,7 @@ async def pay(bill_no: str = Form(...),
         "status": "pending_review",
         "status_label": "待财务审核",
         "grace_expires_at": bill.grace_expires_at.isoformat(),
-        "voucher_path": bill.voucher_path,
+        "voucher_path": voucher_download_url(bill.bill_no),
     }
 
 
@@ -516,8 +530,62 @@ def list_invoice_requests(company_id: int, db: Session = Depends(get_db),
         "amount": r.amount, "invoice_type": r.invoice_type,
         "category": r.category, "title": r.title,
         "status": r.status, "invoice_no": r.invoice_no,
-        "pdf_url": r.pdf_url or "", "provider": r.provider or "",
+        "pdf_url": (invoice_pdf_download_url(r.req_no) if r.pdf_url else ""),
+        "provider": r.provider or "",
         "reject_reason": r.reject_reason,
         "created_at": r.created_at.isoformat(),
         "issued_at": r.issued_at.isoformat() if r.issued_at else None,
     } for r in reqs]}
+
+
+# ============ 敏感财务文件鉴权下载（安全修复：凭证/发票迁出匿名静态目录）============
+
+def _resolve_private_file(rel_key: str):
+    """把存储相对 key（payments/x.png / invoices/x.pdf，兼容旧 /static/site/ 前缀）解析为私有目录绝对路径。
+
+    含路径穿越防护：仅允许 uploads/private/ 内文件。
+    """
+    if not rel_key:
+        return None
+    rel = rel_key
+    if rel.startswith("/static/"):
+        rel = rel.replace("/static/site/", "", 1)
+    base = os.path.realpath(PRIVATE_DIR)
+    full = os.path.realpath(os.path.join(base, rel.lstrip("/")))
+    if not full.startswith(base + os.sep) or not os.path.isfile(full):
+        return None
+    return full
+
+
+@router.get("/files/vouchers/{bill_no}")
+def get_voucher_file(bill_no: str, db: Session = Depends(get_db),
+                     current: dict = Depends(get_current_user)):
+    """下载转账凭证影像（鉴权：本企业管理员 / 平台财务）"""
+    bill = db.query(Bill).filter(Bill.bill_no == bill_no).first()
+    if not bill or not bill.voucher_path:
+        raise HTTPException(status_code=404, detail="凭证不存在")
+    if current["role"] != "platform_admin" and bill.company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权访问")
+    from fastapi.responses import FileResponse
+    full = _resolve_private_file(bill.voucher_path)
+    if full is None:
+        raise HTTPException(status_code=404, detail="凭证文件不存在")
+    return FileResponse(full, filename=os.path.basename(full))
+
+
+@router.get("/files/invoices/{req_no}")
+def get_invoice_file(req_no: str, db: Session = Depends(get_db),
+                     current: dict = Depends(get_current_user)):
+    """下载电子发票 PDF（鉴权：本企业成员 / 平台财务）"""
+    if req_no.endswith(".pdf"):   # URL 含扩展名（前端/下载语义），查询剥除
+        req_no = req_no[:-4]
+    req = db.query(InvoiceRequest).filter(InvoiceRequest.req_no == req_no).first()
+    if not req or not req.pdf_url:
+        raise HTTPException(status_code=404, detail="发票文件不存在")
+    if current["role"] != "platform_admin" and req.company_id != current["company_id"]:
+        raise HTTPException(status_code=403, detail="无权访问")
+    from fastapi.responses import FileResponse
+    full = _resolve_private_file(req.pdf_url)
+    if full is None:
+        raise HTTPException(status_code=404, detail="发票文件不存在")
+    return FileResponse(full, filename=os.path.basename(full))

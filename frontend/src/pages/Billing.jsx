@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import api from '../api'
+import api, { openAuthedFile } from '../api'
 
 const PLAN_BADGES = {
   starter: 'badge-gray',
@@ -329,6 +329,7 @@ export default function Billing() {
                     {b.status === 'pending_review' && b.voucher_path && (
                       <div style={{ marginTop: 4 }}>
                         <a href={b.voucher_path} target="_blank" rel="noreferrer"
+                          onClick={(e) => { e.preventDefault(); openAuthedFile(b.voucher_path) }}
                           style={{ fontSize: 11, color: 'var(--primary)' }}>查看凭证</a>
                       </div>
                     )}
@@ -413,6 +414,7 @@ export default function Billing() {
                     {r.status === 'issued' && r.pdf_url && (
                       <div style={{ marginTop: 2 }}>
                         <a href={r.pdf_url} target="_blank" rel="noreferrer"
+                          onClick={(e) => { e.preventDefault(); openAuthedFile(r.pdf_url) }}
                           style={{ color: 'var(--primary)', fontSize: 11 }}>下载电子发票</a>
                       </div>
                     )}

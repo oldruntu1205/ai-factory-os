@@ -27,4 +27,17 @@ api.interceptors.response.use(
   }
 )
 
+// 鉴权文件打开（财务凭证/发票 PDF 经鉴权下载端点；带 JWT fetch → blob → 新窗口）
+export async function openAuthedFile(url) {
+  try {
+    const res = await api.get(url, { responseType: 'blob' })
+    const blobUrl = URL.createObjectURL(res.data)
+    window.open(blobUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+  } catch (e) {
+    // eslint-disable-next-line no-alert
+    alert('文件打开失败：可能无权限或文件不存在')
+  }
+}
+
 export default api

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import api from '../api'
+import api, { openAuthedFile } from '../api'
 
 const STATUS_MAP = {
   none: { label: '未提交', cls: 'badge-gray' },
@@ -517,6 +517,7 @@ export default function PlatformAdmin() {
                         <td>
                           {b.voucher_path ? (
                             <a href={b.voucher_path} target="_blank" rel="noreferrer"
+                              onClick={(e) => { e.preventDefault(); openAuthedFile(b.voucher_path) }}
                               style={{ color: 'var(--primary)', fontSize: 12 }}>
                               查看凭证图
                             </a>
@@ -686,6 +687,7 @@ export default function PlatformAdmin() {
                                   <div>发票号：{r.invoice_no || '—'}</div>
                                   {r.pdf_url && (
                                     <a href={r.pdf_url} target="_blank" rel="noreferrer"
+                                      onClick={(e) => { e.preventDefault(); openAuthedFile(r.pdf_url) }}
                                       style={{ color: 'var(--primary)' }}>查看发票 PDF</a>
                                   )}
                                 </>

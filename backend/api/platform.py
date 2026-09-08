@@ -300,7 +300,8 @@ def platform_bills(db: Session = Depends(get_db),
         "plan": b.plan, "amount": b.amount, "currency": b.currency,
         "status": b.status, "paid_at": b.paid_at.isoformat() if b.paid_at else None,
         "created_at": b.created_at.isoformat(),
-        "voucher_path": b.voucher_path or "",
+        "voucher_path": (f"/billing/files/vouchers/{b.bill_no}"
+                         if b.voucher_path else ""),
         "voucher_note": b.voucher_note or "",
         "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
         "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
@@ -324,7 +325,8 @@ def platform_pending_review_bills(db: Session = Depends(get_db),
         result.append({
             "id": b.id, "bill_no": b.bill_no, "company_id": b.company_id,
             "plan": b.plan, "amount": b.amount, "currency": b.currency,
-            "voucher_path": b.voucher_path or "",
+            "voucher_path": (f"/billing/files/vouchers/{b.bill_no}"
+                             if b.voucher_path else ""),
             "voucher_note": b.voucher_note or "",
             "submitted_at": b.submitted_at.isoformat() if b.submitted_at else None,
             "grace_expires_at": b.grace_expires_at.isoformat() if b.grace_expires_at else None,
@@ -523,7 +525,8 @@ def platform_invoice_requests(db: Session = Depends(get_db),
         "bank": r.bank, "bank_account": r.bank_account,
         "address": r.address, "phone": r.phone,
         "status": r.status, "invoice_no": r.invoice_no,
-        "pdf_url": r.pdf_url or "", "provider": r.provider or "",
+        "pdf_url": (f"/billing/files/invoices/{r.req_no}.pdf" if r.pdf_url else ""),
+        "provider": r.provider or "",
         "reject_reason": r.reject_reason,
         "created_at": r.created_at.isoformat(),
         "issued_at": r.issued_at.isoformat() if r.issued_at else None,
@@ -674,7 +677,9 @@ def issue_invoice(req_id: int, db: Session = Depends(get_db),
         pass
 
     return {"message": f"开票成功：{req.req_no}", "status": "issued",
-            "invoice_no": req.invoice_no, "pdf_url": req.pdf_url,
+            "invoice_no": req.invoice_no,
+            "pdf_url": (f"/billing/files/invoices/{req.req_no}.pdf"
+                        if req.pdf_url else ""),
             "provider": req.provider}
 
 
@@ -708,3 +713,4 @@ def reject_invoice(req_id: int, reason: str = "",
     except Exception:
         pass
     return {"message": f"已驳回：{req.req_no}", "status": "rejected"}
+

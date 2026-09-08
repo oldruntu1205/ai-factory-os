@@ -36,13 +36,14 @@ class InvoiceProviderError(Exception):
 # ============ 演示 Provider：本地生成 PDF 发票 ============
 
 def _gen_mock_pdf(req: dict, config: dict) -> str:
-    """用 reportlab 生成一张模拟电子发票 PDF，返回文件路径（存 uploads/site/invoices/，经 /static/site/invoices/ 下载）"""
+    """用 reportlab 生成一张模拟电子发票 PDF，返回文件路径（存 uploads/private/invoices/，
+    经鉴权下载端点 /billing/files/invoices/ 访问——安全修复：迁出匿名静态目录）"""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.pdfgen import canvas
     from config import BASE_DIR
 
-    pdf_dir = os.path.join(BASE_DIR, "uploads", "site", "invoices")
+    pdf_dir = os.path.join(BASE_DIR, "uploads", "private", "invoices")
     os.makedirs(pdf_dir, exist_ok=True)
     out = os.path.join(pdf_dir, f"{req['req_no']}.pdf")
 
@@ -122,8 +123,8 @@ class MockInvoiceProvider:
         req = dict(req)
         req["invoice_no"] = invoice_no
         pdf_path = _gen_mock_pdf(req, config)
-        # 供前端下载：/static/site/invoices/<req_no>.pdf（与官网素材同挂载）
-        pdf_url = f"/static/site/invoices/{req['req_no']}.pdf"
+        # 供鉴权下载：存储相对 key（invoices/<req_no>.pdf），响应层包装为下载端点 URL
+        pdf_url = f"invoices/{req['req_no']}.pdf"
         return {"invoice_no": invoice_no, "pdf_url": pdf_url,
                 "provider": PROVIDER_MOCK, "status": "issued",
                 "provider_req_no": f"MOCK{uuid.uuid4().hex[:10].upper()}"}

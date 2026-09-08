@@ -161,10 +161,12 @@ assert rr["status"] == "issued" and rr["invoice_no"] == inv_no, r.text
 assert rr["pdf_url"], r.text
 print("[OK] 企业侧看到已开票 + 发票号 + PDF:", rr["pdf_url"])
 
-# 发票 PDF 可访问
+# 发票 PDF 鉴权下载（安全修复：匿名直接访问应 401；带企业/平台头可下载）
 r = client.get(rr["pdf_url"])
+assert r.status_code == 401, f"匿名应 401（防越权泄露）: {r.status_code}"
+r = client.get(rr["pdf_url"], headers=H)
 assert r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf"), r.text
-print("[OK] 发票 PDF 可下载")
+print("[OK] 发票 PDF 鉴权可下载 / 匿名 401")
 
 # 已开具不可重复开
 r = client.post(f"/platform/invoice-requests/{rid}/issue", headers=HP)
