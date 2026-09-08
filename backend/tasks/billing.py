@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task
 def expire_grace_bills():
     """每小时扫描：缓冲期过期且未审核的账单 → 自动取消升级（回退套餐）"""
+    from sqlalchemy import update as sa_update
     db = SessionLocal()
     expired = 0
     try:
@@ -29,13 +30,23 @@ def expire_grace_bills():
         for bill in bills:
             if not bill.grace_expires_at or bill.grace_expires_at > now:
                 continue
-            # 回退套餐
+            # 并发抢占（修复：与财务 approve/reject 竞态双向资损）。
+            # 条件 UPDATE：仅当仍为 pending_review 且缓冲确实过期才生效；
+            # 已被财务审核（paid/rejected）的单 rowcount=0，跳过，不覆盖审核结果。
+            res = db.execute(
+                sa_update(Bill)
+                .where(Bill.bill_no == bill.bill_no,
+                       Bill.status == "pending_review",
+                       Bill.grace_expires_at <= now)
+                .values(status="expired",
+                        review_note=(bill.review_note or "") +
+                        f" | 缓冲期({bill.grace_expires_at})内未获审核，已自动取消升级"))
+            if res.rowcount != 1:
+                continue  # 已被审核/状态已变更，跳过
+            # 回退套餐（抢占成功后，同事务）
             c = db.query(Company).filter(Company.id == bill.company_id).first()
             if c:
                 _revert_plan(c, bill)
-            bill.status = "expired"
-            bill.review_note = (bill.review_note or "") + \
-                f" | 缓冲期({bill.grace_expires_at})内未获审核，已自动取消升级"
             expired += 1
             try:
                 from utils.audit import log_action

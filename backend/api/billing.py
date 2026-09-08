@@ -349,25 +349,43 @@ async def pay(bill_no: str = Form(...),
     with open(save_path, "wb") as f:
         f.write(data)
 
-    # 状态流转：unpaid → pending_review（缓冲期内套餐临时生效）
+    # 并发抢占（修复：双击/重放可同时通过 unpaid 检查 → 套餐叠加两次 + 双凭证）。
+    # 状态迁移改为条件 UPDATE（WHERE status='unpaid'），rowcount==1 才继续；
+    # 失败方删除已落盘凭证并报错，杜绝重复支付。
+    from sqlalchemy import update as sa_update
     now = datetime.utcnow()
-    bill.status = "pending_review"
-    bill.voucher_path = f"/static/site/payments/{filename}"
-    bill.voucher_note = (note or "").strip()[:300]
-    bill.submitted_at = now
-    bill.grace_expires_at = now + timedelta(hours=GRACE_HOURS)
+    grace_at = now + timedelta(hours=GRACE_HOURS)
+    res = db.execute(
+        sa_update(Bill)
+        .where(Bill.bill_no == bill_no,
+               Bill.company_id == current["company_id"],
+               Bill.status == "unpaid")
+        .values(status="pending_review",
+                voucher_path=f"/static/site/payments/{filename}",
+                voucher_note=(note or "").strip()[:300],
+                submitted_at=now,
+                grace_expires_at=grace_at))
+    if res.rowcount != 1:
+        db.rollback()
+        try:
+            os.remove(save_path)  # 清理孤儿凭证文件
+        except OSError:
+            pass
+        raise HTTPException(status_code=400,
+                            detail="账单状态已变更（可能已提交/已支付），请刷新后重试")
 
-    # 立即应用套餐（24h 缓冲，让客户无缝使用）
+    # 状态流转成功：unpaid → pending_review（缓冲期内套餐临时生效），同事务应用套餐
     c = db.query(Company).filter(Company.id == bill.company_id).first()
     if c and bill.plan in PLANS:
         _apply_plan(c, bill.plan)
     db.commit()
+    db.refresh(bill)  # 同步抢占后的最新状态（Core UPDATE 不经 ORM）
 
     # 审计日志
     try:
         from utils.audit import log_action
         log_action(bill.company_id, "billing.pay_submit",
-                   f"提交转账凭证 {bill.bill_no}（{bill.plan}），缓冲至 {bill.grace_expires_at}",
+                   f"提交转账凭证 {bill.bill_no}（{bill.plan}），缓冲至 {grace_at}",
                    current.get("user_id", 0), current.get("email", ""))
     except Exception:
         pass

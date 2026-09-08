@@ -353,21 +353,35 @@ def review_bill(bill_no: str, data: BillReviewIn,
     c = db.query(Company).filter(Company.id == bill.company_id).first()
     now = datetime.utcnow()
 
+    # 并发抢占（修复：审核 × 24h 过期任务双向资损——两进程各自"读-判-覆盖写"无锁）。
+    # 状态迁移用条件 UPDATE（WHERE status='pending_review'），rowcount==1 才生效；
+    # 与 tasks/billing.expire_grace_bills 竞争时只有一个成功，另一个 rowcount=0 拒绝。
+    from sqlalchemy import update as sa_update
     if data.action == "approve":
-        bill.status = "paid"
-        bill.paid_at = now
-        bill.reviewed_by = current.get("email", "")
-        bill.reviewed_at = now
-        bill.review_note = (data.note or "").strip()[:300]
-        # 套餐已在提交凭证时临时生效，正式确认无需重复应用
+        res = db.execute(
+            sa_update(Bill)
+            .where(Bill.bill_no == bill_no, Bill.status == "pending_review")
+            .values(status="paid", paid_at=now,
+                    reviewed_by=current.get("email", ""), reviewed_at=now,
+                    review_note=(data.note or "").strip()[:300]))
+        if res.rowcount != 1:
+            db.rollback()
+            raise HTTPException(status_code=400,
+                                detail="账单状态已变更（可能已被审核或缓冲过期自动取消），请刷新后处理")
         msg = f"已确认到账，套餐正式生效（{bill.plan}）"
         act = "finance.bill_approve"
     elif data.action == "reject":
-        bill.status = "rejected"
-        bill.reviewed_by = current.get("email", "")
-        bill.reviewed_at = now
-        bill.review_note = (data.note or "凭证与到账不符").strip()[:300]
-        # 回退套餐到升级前
+        res = db.execute(
+            sa_update(Bill)
+            .where(Bill.bill_no == bill_no, Bill.status == "pending_review")
+            .values(status="rejected",
+                    reviewed_by=current.get("email", ""), reviewed_at=now,
+                    review_note=(data.note or "凭证与到账不符").strip()[:300]))
+        if res.rowcount != 1:
+            db.rollback()
+            raise HTTPException(status_code=400,
+                                detail="账单状态已变更（可能已被审核或缓冲过期自动取消），请刷新后处理")
+        # 回退套餐到升级前（仅抢占成功后执行，同事务）
         if c:
             _revert_plan(c, bill)
         msg = f"已驳回，套餐已回退至 {c.plan if c else bill.prev_plan}"
@@ -376,6 +390,7 @@ def review_bill(bill_no: str, data: BillReviewIn,
         raise HTTPException(status_code=400, detail="action 仅支持 approve/reject")
 
     db.commit()
+    db.refresh(bill)  # 同步抢占后的最新状态（Core UPDATE 不经 ORM）
 
     try:
         from utils.audit import log_action
@@ -400,8 +415,11 @@ def platform_finance(db: Session = Depends(get_db),
     # 收入汇总
     total_revenue = sum(b.amount for b in bills if b.status == "paid")
     paid_count = sum(1 for b in bills if b.status == "paid")
-    pending_amount = sum(b.amount for b in bills if b.status == "pending")
-    pending_count = sum(1 for b in bills if b.status == "pending")
+    # 待收口径 = 待支付(unpaid) + 待财务审核(pending_review)（原误用不存在的 pending 恒 0）
+    pending_amount = sum(b.amount for b in bills
+                         if b.status in ("unpaid", "pending_review"))
+    pending_count = sum(1 for b in bills
+                        if b.status in ("unpaid", "pending_review"))
 
     # 按套餐统计
     plan_stats = {}
@@ -597,6 +615,19 @@ def issue_invoice(req_id: int, db: Session = Depends(get_db),
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="该申请已处理")
 
+    # 并发抢占（修复：双击/重试可双开票——真实平台接入后=两张真实税务发票）。
+    # 先条件 UPDATE 占位 issuing（仅 pending 可入），rowcount==1 者才允许外呼；
+    # 外呼在事务内：失败抛错 → 事务回滚 → issuing 还原 pending → 财务可安全重试；
+    # 成功 → issuing→issued 落库 commit → 双进程竞争时另一请求 rowcount=0 被拒。
+    from sqlalchemy import update as sa_update
+    claim = db.execute(
+        sa_update(InvoiceRequest)
+        .where(InvoiceRequest.id == req_id, InvoiceRequest.status == "pending")
+        .values(status="issuing"))
+    if claim.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="该申请正在处理中或已处理，请勿重复操作")
+
     row = db.query(SiteContent).filter(SiteContent.id == 1).first()
     cfg = dict(row.invoice_config or {}) if row else {}
     provider_name = cfg.get("provider", "mock")
@@ -613,17 +644,26 @@ def issue_invoice(req_id: int, db: Session = Depends(get_db),
     try:
         result = provider.issue(req_dict, cfg)
     except InvoiceProviderError as e:
+        db.rollback()  # 释放 issuing 占位 → 还原 pending，允许修正配置后重试
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"开票调用失败：{e}")
 
-    req.status = "issued"
-    req.invoice_no = result.get("invoice_no", "")
-    req.pdf_url = result.get("pdf_url", "")
-    req.provider = result.get("provider", provider_name)
-    req.provider_req_no = result.get("provider_req_no", "")
-    req.issued_at = datetime.utcnow()
+    finalize = db.execute(
+        sa_update(InvoiceRequest)
+        .where(InvoiceRequest.id == req_id, InvoiceRequest.status == "issuing")
+        .values(status="issued",
+                invoice_no=result.get("invoice_no", ""),
+                pdf_url=result.get("pdf_url", ""),
+                provider=result.get("provider", provider_name),
+                provider_req_no=result.get("provider_req_no", ""),
+                issued_at=datetime.utcnow()))
+    if finalize.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="开票状态异常，请联系管理员核查")
     db.commit()
+    db.refresh(req)
 
     try:
         from utils.audit import log_action
@@ -649,9 +689,17 @@ def reject_invoice(req_id: int, reason: str = "",
         raise HTTPException(status_code=404, detail="开票申请不存在")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="该申请已处理")
-    req.status = "rejected"
-    req.reject_reason = reason.strip()[:300]
+    # 并发安全：条件 UPDATE（pending → rejected），与 issue 抢占互斥
+    from sqlalchemy import update as sa_update
+    res = db.execute(
+        sa_update(InvoiceRequest)
+        .where(InvoiceRequest.id == req_id, InvoiceRequest.status == "pending")
+        .values(status="rejected", reject_reason=reason.strip()[:300]))
+    if res.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="该申请正在处理中或已处理，请勿重复操作")
     db.commit()
+    db.refresh(req)
     try:
         from utils.audit import log_action
         log_action(req.company_id, "finance.invoice_reject",
