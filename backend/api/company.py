@@ -213,8 +213,8 @@ def upload_license(
 @router.get("/license/download")
 def download_license(company_id: int, db: Session = Depends(get_db),
                      current: dict = Depends(get_current_user)):
-    """下载本企业营业执照（鉴权：仅本企业成员可访问，防匿名/跨租户枚举下载）"""
-    if company_id != current["company_id"]:
+    """下载本企业营业执照（鉴权：仅本企业成员；平台超管可查看任意企业执照——审核用）"""
+    if current["role"] != "platform_admin" and company_id != current["company_id"]:
         raise HTTPException(status_code=403, detail="无权操作")
     c = db.query(Company).filter(Company.id == company_id).first()
     if not c or not c.business_license_path or not os.path.exists(c.business_license_path):
@@ -232,11 +232,9 @@ def _schedule_auto_approve(company_id: int, delay: int = 1):
 def approve_license(company_id: int, approve: bool = True,
                     reject_reason: str = "", db: Session = Depends(get_db),
                     current: dict = Depends(get_current_user)):
-    """平台超管审核营业执照：通过或拒绝（安全修复：仅平台超管可审，企业管理员不可自审）"""
+    """平台超管审核营业执照：通过或拒绝（仅平台超管可审；修复 company_id=0 比较致恒 403 死代码）"""
     if current["role"] != "platform_admin":
         raise HTTPException(status_code=403, detail="仅平台超管可审核营业执照")
-    if company_id != current["company_id"]:
-        raise HTTPException(status_code=403, detail="无权操作")
     c = db.query(Company).filter(Company.id == company_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="企业不存在")

@@ -303,6 +303,14 @@ export default function PlatformAdmin() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {v.license_url && (
+                  <a href={v.license_url} target="_blank" rel="noreferrer"
+                    onClick={(e) => { e.preventDefault(); openAuthedFile(v.license_url) }}
+                    className="btn btn-primary btn-sm"
+                    style={{ textDecoration: 'none' }}>
+                    🖼 查看执照原件
+                  </a>
+                )}
                 <button className="btn btn-success btn-sm" onClick={() => verify(v.id, true)}>
                   ✅ 通过认证
                 </button>

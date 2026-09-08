@@ -17,7 +17,7 @@ api/channels.py —— 外部渠道 API（第五阶段 + V2.1 自动化，已完
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth.deps import get_current_user
+from auth.deps import get_current_user, require_company
 from api.company import require_verified
 from channels.whatsapp.webhook import send_whatsapp_message
 from channels.email.generator import create_email
@@ -115,8 +115,13 @@ def email_sequence(data: EmailGenerate, current: dict = Depends(get_current_user
 
 @router.post("/email/followup")
 def email_followup(data: FollowUpIn, current: dict = Depends(get_current_user)):
-    """发送线索第 N 步跟进邮件（自动带最新报价 PDF）"""
+    """发送线索第 N 步跟进邮件（自动带最新报价 PDF）。
+
+    安全修复：company_id 必须为当前登录企业（此前不校验归属，
+    任意用户可借他企 SMTP 配置向其客户发信并推进其线索状态机——跨租户动作注入）。
+    """
     require_verified(current.get("license_verified", False))
+    require_company(data.company_id, current)
     return send_follow_up(data.lead_id, data.company_id, step=data.step)
 
 
@@ -165,9 +170,14 @@ def email_logs(company_id: int, current: dict = Depends(get_current_user)):
 
 @router.post("/wecom/robot")
 def wecom_robot(data: WecomRobotIn, current: dict = Depends(get_current_user)):
-    """向企业微信群推送（AI 日报/报价 markdown），优先用企业配置"""
+    """向企业微信群推送（AI 日报/报价 markdown），优先用企业配置
+
+    安全修复：company_id 若不传则用当前企业；若显式传他企 → 403
+    （此前任意用户可借任意企业已配置的企微机器人 webhook 推送内容——跨租户借力外发）。
+    """
     require_verified(current.get("license_verified", False))
     cid = data.company_id or current["company_id"]
+    require_company(cid, current)
     if data.msgtype == "text":
         return send_robot_text(data.content, company_id=cid)
     return send_robot_markdown(data.content, company_id=cid)

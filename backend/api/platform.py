@@ -239,9 +239,26 @@ def pending_verifications(db: Session = Depends(get_db),
     return {"verifications": [{
         "id": c.id, "name": c.name, "license_status": c.license_status,
         "has_license": bool(c.business_license_path),
+        # 安全修复：执照原件经鉴权端点预览（此前超管无法查看原件，盲审）
+        "license_url": (f"/platform/companies/{c.id}/license"
+                        if c.business_license_path else ""),
         "license_reject_reason": c.license_reject_reason or "",
         "uploaded_at": c.license_uploaded_at.isoformat() if c.license_uploaded_at else None,
     } for c in rows]}
+
+
+@router.get("/companies/{company_id}/license")
+def platform_license_file(company_id: int, db: Session = Depends(get_db),
+                          current: dict = Depends(get_current_user)):
+    """平台侧查看企业营业执照原件（审核用，仅平台超管）"""
+    _require_platform(current)
+    import os
+    from fastapi.responses import FileResponse
+    c = db.query(Company).filter(Company.id == company_id).first()
+    if not c or not c.business_license_path or not os.path.exists(c.business_license_path):
+        raise HTTPException(status_code=404, detail="营业执照不存在")
+    return FileResponse(c.business_license_path,
+                        filename=os.path.basename(c.business_license_path))
 
 
 @router.post("/companies/{company_id}/verify")
