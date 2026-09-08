@@ -123,13 +123,30 @@ class AgentRegistry:
     # ---------- 发现 ----------
 
     def get_agent(self, name: str, company_id: int = 0) -> Optional[AgentManifest]:
-        """查询指定属主的 Agent（平台级传 0；企业私有传企业 id）"""
-        agent = self._agents.get(self._key(company_id, name))
+        """查询指定属主的 Agent（平台级传 0；企业私有传企业 id）。
+
+        多 worker 一致性（uvicorn --workers N 各进程独立内存）：
+        - 平台内置 Agent（company_id=0 且为内置名）：DB 无行，走内存常驻路径；
+        - 企业私有（company_id>0）与持久化平台级：以 DB 为真源——每次查询同步
+          DB 行到本进程内存，保证『其他 worker 上的注册更新/注销』即时可见，
+          不会因本进程内存命中旧 manifest 而永久 stale；
+        - 平台级非内置（商城包级 Agent 仅内存注册、未持久化）：DB 无行时保留内存。
+        """
+        cid = int(company_id or 0)
+        key = self._key(cid, name)
+        if cid == 0 and name in self._BUILTIN_NAMES:
+            # 平台内置：常驻内存，agent_manifests 无其行，直接返回
+            return self._agents.get(key)
+        # DB 真源：有行 → 装载覆盖本进程内存并返回
+        agent = self._load_one_from_db(name, cid)
         if agent is not None:
             return agent
-        # 多 worker 兜底：本 worker 内存未命中时查持久化（自定义 Agent 已在 DB），
-        # 加载后缓存进本 worker 内存，避免每次查库
-        return self._load_one_from_db(name, company_id)
+        if cid > 0:
+            # 企业私有：DB 无行 = 已在其他进程注销 → 清除本进程残留
+            self._agents.pop(key, None)
+            return None
+        # 平台级非内置（如商城内存注册未持久化）：DB 无行时保留内存注册
+        return self._agents.get(key)
 
     def resolve_agent(self, name: str, company_id: int) -> Optional[AgentManifest]:
         """解析实际生效的 Agent：企业私有（company_id>0）优先，未命中回退平台级（0）。
@@ -192,21 +209,21 @@ class AgentRegistry:
                 rows = db.query(AgentManifestRecord).all()
                 db_keys = {self._key(row.company_id or 0, row.name) for row in rows}
                 for row in rows:
+                    # 多 worker 一致性：以 DB 行为准总是覆盖本进程内存（注册更新即时可见）
                     key = self._key(row.company_id or 0, row.name)
-                    if key not in self._agents:
-                        manifest = AgentManifest(
-                            name=row.name, version=row.version or "1.0",
-                            industry=row.industry or "general",
-                            label=row.label or row.name,
-                            description=row.description or "",
-                            tools=list(row.tools or []),
-                            permissions=list(row.permissions or []),
-                            system_prompt=row.system_prompt or "",
-                            status=row.status or "registered",
-                            company_id=row.company_id or 0,
-                        )
-                        manifest.handler = self._make_custom_handler(manifest)
-                        self._agents[key] = manifest
+                    manifest = AgentManifest(
+                        name=row.name, version=row.version or "1.0",
+                        industry=row.industry or "general",
+                        label=row.label or row.name,
+                        description=row.description or "",
+                        tools=list(row.tools or []),
+                        permissions=list(row.permissions or []),
+                        system_prompt=row.system_prompt or "",
+                        status=row.status or "registered",
+                        company_id=row.company_id or 0,
+                    )
+                    manifest.handler = self._make_custom_handler(manifest)
+                    self._agents[key] = manifest
                 # 同步删除：内存中已注销（DB 无记录）的自定义 Agent，避免跨 worker 残留。
                 # 仅平台级内置 Agent 名（company_id=0 且内置）常驻不随 DB 清理。
                 for key in [k for k in self._agents if k not in db_keys]:
