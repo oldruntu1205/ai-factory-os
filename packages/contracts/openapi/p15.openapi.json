@@ -1,0 +1,648 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "AI Factory P1.5 Persistence and Event Consistency Extension",
+    "version": "3.0.0",
+    "description": "仅扩展 v3.0.0 §11–§13 的平台与 Mock 语义；不新增接口层，不实现外部字段映射。"
+  },
+  "paths": {
+    "/internal/v1/tasks/{task_id}": {
+      "get": {
+        "operationId": "p15__control__get___internal_v1_tasks__task_id_",
+        "summary": "读取 control-plane 权威 Task 编排状态；manufacturing-core 据此核验任务存在性",
+        "x-owner": "control",
+        "x-source": "§12, §13",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "query",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs",
+          "path_task_id_equals_context_task_id",
+          "caller_delegated_acl",
+          "authoritative_persistent_read"
+        ],
+        "responses": {
+          "200": {
+            "description": "受控读取 owner 的持久化记录，携带状态来源和更新时间。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/runs/{run_id}": {
+      "get": {
+        "operationId": "p15__runtime__get___internal_v1_runs__run_id_",
+        "summary": "读取 hermes-runtime 权威 Run 状态与持久化版本",
+        "x-owner": "runtime",
+        "x-source": "§12, §13",
+        "x-interface-layer": "L2",
+        "x-operation-kind": "query",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs",
+          "run_task_binding_matches_context",
+          "caller_delegated_acl",
+          "authoritative_persistent_read"
+        ],
+        "responses": {
+          "200": {
+            "description": "受控读取 owner 的持久化记录，携带状态来源和更新时间。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/events": {
+      "post": {
+        "operationId": "p15__owner_local__post___internal_v1_events",
+        "summary": "本 owner 持久化接收事实；投影和 inbox 同事务收敛",
+        "x-owner": "owner-local",
+        "x-source": "§11",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs"
+        ],
+        "responses": {
+          "200": {
+            "description": "仅确认可信事实/回执已持久化；HTTP 200 不证明业务成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryRequest"
+              }
+            }
+          }
+        },
+        "x-runtime-units": [
+          "security-gateway",
+          "control-plane",
+          "decision-service",
+          "hermes-runtime",
+          "manufacturing-core",
+          "tool-gateway",
+          "transaction-service",
+          "trajectory-eval"
+        ],
+        "x-owner-routing": "target_unit_from_trusted_service_route_not_request_body",
+        "x-required-caller": "authenticated_broker_or_registered_authority",
+        "x-ack-boundary": "durable_inbox_and_processing_position"
+      }
+    },
+    "/internal/v1/events/dlq/{dlq_id}": {
+      "get": {
+        "operationId": "p15__owner_local__get___internal_v1_events_dlq__dlq_id_",
+        "summary": "本 owner 内查询死信原因、次数和人工处理状态",
+        "x-owner": "owner-local",
+        "x-source": "§11",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "query",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs",
+          "owner_local_operator_permission",
+          "tenant_and_target_owner_match"
+        ],
+        "responses": {
+          "200": {
+            "description": "受控读取 owner 的持久化记录，携带状态来源和更新时间。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeadLetter"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "dlq_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "x-runtime-units": [
+          "security-gateway",
+          "control-plane",
+          "decision-service",
+          "hermes-runtime",
+          "manufacturing-core",
+          "tool-gateway",
+          "transaction-service",
+          "trajectory-eval"
+        ],
+        "x-owner-routing": "target_unit_from_trusted_service_route_not_request_body"
+      }
+    },
+    "/internal/v1/events/dlq/{dlq_id}/replay": {
+      "post": {
+        "operationId": "p15__owner_local__post___internal_v1_events_dlq__dlq_id__replay",
+        "summary": "请求重放原死信事件，原去重规则和版本规则不变",
+        "x-owner": "owner-local",
+        "x-source": "§11",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理动作请求；accepted 不是业务成功或已过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "dlq_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayRequest"
+              }
+            }
+          }
+        },
+        "x-runtime-units": [
+          "security-gateway",
+          "control-plane",
+          "decision-service",
+          "hermes-runtime",
+          "manufacturing-core",
+          "tool-gateway",
+          "transaction-service",
+          "trajectory-eval"
+        ],
+        "x-owner-routing": "target_unit_from_trusted_service_route_not_request_body",
+        "x-required-caller": "authorized_owner_local_operator",
+        "x-idempotency": "tenant_and_request_key_same_payload_same_request_conflict_409"
+      }
+    },
+    "/internal/v1/commands/{command_id}/receipts": {
+      "post": {
+        "operationId": "p15__transaction__post___internal_v1_commands__command_id__receipts",
+        "summary": "已授权 adapter 提交权威凭证引用，Transaction 验证后决定 Command 终态",
+        "x-owner": "transaction",
+        "x-source": "§11, §12",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "tenant_matches_context_and_authenticated_identity",
+          "no_sensitive_content_in_logs",
+          "bind_receipt_to_persisted_command",
+          "authority_credential_verified_independently",
+          "only_verified_receipt_drives_success"
+        ],
+        "responses": {
+          "200": {
+            "description": "仅确认可信事实/回执已持久化；HTTP 200 不证明业务成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorityReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptSubmission"
+              }
+            }
+          }
+        },
+        "x-required-caller": "authenticated_registered_adapter"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommonContext": {
+        "$ref": "p0.openapi.json#/components/schemas/CommonContext"
+      },
+      "Error": {
+        "$ref": "p0.openapi.json#/components/schemas/Error"
+      },
+      "EventEnvelope": {
+        "$ref": "p0.openapi.json#/components/schemas/EventEnvelope"
+      },
+      "Outbox": {
+        "$ref": "../schemas/p15-outbox.json"
+      },
+      "Inbox": {
+        "$ref": "../schemas/p15-inbox.json"
+      },
+      "DeadLetter": {
+        "$ref": "../schemas/p15-dlq.json"
+      },
+      "AuthorityReceipt": {
+        "$ref": "../schemas/p15-receipt.json"
+      },
+      "ReceiptSubmission": {
+        "$ref": "../schemas/p15-receipt.json#/$defs/Submission"
+      },
+      "TaskView": {
+        "$ref": "../schemas/p15-lifecycle.json#/$defs/TaskView"
+      },
+      "RunView": {
+        "$ref": "../schemas/p15-lifecycle.json#/$defs/RunView"
+      },
+      "DeliveryRequest": {
+        "$ref": "../schemas/p15-event-api.json#/$defs/DeliveryRequest"
+      },
+      "DeliveryAck": {
+        "$ref": "../schemas/p15-event-api.json#/$defs/DeliveryAck"
+      },
+      "ReplayRequest": {
+        "$ref": "../schemas/p15-event-api.json#/$defs/ReplayRequest"
+      },
+      "ReplayAccepted": {
+        "$ref": "../schemas/p15-event-api.json#/$defs/ReplayAccepted"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "$ref": "p0.openapi.json#/components/responses/Error400"
+      },
+      "Error401": {
+        "$ref": "p0.openapi.json#/components/responses/Error401"
+      },
+      "Error403": {
+        "$ref": "p0.openapi.json#/components/responses/Error403"
+      },
+      "Error404": {
+        "$ref": "p0.openapi.json#/components/responses/Error404"
+      },
+      "Error409": {
+        "$ref": "p0.openapi.json#/components/responses/Error409"
+      },
+      "Error422": {
+        "$ref": "p0.openapi.json#/components/responses/Error422"
+      },
+      "Error429": {
+        "$ref": "p0.openapi.json#/components/responses/Error429"
+      },
+      "Error503": {
+        "$ref": "p0.openapi.json#/components/responses/Error503"
+      }
+    },
+    "parameters": {
+      "Context": {
+        "$ref": "p0.openapi.json#/components/parameters/Context"
+      }
+    },
+    "securitySchemes": {
+      "ExternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/ExternalIdentity"
+      },
+      "InternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/InternalIdentity"
+      }
+    }
+  },
+  "x-source-version": "3.0.0",
+  "x-contract-extension": {
+    "stage": "P1.5",
+    "sources": [
+      "§11",
+      "§12",
+      "§13"
+    ],
+    "new_interface_layer": false,
+    "p0_p1_immutable": true,
+    "context_shape": "nested_context",
+    "get_context_transport": "P0 X-Context header"
+  },
+  "x-delivery": {
+    "semantics": "at_least_once",
+    "global_exactly_once": false,
+    "cross_database_transaction": false,
+    "aggregate_key": [
+      "tenant_id",
+      "aggregate_id"
+    ],
+    "envelope": "event-envelope.json",
+    "late_event_overwrite": false
+  },
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "unknown_model": "reject",
+    "missing_registry": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "local_failure": "reject_or_queue",
+    "local_failure_public_fallback": false,
+    "tenant_source": "authenticated_identity",
+    "model_output_is_execution_permission": false
+  }
+}

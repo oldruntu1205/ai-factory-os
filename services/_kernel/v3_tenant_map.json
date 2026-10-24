@@ -1,0 +1,52 @@
+{
+  "_comment": "V2.1 公司/用户 → V3.0 租户/工厂/身份 的映射。**这是两套身份模型的唯一接缝**，所以放在一处、显式列出。",
+  "_why": "V2.1 只有「公司(company) + 用户(user)」，没有工厂与岗位；V3.0 的语义是 tenant / factory / actor / employee。两者不会自动对应，必须显式声明。未列出的公司或用户一律**拒绝**（fail-closed），不静默回退——那样会让一家公司看到另一家的数据，或让同一个人既发起又批准。",
+  "_scope": "开发/演示期的最小映射。生产登记表由 control-plane 的 Release Registry 提供（待冻结）。",
+
+  "mappings": {
+    "1": {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "default_employee_id": "employee-planning",
+      "label": "太阳玻璃仪器（演示租户）",
+
+      "_comment_actors": "**一人一 actor**。原先每个公司只登记一个 actor_id，于是公司里所有人共用同一个执行身份——后果不是「不方便」，而是**职责分离永远不成立**：同一个人既发起又批准，而 `revalidate_before_execution` 会因此报 `DUTIES_NOT_SEPARATED` 并拒绝执行（实测）。所以 actor 必须按**用户**登记。",
+      "_comment_actor_deny": "未登记的用户**拒绝**（ACTOR_NOT_MAPPED），不退回 tenant 级默认 actor。退回会让「某个人」变成「某公司的执行身份」，从而绕过职责分离。",
+      "actors": {
+        "admin@demo.com": "user-demo",
+        "approver@demo.com": "user-approver"
+      }
+    },
+    "8": {
+      "tenant_id": "tenant-c3",
+      "factory_id": "factory-demo",
+      "default_employee_id": "employee-planning",
+      "label": "演示租户 C3（用于验证多租户隔离）",
+      "actors": {
+        "inv_test@example.com": "user-demo"
+      }
+    }
+  },
+
+  "_why_actor_id_is_mapped": {
+    "问题": "V2.1 的用户名是**邮箱**（如 admin@demo.com），而 V3.0 的 `actor_id` 必须是合法标识符（契约 pattern：字母数字开头，只含字母数字与 . _ : -）。所以邮箱**不能**直接当 actor_id。",
+    "实测": "直接把邮箱塞进 actor_id 会被控制面 400 REQUEST_INVALID（object_ref: actor_id）拒绝。",
+    "决定": "`actor_id` 与 tenant/factory 同属**后端标识符**，必须在映射表里显式登记，不由用户可控的值推导。用户的邮箱另存于 `identity.user_email`，仅用于显示与审计追溯。",
+    "约束": "actor 名字必须是登记表 `tenants[*].actors` 里**已有**的——映射表只写「谁是谁」，不新增 V3 侧身份。新增 actor 要同时改 `registry.mock.json`。"
+  },
+  "_unmapped_company_policy": {
+    "action": "deny",
+    "code": "TENANT_NOT_MAPPED",
+    "message": "该公司尚未映射到 V3.0 租户；请在上表登记后再访问 V3.0 页面。"
+  },
+  "_unmapped_user_policy": {
+    "action": "deny",
+    "code": "ACTOR_NOT_MAPPED",
+    "message": "该用户尚未映射到 V3.0 执行身份；请在上表该公司下登记 actor（并确认该 actor 已在登记表 tenants[*].actors 中）后再访问。"
+  },
+  "_anonymous_policy": {
+    "action": "deny",
+    "code": "AUTH_REQUIRED",
+    "message": "V3.0 页面需要 V2.1 登录态；请先登录。"
+  }
+}

@@ -1,0 +1,1418 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "AI Factory V3.0 P0 契约",
+    "version": "3.0.0",
+    "description": "唯一上位文档 v3.0.0 §10.1/§10.2/§11/§12/§14.2。仅契约与 Mock 形状；待冻结项不能充作生产许可。"
+  },
+  "paths": {
+    "/api/v1/tasks": {
+      "post": {
+        "operationId": "control__api_v1_tasks_post",
+        "summary": "幂等受理任务，202返回task_id/状态URL",
+        "x-owner": "control",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅已持久化受理；不表示已执行、已过账或成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}": {
+      "get": {
+        "operationId": "control__api_v1_tasks_task_id__get",
+        "summary": "平台任务投影；执行事实来自transaction",
+        "x-owner": "control",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            },
+            "description": "必须与 Context/请求绑定及可信对象归属一致；跨租户访问拒绝。"
+          },
+          {
+            "$ref": "#/components/parameters/Context"
+          }
+        ]
+      }
+    },
+    "/api/v1/approvals/{approval_id}/decisions": {
+      "post": {
+        "operationId": "control__api_v1_approvals_approval_id_decisions_post",
+        "summary": "授权人员批准/拒绝，绑定payload与版本",
+        "x-owner": "control",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalDecisionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            },
+            "description": "必须与 Context/请求绑定及可信对象归属一致；跨租户访问拒绝。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/policy/evaluate": {
+      "post": {
+        "operationId": "control__internal_v1_policy_evaluate_post",
+        "summary": "对可信规范化动作作出策略判定",
+        "x-owner": "control",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyEvaluateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/decisions": {
+      "post": {
+        "operationId": "decision__internal_v1_decisions_post",
+        "summary": "有限类型结果、校准与回退路径",
+        "x-owner": "decision",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/runs": {
+      "post": {
+        "operationId": "runtime__internal_v1_runs_post",
+        "summary": "创建持久化run；返回run_id",
+        "x-owner": "runtime",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/runs/{run_id}/resume": {
+      "post": {
+        "operationId": "runtime__internal_v1_runs_run_id_resume_post",
+        "summary": "检查点版本校验；重复恢复不得重复副作用",
+        "x-owner": "runtime",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            },
+            "description": "必须与 Context/请求绑定及可信对象归属一致；跨租户访问拒绝。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunResumeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/model-invocations": {
+      "post": {
+        "operationId": "security__internal_v1_model_invocations_post",
+        "summary": "所有中心模型调用治理入口",
+        "x-owner": "security",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "deny_sensitive_nonlocal_model",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInvocationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInvocationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/contexts/query": {
+      "post": {
+        "operationId": "manufacturing__internal_v1_contexts_query_post",
+        "summary": "有权限的业务快照与来源，不支持任意SQL",
+        "x-owner": "manufacturing",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextQueryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextQueryRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/tool-requests": {
+      "post": {
+        "operationId": "tool__internal_v1_tool_requests_post",
+        "summary": "规范化及策略校验；只读执行或提交写命令",
+        "x-owner": "tool",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolRequestResult"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "写操作必须先持久化 Command；accepted 不是副作用成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolRequest"
+              }
+            }
+          }
+        },
+        "x-read-write-responses": {
+          "read": 200,
+          "write": 202
+        }
+      }
+    },
+    "/internal/v1/commands": {
+      "post": {
+        "operationId": "transaction__internal_v1_commands_post",
+        "summary": "持久化写命令，返回command_id/status",
+        "x-owner": "transaction",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅已持久化受理；不表示已执行、已过账或成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/commands/{command_id}": {
+      "get": {
+        "operationId": "transaction__internal_v1_commands_command_id__get",
+        "summary": "源系统回执与UNKNOWN/人工状态",
+        "x-owner": "transaction",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            },
+            "description": "必须与 Context/请求绑定及可信对象归属一致；跨租户访问拒绝。"
+          },
+          {
+            "$ref": "#/components/parameters/Context"
+          }
+        ]
+      }
+    },
+    "/internal/v1/tool-executions": {
+      "post": {
+        "operationId": "tool__internal_v1_tool_executions_post",
+        "summary": "仅transaction受限身份；执行时复核授权",
+        "x-owner": "tool",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolExecutionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolExecutionRequest"
+              }
+            }
+          }
+        },
+        "x-required-caller": "transaction-service"
+      }
+    },
+    "/edge/v1/decisions": {
+      "post": {
+        "operationId": "edge__edge_v1_decisions_post",
+        "summary": "本地推理；影子结果不产生动作",
+        "x-owner": "edge",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDecisionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeDecisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/releases/activate": {
+      "post": {
+        "operationId": "edge__edge_v1_releases_activate_post",
+        "summary": "校验签名、适配版本与门禁证据",
+        "x-owner": "edge",
+        "x-source": "§10.1",
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject"
+        ],
+        "responses": {
+          "200": {
+            "description": "类型校验及授权后返回；状态来源由响应字段显式声明。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeRelease"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeReleaseActivationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "health_live",
+        "summary": "核心服务存活基线",
+        "x-owner": "all-core-services",
+        "x-source": "§14.2",
+        "x-global-object": true,
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "全局运维状态，包含依赖、策略版本与积压。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "health_ready",
+        "summary": "核心服务就绪基线",
+        "x-owner": "all-core-services",
+        "x-source": "§14.2",
+        "x-global-object": true,
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "全局运维状态，包含依赖、策略版本与积压。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommonContext": {
+        "$ref": "../schemas/common-context.json"
+      },
+      "Error": {
+        "$ref": "../schemas/error.json"
+      },
+      "Command": {
+        "$ref": "../schemas/command.json"
+      },
+      "Task": {
+        "$ref": "../schemas/task.json"
+      },
+      "CommandStatus": {
+        "$ref": "../schemas/command-status.json"
+      },
+      "DecisionResult": {
+        "$ref": "../schemas/decision-result.json"
+      },
+      "EventEnvelope": {
+        "$ref": "../schemas/event-envelope.json"
+      },
+      "ToolSpec": {
+        "$ref": "../schemas/tool-spec.json"
+      },
+      "ServiceManifest": {
+        "$ref": "../schemas/service-manifest.json"
+      },
+      "TaskCreateRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/TaskCreateRequest"
+      },
+      "ApprovalDecisionRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/ApprovalDecisionRequest"
+      },
+      "ApprovalDecisionResult": {
+        "$ref": "../schemas/api-models.json#/$defs/ApprovalDecisionResult"
+      },
+      "PolicyEvaluateRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/PolicyEvaluateRequest"
+      },
+      "PolicyResult": {
+        "$ref": "../schemas/api-models.json#/$defs/PolicyResult"
+      },
+      "DecisionRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/DecisionRequest"
+      },
+      "Checkpoint": {
+        "$ref": "../schemas/api-models.json#/$defs/Checkpoint"
+      },
+      "RunCreateRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/RunCreateRequest"
+      },
+      "RunResumeRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/RunResumeRequest"
+      },
+      "RunResult": {
+        "$ref": "../schemas/api-models.json#/$defs/RunResult"
+      },
+      "ModelInvocationRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/ModelInvocationRequest"
+      },
+      "ModelInvocationResult": {
+        "$ref": "../schemas/api-models.json#/$defs/ModelInvocationResult"
+      },
+      "ContextQueryRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/ContextQueryRequest"
+      },
+      "FactSnapshot": {
+        "$ref": "../schemas/api-models.json#/$defs/FactSnapshot"
+      },
+      "ContextQueryResult": {
+        "$ref": "../schemas/api-models.json#/$defs/ContextQueryResult"
+      },
+      "ToolRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/ToolRequest"
+      },
+      "ToolRequestResult": {
+        "$ref": "../schemas/api-models.json#/$defs/ToolRequestResult"
+      },
+      "ToolExecutionRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/ToolExecutionRequest"
+      },
+      "ToolExecutionResult": {
+        "$ref": "../schemas/api-models.json#/$defs/ToolExecutionResult"
+      },
+      "Saga": {
+        "$ref": "../schemas/api-models.json#/$defs/Saga"
+      },
+      "EdgeDecisionRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/EdgeDecisionRequest"
+      },
+      "EdgeDecisionResult": {
+        "$ref": "../schemas/api-models.json#/$defs/EdgeDecisionResult"
+      },
+      "EdgeReleaseActivationRequest": {
+        "$ref": "../schemas/api-models.json#/$defs/EdgeReleaseActivationRequest"
+      },
+      "EdgeRelease": {
+        "$ref": "../schemas/api-models.json#/$defs/EdgeRelease"
+      },
+      "Health": {
+        "$ref": "../schemas/api-models.json#/$defs/Health"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "结构或参数错误（§10.2）。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "身份拒绝（§10.2）。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "权限拒绝（§10.2），未知租户/工具/数据等级及禁止出域必须拒绝；具体业务 code 待冻结。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "保留标准响应；上位文档未定义404业务语义，待冻结，不用于泄露跨租户对象存在性。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "幂等或版本冲突（§10.2）。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "结构或参数错误（§10.2）。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "预算限制（§10.2）。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "依赖不可用（§10.2）；不证明外部写入未执行。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Context": {
+        "name": "X-Context",
+        "in": "header",
+        "required": true,
+        "description": "GET 使用 JSON 编码的公共 Context；所有租户信息仍须与可信身份核对。此头不是认证。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CommonContext"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ExternalIdentity": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "外部认证受众，可信渠道身份映射；生产 token/SSO 细节待冻结。"
+      },
+      "InternalIdentity": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "内部服务受众与受限服务身份，需核对用户委托范围。"
+      },
+      "EdgeIdentity": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "现场独立受众、本地许可与网络 ACL；不得公网开放。"
+      }
+    }
+  },
+  "x-source-version": "3.0.0",
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "tenant_source": "authenticated_identity",
+    "missing_registry": "reject",
+    "model_output_is_execution_permission": false
+  },
+  "x-health-path-exception": "/health/live 与 /health/ready 是 §14.2 明定运维路径，业务接口仅使用 §10.1 三类版本化前缀。",
+  "x-http-code-freeze": "统一 body.code 的字符串目录与404业务语义待冻结；不得以文档 HTTP 状态分类推造业务码。"
+}

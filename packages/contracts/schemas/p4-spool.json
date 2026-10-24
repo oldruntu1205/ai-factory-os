@@ -1,0 +1,534 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 durable local spool and fact-only reconnect",
+  "x-schema-container": true,
+  "$defs": {
+    "Entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "boot_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "event_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "occurred_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "aggregate_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "enum": [
+            "comparison",
+            "executed_fact",
+            "pending_action"
+          ]
+        },
+        "payload_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "action_executed": {
+          "type": "boolean"
+        },
+        "command_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command_idempotency_key": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receipt_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receipt_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issued_at": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/UtcTimestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/UtcTimestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ttl_seconds": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "center_execution_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "boot_id",
+        "sequence",
+        "event_id",
+        "event_hash",
+        "occurred_at",
+        "aggregate_ref",
+        "aggregate_version",
+        "kind",
+        "payload_ref",
+        "payload_hash",
+        "action_executed",
+        "command_id",
+        "command_idempotency_key",
+        "receipt_ref",
+        "receipt_hash",
+        "issued_at",
+        "expires_at",
+        "ttl_seconds",
+        "center_execution_allowed"
+      ],
+      "x-tenant-scope": "inherited",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "comparison"
+            },
+            "action_executed": {
+              "const": false
+            },
+            "command_id": {
+              "type": "null"
+            },
+            "command_idempotency_key": {
+              "type": "null"
+            },
+            "receipt_ref": {
+              "type": "null"
+            },
+            "receipt_hash": {
+              "type": "null"
+            },
+            "issued_at": {
+              "type": "null"
+            },
+            "expires_at": {
+              "type": "null"
+            },
+            "ttl_seconds": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "executed_fact"
+            },
+            "action_executed": {
+              "const": true
+            },
+            "command_id": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "command_idempotency_key": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "receipt_ref": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "receipt_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "issued_at": {
+              "type": "null"
+            },
+            "expires_at": {
+              "type": "null"
+            },
+            "ttl_seconds": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "pending_action"
+            },
+            "action_executed": {
+              "const": false
+            },
+            "command_id": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "command_idempotency_key": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "receipt_ref": {
+              "type": "null"
+            },
+            "receipt_hash": {
+              "type": "null"
+            },
+            "issued_at": {
+              "$ref": "common-context.json#/$defs/UtcTimestamp"
+            },
+            "expires_at": {
+              "$ref": "common-context.json#/$defs/UtcTimestamp"
+            },
+            "ttl_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ],
+      "description": "事件类别不是新的 Command 状态。pending_action 仅代表本地历史待执行引用；中心补报通道不授予执行权，P4 本地也不执行。"
+    },
+    "Acknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "event_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "facts_persisted": {
+          "const": true
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "late": {
+          "type": "boolean"
+        },
+        "expired": {
+          "type": "boolean"
+        },
+        "state_updated": {
+          "type": "boolean"
+        },
+        "action_executed": {
+          "const": false
+        },
+        "center_replay_allowed": {
+          "const": false
+        },
+        "fact_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "state_confirmation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "event_id",
+        "event_hash",
+        "facts_persisted",
+        "duplicate",
+        "late",
+        "expired",
+        "state_updated",
+        "action_executed",
+        "center_replay_allowed",
+        "fact_record_ref",
+        "state_confirmation_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "duplicate": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "duplicate"
+                ]
+              },
+              {
+                "properties": {
+                  "late": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "late"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "state_updated": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "batch_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "p4-spool.json#/$defs/Entry"
+          },
+          "minItems": 1
+        },
+        "report_facts_only": {
+          "const": true
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "batch_ref",
+        "entries",
+        "report_facts_only"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "BatchAcknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "batch_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "acknowledged_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "p4-spool.json#/$defs/Acknowledgement"
+          },
+          "minItems": 1
+        },
+        "center_replay_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "batch_ref",
+        "acknowledged_at",
+        "results",
+        "center_replay_allowed"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "LocalIdempotencyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "receipt_idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "receipt_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "command_status": {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED",
+            "UNKNOWN",
+            "MANUAL_REVIEW"
+          ]
+        },
+        "state_confirmation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "state_confirmation_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "repeat_device_write_allowed": {
+          "const": false
+        },
+        "receipt_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "device_ref",
+        "command_id",
+        "command_idempotency_key",
+        "command_payload_hash",
+        "receipt_idempotency_key",
+        "receipt_hash",
+        "command_status",
+        "state_confirmation_ref",
+        "state_confirmation_hash",
+        "repeat_device_write_allowed",
+        "receipt_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "复用 §12 Command 终态/收敛态；重复提交只返回既有记录。同键异 hash 冲突；UNKNOWN 必须查询设备状态或人工收敛。"
+    }
+  },
+  "x-spool-policy": {
+    "persistence": "durable_local_spool",
+    "identity": [
+      "edge_id",
+      "boot_id",
+      "sequence",
+      "event_id"
+    ],
+    "dedupe_key": [
+      "context.tenant_id",
+      "edge_id",
+      "event_id"
+    ],
+    "reconnect_dedupe_by": "event_id",
+    "same_event_different_hash": "409",
+    "report_executed_actions": "facts_only",
+    "center_replay_allowed": false,
+    "pending_action_requires": [
+      "issued_at",
+      "expires_at",
+      "ttl_seconds"
+    ],
+    "expired_pending_action_execute": false,
+    "expiry_boundary": "now_greater_than_or_equal_to_expires_at",
+    "expiry_relation": "expires_at_equals_issued_at_plus_ttl_seconds",
+    "late_event_overwrites_newer_state": false,
+    "late_detection": "aggregate_version_not_greater_than_current_version",
+    "sequence_scope": [
+      "context.tenant_id",
+      "edge_id",
+      "boot_id"
+    ],
+    "receipt_durable_before_ack": true,
+    "local_delete_before_ack": false,
+    "partial_batch_ack_per_event": true,
+    "unknown_delivery": "retain_and_query_or_resubmit_same_event",
+    "silent_drop": false,
+    "p4_pending_action_execution": false,
+    "device_command_and_receipt_idempotency": true,
+    "local_idempotency_key_scope": [
+      "context.tenant_id",
+      "edge_id",
+      "device_ref"
+    ],
+    "duplicate_command_same_hash": "return_same_result_without_device_write",
+    "duplicate_command_different_hash": "409",
+    "unknown_device_result": "query_state_or_MANUAL_REVIEW_without_new_key_retry"
+  }
+}

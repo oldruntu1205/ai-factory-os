@@ -1,0 +1,2742 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ApiModels",
+  "x-schema-container": true,
+  "description": "§10.1 请求/响应封闭结构。未冻结业务输入使用登记 Schema 与受控引用，不能绕过实际内容验证。",
+  "$defs": {
+    "TaskCreateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "tenant 范围内幂等受理任务。"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "idempotency_key",
+        "input_ref",
+        "input_schema"
+      ],
+      "x-tenant-scope": "self",
+      "description": "任务内容使用已分级的本地引用；解析后必须按登记 Schema 验证。"
+    },
+    "ApprovalDecisionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "approval_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "payload_hash": {
+          "type": "string",
+          "minLength": 1,
+          "description": "可信规范化 payload 哈希；改变需重新审批。"
+        },
+        "policy_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tools",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "action_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/CatalogValue"
+          },
+          "minItems": 1
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "approval_id",
+        "approved",
+        "object_id",
+        "payload_hash",
+        "policy_version",
+        "tool_id",
+        "tool_version",
+        "action_scope",
+        "valid_until",
+        "expected_version"
+      ],
+      "x-tenant-scope": "self",
+      "description": "可信岗位身份批准或拒绝；管理权不能代替业务批准权。路径 approval_id 必须与 body 相同。"
+    },
+    "ApprovalDecisionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "approval_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "approval_id",
+        "approved",
+        "record_version",
+        "decision_ref"
+      ],
+      "x-tenant-scope": "self"
+    },
+    "PolicyEvaluateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tools",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "action": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "payload_hash": {
+          "type": "string",
+          "minLength": 1,
+          "description": "已由可信服务计算的 canonical payload 哈希。"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "normalized_payload_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "delegated_scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "tool_id",
+        "tool_version",
+        "action",
+        "object_id",
+        "payload_hash",
+        "expected_version",
+        "payload_version",
+        "normalized_payload_ref",
+        "delegated_scopes"
+      ],
+      "x-tenant-scope": "self",
+      "description": "权威 Policy 判定的输入，必须来自可信规范化服务；身份委托范围不可由模型提升。"
+    },
+    "PolicyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "approval_required": {
+          "type": "boolean"
+        },
+        "risk_class": {
+          "$ref": "common-context.json#/$defs/RiskClass"
+        },
+        "policy_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_code": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "allowed",
+        "approval_required",
+        "risk_class",
+        "policy_version",
+        "evaluation_ref",
+        "approval_ref",
+        "reason_code",
+        "valid_until"
+      ],
+      "x-tenant-scope": "self",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "allowed": {
+                "const": true
+              },
+              "approval_required": {
+                "const": true
+              }
+            },
+            "required": [
+              "allowed",
+              "approval_required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        }
+      ],
+      "x-policy-authority": "control-plane"
+    },
+    "DecisionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "catalog_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "decision_kind": {
+          "type": "string",
+          "enum": [
+            "Route",
+            "Classify",
+            "Score",
+            "Rank",
+            "Filter",
+            "Gate",
+            "Select",
+            "Escalate"
+          ],
+          "description": "上游 §3 给 Jev Decision Fabric 的封闭清单。**省缺时按 Route 处理**（P0 之前的既有调用方只做任务路由，加字段是兼容升级）。请求未实现的类型必须显式拒绝，不得静默按 Route 返回。"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "input_ref",
+        "input_schema",
+        "catalog_version"
+      ],
+      "x-tenant-scope": "self",
+      "description": "输入及有限输出目录未登记时拒绝；置信度不赋执行权。"
+    },
+    "Checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "run_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "program_position": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "context_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "pending_command_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "completed_tool_receipt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "model_version": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "run_id",
+        "version",
+        "program_position",
+        "context_refs",
+        "pending_command_ids",
+        "completed_tool_receipt_refs",
+        "model_version",
+        "policy_version"
+      ],
+      "x-tenant-scope": "self",
+      "description": "恢复先查现存 Command；成功步骤不得重放，持久化引用均按 tenant 隔离。"
+    },
+    "RunCreateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "runtime_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "input_ref",
+        "runtime_version"
+      ],
+      "x-tenant-scope": "self"
+    },
+    "RunResumeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "run_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_checkpoint_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoint_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "run_id",
+        "expected_checkpoint_version",
+        "checkpoint_ref",
+        "fencing_token",
+        "idempotency_key"
+      ],
+      "x-tenant-scope": "self",
+      "description": "检查点 CAS；租约与 fencing token 拒绝旧 worker。重复恢复不得重复副作用。"
+    },
+    "RunResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "run_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Run"
+        },
+        "status_source": {
+          "const": "hermes-runtime"
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "checkpoint": {
+          "anyOf": [
+            {
+              "$ref": "api-models.json#/$defs/Checkpoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "run_id",
+        "status",
+        "status_source",
+        "updated_at",
+        "checkpoint",
+        "command_refs"
+      ],
+      "x-tenant-scope": "self"
+    },
+    "ModelInvocationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "model_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "model_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "model_backend": {
+          "type": "string",
+          "enum": [
+            "local",
+            "enterprise_cloud",
+            "public"
+          ],
+          "description": "§4.1 模型部署类别的协议表示；仅登记且符合数据路由的后端。local 必须是批准企业本地域。",
+          "x-backend-source": "registered_model_metadata"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "output_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "model_id",
+        "model_version",
+        "model_backend",
+        "purpose",
+        "input_refs",
+        "output_schema"
+      ],
+      "x-tenant-scope": "self",
+      "description": "合并输入按最高等级处理；重新分类结果不得低于请求等级。C2 云处理还须批准变换；C4 任务白名单与专门批准。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C3",
+                  "C4"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "model_backend": {
+                "const": "local"
+              }
+            }
+          }
+        }
+      ],
+      "x-admission-policy": {
+        "unknown_tenant": "reject",
+        "unknown_data_class": "reject",
+        "unknown_model": "reject",
+        "sensitive_nonlocal_model": "reject",
+        "local_failure_public_fallback": false,
+        "inherit_highest_class": true
+      },
+      "examples": [
+        {
+          "tenant_id": "tenant-demo",
+          "factory_id": "factory-demo",
+          "actor_id": "user-demo",
+          "employee_id": "employee-planning",
+          "task_id": "task-demo",
+          "trace_id": "trace-demo",
+          "data_class": "C3",
+          "schema_version": "1.0.0",
+          "deadline_at": "2026-10-05T00:00:00Z",
+          "model_id": "model-demo",
+          "model_version": "model-demo",
+          "model_backend": "local",
+          "purpose": "purpose-demo",
+          "input_refs": [
+            "input-demo"
+          ],
+          "output_schema": {
+            "schema_ref": "decision-result.json",
+            "schema_version": "1.0.0",
+            "schema_hash": "hash-demo"
+          }
+        }
+      ]
+    },
+    "ModelInvocationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "invocation_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "model_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "output_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "output_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "invocation_id",
+        "model_version",
+        "output_ref",
+        "output_schema"
+      ],
+      "x-tenant-scope": "self",
+      "description": "输出扫描及 Schema 验证后才能消费，输出继承输入最高级别。"
+    },
+    "ContextQueryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "query_id": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "object_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "required_scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "query_id",
+        "object_refs",
+        "purpose",
+        "required_scopes"
+      ],
+      "x-tenant-scope": "self",
+      "description": "只能调用登记的有限查询目录；检索前 tenant/factory/岗位 ACL，返回后复核，不接受 SQL 或任意 URL。"
+    },
+    "FactSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_system": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "source_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "source_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "occurred_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "received_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "quality_status": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "snapshot_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "source_system",
+        "source_id",
+        "source_version",
+        "occurred_at",
+        "received_at",
+        "data_class",
+        "tenant_id",
+        "quality_status",
+        "snapshot_ref",
+        "valid_until"
+      ],
+      "x-tenant-scope": "self",
+      "description": "§5.2 版本化只读投影；质量状态目录待冻结，不使用时间戳覆盖不同系统的账务和实物事实。"
+    },
+    "ContextQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "snapshots": {
+          "type": "array",
+          "items": {
+            "$ref": "api-models.json#/$defs/FactSnapshot"
+          }
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "snapshots"
+      ],
+      "x-tenant-scope": "self"
+    },
+    "ToolRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tools",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "tool_id",
+        "tool_version",
+        "input_ref",
+        "input_schema",
+        "idempotency_key",
+        "expected_version"
+      ],
+      "x-tenant-scope": "self",
+      "description": "Tool 白名单及登记 Schema 验证；写操作规范化后交 Policy/Transaction，未知工具拒绝。"
+    },
+    "ToolRequestResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tools",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "read_write": {
+          "type": "string",
+          "enum": [
+            "read",
+            "write"
+          ]
+        },
+        "output_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "command-status.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "tool_id",
+        "tool_version",
+        "read_write",
+        "output_ref",
+        "command"
+      ],
+      "x-tenant-scope": "self",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "read_write": {
+                "const": "read"
+              }
+            },
+            "required": [
+              "read_write"
+            ]
+          },
+          "then": {
+            "properties": {
+              "output_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "command": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "read_write": {
+                "const": "write"
+              }
+            },
+            "required": [
+              "read_write"
+            ]
+          },
+          "then": {
+            "properties": {
+              "output_ref": {
+                "type": "null"
+              },
+              "command": {
+                "$ref": "command-status.json"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ToolExecutionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command": {
+          "$ref": "command.json"
+        },
+        "execution_permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "command_id",
+        "command",
+        "execution_permit_ref",
+        "fencing_token"
+      ],
+      "x-tenant-scope": "self",
+      "description": "仅 Transaction 受限身份；执行点重新验证 Policy/批准/对象版本，adapter 只接受 Tool 身份及命令许可。"
+    },
+    "ToolExecutionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Command"
+        },
+        "receipt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "source_system": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "command_id",
+        "status",
+        "receipt_refs",
+        "source_system",
+        "updated_at"
+      ],
+      "x-tenant-scope": "self",
+      "description": "超时及5xx不能证明未执行；UNKNOWN 时进入权威查询和人工收敛。"
+    },
+    "Saga": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "saga_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Saga"
+        },
+        "command_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "receipt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "saga_id",
+        "status",
+        "command_refs",
+        "receipt_refs",
+        "updated_at"
+      ],
+      "x-tenant-scope": "self",
+      "description": "补偿是新业务动作；先实物再账务，失败进人工队列。"
+    },
+    "EdgeDecisionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "shadow",
+            "restricted"
+          ]
+        },
+        "model_backend": {
+          "const": "local"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "model_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "calibration_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "feature_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "tokenizer_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "action_mapping_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "local_policy_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "edge_id",
+        "mode",
+        "model_backend",
+        "input_ref",
+        "input_schema",
+        "release_id",
+        "model_version",
+        "calibration_version",
+        "feature_version",
+        "tokenizer_version",
+        "action_mapping_version",
+        "local_policy_ref"
+      ],
+      "x-tenant-scope": "self",
+      "description": "现场只用本地推理与许可；断连不向公网模型兜底，影子写口物理/网络禁用。"
+    },
+    "EdgeDecisionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "shadow",
+            "restricted"
+          ]
+        },
+        "decision": {
+          "$ref": "decision-result.json"
+        },
+        "action_executed": {
+          "type": "boolean"
+        },
+        "receipt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "edge_id",
+        "mode",
+        "decision",
+        "action_executed",
+        "receipt_refs"
+      ],
+      "x-tenant-scope": "self",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "shadow"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action_executed": {
+                "const": false
+              },
+              "receipt_refs": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "x-edge-constraints": {
+        "shadow_has_side_effect": false,
+        "confidence_overrides_interlock": false,
+        "expired_policy_allows_action": false,
+        "executed_action_replay": false
+      },
+      "examples": [
+        {
+          "tenant_id": "tenant-demo",
+          "factory_id": "factory-demo",
+          "actor_id": "user-demo",
+          "employee_id": "employee-planning",
+          "task_id": "task-demo",
+          "trace_id": "trace-demo",
+          "data_class": "C2",
+          "schema_version": "1.0.0",
+          "deadline_at": "2026-10-05T00:00:00Z",
+          "edge_id": "edge-demo",
+          "mode": "shadow",
+          "decision": {
+            "tenant_id": "tenant-demo",
+            "factory_id": "factory-demo",
+            "actor_id": "user-demo",
+            "employee_id": "employee-planning",
+            "task_id": "task-demo",
+            "trace_id": "trace-demo",
+            "data_class": "C2",
+            "schema_version": "1.0.0",
+            "deadline_at": "2026-10-05T00:00:00Z",
+            "decision_id": "decision-demo",
+            "decision_kind": "Gate",
+            "route": "route-demo",
+            "action": "action-demo",
+            "category": "category-demo",
+            "confidence": null,
+            "model_version": null,
+            "calibration_version": null,
+            "rule_version": "rule-demo",
+            "reason_code": "reason-demo",
+            "evidence_refs": [
+              "evidence-demo"
+            ],
+            "fallback": {
+              "route": "route-demo",
+              "reason_code": "reason-demo"
+            }
+          },
+          "action_executed": false,
+          "receipt_refs": []
+        }
+      ]
+    },
+    "EdgeReleaseActivationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "package_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "signature_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "schema_binding": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "model_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "calibration_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "feature_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "tokenizer_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "action_mapping_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "gate_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "shadow_days": {
+          "type": "integer",
+          "minimum": 14
+        },
+        "schema_frozen": {
+          "const": true
+        },
+        "offline_calibration_passed": {
+          "const": true
+        },
+        "shadow_coverage_passed": {
+          "const": true
+        },
+        "local_permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "local_permit_valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "interlock_verified": {
+          "const": true
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "edge_id",
+        "release_id",
+        "package_ref",
+        "signature_ref",
+        "schema_binding",
+        "model_version",
+        "calibration_version",
+        "feature_version",
+        "tokenizer_version",
+        "action_mapping_version",
+        "gate_evidence_refs",
+        "shadow_days",
+        "schema_frozen",
+        "offline_calibration_passed",
+        "shadow_coverage_passed",
+        "local_permit_ref",
+        "local_permit_valid_until",
+        "interlock_verified"
+      ],
+      "x-tenant-scope": "self",
+      "description": "字段声明不是门禁证据；可信发布与现场服务须核实签名、hash、版本、连续14天及冻结指标、岗位许可。两周期满不自动批准。"
+    },
+    "EdgeRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "employee_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "没有 AI 员工绑定时显式 null。"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "employee_id",
+        "task_id",
+        "trace_id",
+        "data_class",
+        "schema_version",
+        "deadline_at",
+        "edge_id",
+        "release_id",
+        "status",
+        "evidence_refs",
+        "updated_at"
+      ],
+      "x-tenant-scope": "self"
+    },
+    "Health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "enum": [
+            "security-gateway",
+            "control-plane",
+            "decision-service",
+            "hermes-runtime",
+            "manufacturing-core",
+            "tool-gateway",
+            "transaction-service",
+            "trajectory-eval"
+          ]
+        },
+        "live": {
+          "type": "boolean"
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "checked_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "policy_version": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "backlog": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "dependency_id": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "ready": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "dependency_id",
+              "ready"
+            ],
+            "x-tenant-scope": "inherited"
+          }
+        }
+      },
+      "required": [
+        "service_id",
+        "live",
+        "ready",
+        "checked_at",
+        "policy_version",
+        "backlog",
+        "dependencies"
+      ],
+      "x-tenant-scope": "global",
+      "description": "§14.2 运维健康基线；不暴露 tenant 或敏感数据。readiness 包含依赖、策略版本与积压；不可用返回503。",
+      "x-global-reason": "仅全局运行单元状态，不属于业务接口。",
+      "examples": [
+        {
+          "service_id": "control-plane",
+          "live": true,
+          "ready": true,
+          "checked_at": "2026-10-05T00:00:00Z",
+          "policy_version": "policy-demo",
+          "backlog": 0,
+          "dependencies": []
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "then": {
+            "properties": {
+              "live": {
+                "const": true
+              },
+              "policy_version": {
+                "$ref": "common-context.json#/$defs/Version"
+              },
+              "dependencies": {
+                "items": {
+                  "properties": {
+                    "ready": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 disconnected safety evaluation",
+  "x-schema-container": true,
+  "$defs": {
+    "Decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_status": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "mode": {
+          "enum": [
+            "shadow",
+            "restricted"
+          ]
+        },
+        "center_connected": {
+          "type": "boolean"
+        },
+        "checked_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "policy_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "permit_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "permit_valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "site_procedure_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy_signature_valid": {
+              "type": "boolean"
+            },
+            "policy_unexpired": {
+              "type": "boolean"
+            },
+            "permit_signature_valid": {
+              "type": "boolean"
+            },
+            "permit_unexpired": {
+              "type": "boolean"
+            },
+            "versions_match": {
+              "type": "boolean"
+            },
+            "local_persistence_available": {
+              "type": "boolean"
+            },
+            "scenario_approved": {
+              "type": "boolean"
+            },
+            "site_procedure_valid": {
+              "type": "boolean"
+            },
+            "hard_interlocks_passed": {
+              "type": "boolean"
+            },
+            "execution_budget_available": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "policy_signature_valid",
+            "policy_unexpired",
+            "permit_signature_valid",
+            "permit_unexpired",
+            "versions_match",
+            "local_persistence_available",
+            "scenario_approved",
+            "site_procedure_valid",
+            "hard_interlocks_passed",
+            "execution_budget_available"
+          ],
+          "x-tenant-scope": "inherited"
+        },
+        "autonomy_eligible": {
+          "type": "boolean"
+        },
+        "ai_new_actions_enabled": {
+          "type": "boolean"
+        },
+        "return_to_device_baseline": {
+          "type": "boolean"
+        },
+        "manual_queue_required": {
+          "type": "boolean"
+        },
+        "fallback_definition_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "control_safety_requires_center_response": {
+          "const": false
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "release_status",
+        "mode",
+        "center_connected",
+        "checked_at",
+        "policy_ref",
+        "policy_hash",
+        "policy_valid_until",
+        "permit_ref",
+        "permit_hash",
+        "permit_valid_until",
+        "site_procedure_ref",
+        "checks",
+        "autonomy_eligible",
+        "ai_new_actions_enabled",
+        "return_to_device_baseline",
+        "manual_queue_required",
+        "fallback_definition_ref",
+        "control_safety_requires_center_response",
+        "evidence_refs"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "为 A10 声明断连安全判定；restricted 分支仅表达后续阶段必要门禁，不由 P4 新接口启用。P4 端点固定 shadow。",
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "shadow"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              {
+                "properties": {
+                  "release_status": {
+                    "not": {
+                      "const": "ACTIVE"
+                    }
+                  }
+                },
+                "required": [
+                  "release_status"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "policy_signature_valid": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "policy_signature_valid"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "policy_unexpired": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "policy_unexpired"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "permit_signature_valid": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "permit_signature_valid"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "permit_unexpired": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "permit_unexpired"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "versions_match": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "versions_match"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "local_persistence_available": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "local_persistence_available"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "scenario_approved": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "scenario_approved"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "site_procedure_valid": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "site_procedure_valid"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "hard_interlocks_passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "hard_interlocks_passed"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              },
+              {
+                "properties": {
+                  "checks": {
+                    "properties": {
+                      "execution_budget_available": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "execution_budget_available"
+                    ]
+                  }
+                },
+                "required": [
+                  "checks"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "autonomy_eligible": {
+                "const": false
+              },
+              "ai_new_actions_enabled": {
+                "const": false
+              },
+              "return_to_device_baseline": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "autonomy_eligible": {
+                "const": true
+              }
+            },
+            "required": [
+              "autonomy_eligible"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "const": "restricted"
+              },
+              "release_status": {
+                "const": "ACTIVE"
+              },
+              "checks": {
+                "properties": {
+                  "policy_signature_valid": {
+                    "const": true
+                  },
+                  "policy_unexpired": {
+                    "const": true
+                  },
+                  "permit_signature_valid": {
+                    "const": true
+                  },
+                  "permit_unexpired": {
+                    "const": true
+                  },
+                  "versions_match": {
+                    "const": true
+                  },
+                  "local_persistence_available": {
+                    "const": true
+                  },
+                  "scenario_approved": {
+                    "const": true
+                  },
+                  "site_procedure_valid": {
+                    "const": true
+                  },
+                  "hard_interlocks_passed": {
+                    "const": true
+                  },
+                  "execution_budget_available": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ai_new_actions_enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "ai_new_actions_enabled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "autonomy_eligible": {
+                "const": true
+              },
+              "mode": {
+                "const": "restricted"
+              },
+              "return_to_device_baseline": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ShadowDecision": {
+      "allOf": [
+        {
+          "$ref": "p4-autonomy.json#/$defs/Decision"
+        },
+        {
+          "properties": {
+            "mode": {
+              "const": "shadow"
+            },
+            "ai_new_actions_enabled": {
+              "const": false
+            }
+          },
+          "required": [
+            "mode",
+            "ai_new_actions_enabled"
+          ]
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "policy_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "site_procedure_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "mode",
+        "policy_ref",
+        "permit_ref",
+        "site_procedure_ref",
+        "device_ref"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-autonomy-policy": {
+    "signed_policy_and_permit_valid_required": true,
+    "invalid_policy_permit_versions_or_persistence": "disable_ai_new_actions_and_return_device_baseline",
+    "expired_at_boundary": "now_greater_than_or_equal_to_valid_until",
+    "control_safety_depends_on_center_human_response": false,
+    "shadow_can_autonomously_execute": false,
+    "autonomy_does_not_bypass_guard": true,
+    "p4_endpoint_restricted_mode": false
+  }
+}

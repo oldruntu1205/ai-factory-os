@@ -1,0 +1,1387 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Factory P4 Edge 影子契约扩展",
+    "version": "3.0.0",
+    "description": "唯一上位依据 AI Factory V3.0.0 §8/§10/§12/§16/§17。仅新增 P4 接口；控制写路径物理/网络禁用；静态契约不构成14天运行验收。"
+  },
+  "paths": {
+    "/internal/v1/edge/releases": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_releases",
+        "summary": "创建 DRAFT 发布台账",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/release_Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/release_Create"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/edge/releases/{release_id}": {
+      "get": {
+        "operationId": "p4__get___api_v1_edge_releases__release_id_",
+        "summary": "查询带来源与版本的发布台账",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L0",
+        "x-operation-kind": "query",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/release_Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "release_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/edge/releases/{release_id}/transitions": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_releases__release_id__transitions",
+        "summary": "CAS 校验并持久化相邻状态转换；P4 不开放写口",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/release_Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "release_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/release_Transition"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/releases/{release_id}/gate-reopen": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_releases__release_id__gate_reopen",
+        "summary": "行为性变化使旧批准失效并建立替代 DRAFT 门禁记录",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/release_Reopen"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "release_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/release_Reopen"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/scenarios/freeze": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_scenarios_freeze",
+        "summary": "冻结场景 Schema 与多字段聚合规格",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/scenario_Specification"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/scenario_Specification"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/shadow-thresholds/freeze": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_shadow_thresholds_freeze",
+        "summary": "观察开始前冻结门槛，登记 hash 与审定证据",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/shadow_Threshold"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/shadow_Threshold"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/features/records": {
+      "post": {
+        "operationId": "p4__post___edge_v1_features_records",
+        "summary": "受控采集及特征引用校验，持久化输入证据",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/observation_FeatureRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/observation_FeatureRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/inferences/shadow": {
+      "post": {
+        "operationId": "p4__post___edge_v1_inferences_shadow",
+        "summary": "本地推理并保存比对引用，无设备动作",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/observation_InferenceRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/observation_InferenceRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/guards/evaluate": {
+      "post": {
+        "operationId": "p4__post___edge_v1_guards_evaluate",
+        "summary": "可信本地检查并生成有序 Guard 比对结果",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/guard_Result"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/guard_Request"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/shadow-reports": {
+      "post": {
+        "operationId": "p4__post___edge_v1_shadow_reports",
+        "summary": "保存生产影子实测报告；不接受报告自定门槛",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/shadow_Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/shadow_Report"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/shadow-reports/evaluate": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_shadow_reports_evaluate",
+        "summary": "读取已冻结门槛与实测并形成晋级证据，不自动批准",
+        "x-owner": "evidence",
+        "x-runtime-unit": "trajectory-eval",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/shadow_Evaluation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/shadow_EvaluateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/edge/shadow-reports/{report_id}": {
+      "get": {
+        "operationId": "p4__get___api_v1_edge_shadow_reports__report_id_",
+        "summary": "查询受控影子报告",
+        "x-owner": "evidence",
+        "x-runtime-unit": "trajectory-eval",
+        "x-interface-layer": "L0",
+        "x-operation-kind": "query",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/shadow_Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        ]
+      }
+    },
+    "/edge/v1/spool/entries": {
+      "post": {
+        "operationId": "p4__post___edge_v1_spool_entries",
+        "summary": "幂等持久化本地 spool；不执行设备动作",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/spool_Entry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/spool_Entry"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/spool/facts": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_spool_facts",
+        "summary": "重连逐事件去重补报事实，逐项持久化确认",
+        "x-owner": "evidence",
+        "x-runtime-unit": "trajectory-eval",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/spool_BatchAcknowledgement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/spool_Batch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/autonomy/evaluate": {
+      "post": {
+        "operationId": "p4__post___edge_v1_autonomy_evaluate",
+        "summary": "影子断连安全判定，保持设备基线",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/autonomy_ShadowDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/autonomy_Request"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/edge/device-fallbacks/freeze": {
+      "post": {
+        "operationId": "p4__post___internal_v1_edge_device_fallbacks_freeze",
+        "summary": "登记设备工程师逐设备定义的固定回退",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/fallback_Definition"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/fallback_Definition"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/v1/device-fallbacks/{device_ref}": {
+      "get": {
+        "operationId": "p4__get___edge_v1_device_fallbacks__device_ref_",
+        "summary": "查询本地已签名回退定义，无设备执行",
+        "x-owner": "edge",
+        "x-runtime-unit": "edge",
+        "x-interface-layer": "L5",
+        "x-operation-kind": "query",
+        "x-source": "§8.1–§8.4/§10/§12/§16/§17",
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "reference_tenant_acl",
+          "delegated_actor_scope",
+          "deadline",
+          "path_id_matches_payload_and_registry",
+          "trusted_evidence_lookup",
+          "registry_unavailable_reject",
+          "p4_physical_or_network_control_write_disabled",
+          "no_sensitive_content_in_logs"
+        ],
+        "security": [
+          {
+            "EdgeIdentity": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "受控事实或比对记录；HTTP 200 不代表设备动作执行或上线批准。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/fallback_Definition"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "device_ref",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommonContext": {
+        "$ref": "p0.openapi.json#/components/schemas/CommonContext"
+      },
+      "Error": {
+        "$ref": "p0.openapi.json#/components/schemas/Error"
+      },
+      "release_Record": {
+        "$ref": "../schemas/p4-release.json#/$defs/Record"
+      },
+      "release_Create": {
+        "$ref": "../schemas/p4-release.json#/$defs/Create"
+      },
+      "release_Transition": {
+        "$ref": "../schemas/p4-release.json#/$defs/Transition"
+      },
+      "release_Reopen": {
+        "$ref": "../schemas/p4-release.json#/$defs/Reopen"
+      },
+      "scenario_Specification": {
+        "$ref": "../schemas/p4-scenario.json#/$defs/Specification"
+      },
+      "shadow_Threshold": {
+        "$ref": "../schemas/p4-shadow.json#/$defs/Threshold"
+      },
+      "observation_FeatureRecord": {
+        "$ref": "../schemas/p4-observation.json#/$defs/FeatureRecord"
+      },
+      "observation_FeatureRequest": {
+        "$ref": "../schemas/p4-observation.json#/$defs/FeatureRequest"
+      },
+      "observation_InferenceRecord": {
+        "$ref": "../schemas/p4-observation.json#/$defs/InferenceRecord"
+      },
+      "observation_InferenceRequest": {
+        "$ref": "../schemas/p4-observation.json#/$defs/InferenceRequest"
+      },
+      "guard_Result": {
+        "$ref": "../schemas/p4-guard.json#/$defs/Result"
+      },
+      "guard_Request": {
+        "$ref": "../schemas/p4-guard.json#/$defs/Request"
+      },
+      "shadow_Report": {
+        "$ref": "../schemas/p4-shadow.json#/$defs/Report"
+      },
+      "shadow_Evaluation": {
+        "$ref": "../schemas/p4-shadow.json#/$defs/Evaluation"
+      },
+      "shadow_EvaluateRequest": {
+        "$ref": "../schemas/p4-shadow.json#/$defs/EvaluateRequest"
+      },
+      "spool_Entry": {
+        "$ref": "../schemas/p4-spool.json#/$defs/Entry"
+      },
+      "spool_BatchAcknowledgement": {
+        "$ref": "../schemas/p4-spool.json#/$defs/BatchAcknowledgement"
+      },
+      "spool_Batch": {
+        "$ref": "../schemas/p4-spool.json#/$defs/Batch"
+      },
+      "autonomy_ShadowDecision": {
+        "$ref": "../schemas/p4-autonomy.json#/$defs/ShadowDecision"
+      },
+      "autonomy_Request": {
+        "$ref": "../schemas/p4-autonomy.json#/$defs/Request"
+      },
+      "fallback_Definition": {
+        "$ref": "../schemas/p4-fallback.json#/$defs/Definition"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "$ref": "p0.openapi.json#/components/responses/Error400"
+      },
+      "Error401": {
+        "$ref": "p0.openapi.json#/components/responses/Error401"
+      },
+      "Error403": {
+        "$ref": "p0.openapi.json#/components/responses/Error403"
+      },
+      "Error409": {
+        "$ref": "p0.openapi.json#/components/responses/Error409"
+      },
+      "Error422": {
+        "$ref": "p0.openapi.json#/components/responses/Error422"
+      },
+      "Error429": {
+        "$ref": "p0.openapi.json#/components/responses/Error429"
+      },
+      "Error503": {
+        "$ref": "p0.openapi.json#/components/responses/Error503"
+      }
+    },
+    "parameters": {
+      "Context": {
+        "$ref": "p0.openapi.json#/components/parameters/Context"
+      }
+    },
+    "securitySchemes": {
+      "ExternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/ExternalIdentity"
+      },
+      "InternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/InternalIdentity"
+      },
+      "EdgeIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/EdgeIdentity"
+      }
+    }
+  },
+  "x-contract-extension": {
+    "stage": "p4",
+    "new_interface_layer": false,
+    "existing_p0_edge_operations_unchanged": true
+  },
+  "x-edge-constraints": {
+    "shadow_control_write_disable": "physical_or_network",
+    "shadow_side_effects": false,
+    "center_device_write": false,
+    "confidence_overrides_hard_checks": false,
+    "human_approval_overrides_interlock": false,
+    "center_replay_executed_action": false,
+    "p4_execution_permission": false
+  },
+  "x-upstream-alignment": {
+    "A09": "§17 line 463: shadow write impossible; hard checks precede confidence",
+    "A10": "§17 line 464: reconnect reports facts only; expired actions never execute",
+    "A12": "§17 line 466: frozen hardware/latency/error thresholds and continuous >=14d report"
+  }
+}

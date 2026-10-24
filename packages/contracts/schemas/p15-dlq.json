@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15DeadLetter",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "context": {
+      "$ref": "common-context.json"
+    },
+    "dlq_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "owner_unit": {
+      "$ref": "p15-lifecycle.json#/$defs/OwnerUnit"
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "OUTBOX",
+        "INBOX"
+      ]
+    },
+    "event": {
+      "$ref": "event-envelope.json"
+    },
+    "error": {
+      "$ref": "error.json"
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "replay_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "handling_status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "REPLAY_QUEUED",
+        "RESOLVED",
+        "MANUAL_REVIEW"
+      ]
+    },
+    "created_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "updated_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "operator_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "handling_reason_code": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resolution_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "record_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "publication_evidence_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "context",
+    "dlq_id",
+    "owner_unit",
+    "origin",
+    "event",
+    "error",
+    "attempt_count",
+    "replay_count",
+    "handling_status",
+    "created_at",
+    "updated_at",
+    "operator_ref",
+    "handling_reason_code",
+    "resolution_ref",
+    "record_version",
+    "publication_evidence_ref"
+  ],
+  "x-tenant-scope": "context",
+  "description": "保留原事件、脱敏错误原因和次数。RESOLVED 必须绑定原消费链确认或人工证据；关闭死信不等于业务成功。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "handling_status": {
+            "enum": [
+              "REPLAY_QUEUED"
+            ]
+          }
+        },
+        "required": [
+          "handling_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "operator_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "replay_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "handling_status": {
+            "enum": [
+              "RESOLVED"
+            ]
+          }
+        },
+        "required": [
+          "handling_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "operator_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "handling_reason_code": {
+            "$ref": "common-context.json#/$defs/CatalogValue"
+          },
+          "resolution_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      }
+    }
+  ],
+  "x-replay-policy": {
+    "same_event_id": true,
+    "same_tenant": true,
+    "same_aggregate_version": true,
+    "same_payload_hash": true,
+    "original_inbox_rules": true,
+    "replay_is_business_retry": false,
+    "executed_edge_action_replay": false,
+    "direct_projection_write": false,
+    "close_means_business_success": false,
+    "append_only_attempt_history": true,
+    "manual_resolution_requires_evidence": true,
+    "same_publication_evidence_ref": true,
+    "outbox_replay_reuses_original_outbox_row": true,
+    "outbox_replay_returns_to_original_producer": true
+  },
+  "x-storage-policy": {
+    "owner": "owner_unit",
+    "unique_key": [
+      "context.tenant_id",
+      "dlq_id"
+    ],
+    "same_owner_as_origin": true,
+    "original_event_immutable": true,
+    "purge_on_replay": false
+  },
+  "x-required-enforcement": [
+    "context_tenant_matches_event_and_authenticated_identity",
+    "owner_local_operator_permission",
+    "error_details_redacted",
+    "no_sensitive_body"
+  ]
+}

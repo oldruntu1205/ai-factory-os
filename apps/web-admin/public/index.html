@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V3 管理后台</title>
+<style>
+  /*
+   * 样式刻意写在页面里，不引外部 CSS 框架：
+   * 本机 npm registry 连通性未确认，引外部资源会让"能不能打开"依赖网络。
+   * 这是调试控制台，不是产品界面——**能打开、看得清、数据准**优先。
+   */
+  :root {
+    color-scheme: dark;
+    --bg: #0b0f16;
+    --panel: #141a24;
+    --panel2: #1b2331;
+    --line: #263041;
+    --fg: #e6edf7;
+    --dim: #94a3b8;
+    --accent: #5b9dff;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --unknown: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.55 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    background: var(--panel); display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .hint { color: var(--dim); font-size: 12px; }
+  main { padding: 18px 20px 60px; max-width: 1180px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=text] {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
+    border-radius: 7px; padding: 8px 10px; min-width: 320px; font: inherit;
+  }
+  button {
+    background: var(--accent); color: #06131f; border: 0; border-radius: 7px;
+    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  /* 结论徽标：**颜色只是辅助**，文字必须自己说清楚 */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .POSTED { background: rgba(52,211,153,.16); color: var(--ok); }
+  .NOT_POSTED { background: rgba(148,163,184,.16); color: var(--dim); }
+  .UNKNOWN { background: rgba(167,139,250,.18); color: var(--unknown); }
+  .NEEDS_HUMAN { background: rgba(251,191,36,.18); color: var(--warn); }
+  .FAILED { background: rgba(248,113,113,.18); color: var(--bad); }
+  .NOT_APPLICABLE { background: rgba(148,163,184,.14); color: var(--dim); }
+  .BLOCKED { background: rgba(248,113,113,.18); color: var(--bad); }
+  .DECIDABLE { background: rgba(52,211,153,.16); color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .reason { color: var(--fg); }
+  .src { color: var(--dim); font-size: 12px; }
+  .warnbox {
+    border-left: 3px solid var(--warn); background: rgba(251,191,36,.08);
+    padding: 9px 12px; border-radius: 0 7px 7px 0; margin: 10px 0; font-size: 13px;
+  }
+  .errbox {
+    border-left: 3px solid var(--bad); background: rgba(248,113,113,.08);
+    padding: 9px 12px; border-radius: 0 7px 7px 0; margin: 10px 0; font-size: 13px;
+  }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  .dim { color: var(--dim); }
+  .legend { font-size: 12px; color: var(--dim); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>V3 管理后台</h1>
+  <span class="hint">任务结论 / 批准可决定性 · 数据来自真实服务</span>
+  <span class="row" style="margin-left:auto">
+    <span id="health" class="hint">检测后端…</span>
+    <button class="ghost" id="refresh">刷新</button>
+  </span>
+</header>
+
+<main>
+  <div id="banner"></div>
+
+  <!-- ================= 任务结论 ================= -->
+  <section class="card">
+    <h2 style="margin:0 0 4px; font-size:15px">任务结论</h2>
+    <p class="hint" style="margin:0 0 10px">
+      输入 task_id 查询。<strong>本系统没有"任务列表"接口</strong>（只有按 id 取单条），
+      所以这里是精确查询而不是列表——这一点如实说明，不用假数据凑出一个列表。
+    </p>
+    <div class="row">
+      <input type="text" id="taskId" placeholder="task_id" value="task-demo" />
+      <button id="queryTask">查询</button>
+    </div>
+    <div id="taskResult"></div>
+  </section>
+
+  <!-- ================= 命令与权威回执 ================= -->
+  <section class="card">
+    <h2 style="margin:0 0 4px; font-size:15px">命令与权威回执</h2>
+    <p class="hint" style="margin:0 0 10px">
+      <strong>这里才是「已过账」唯一能成立的地方。</strong>
+      任务视图里的编排状态<strong>不等于</strong>账务事实；
+      只有权威回执说 <code>POSTED</code> 才算过账（上游 §6 / A14）。
+      命令与任务的关联（<code>command_refs</code>）属后续阶段、当前尚未接线，
+      所以这里按 command_id 直接查——不伪造那条关联。
+    </p>
+    <div class="row">
+      <input type="text" id="commandId" placeholder="command_id" />
+      <button id="queryCommand">查询</button>
+    </div>
+    <div id="commandResult"></div>
+  </section>
+
+  <!-- ================= 批准可决定性 ================= -->
+  <section class="card">
+    <h2 style="margin:0 0 4px; font-size:15px">批准可决定性</h2>
+    <p class="hint" style="margin:0 0 10px">
+      输入 approval_id 查询。<strong>决定必须记名</strong>：
+      未配置决定人时写路径关闭（返回 403 并说明如何开启），
+      后台<strong>不会</strong>自行借用某个身份替人做决定。
+    </p>
+    <div class="row">
+      <input type="text" id="approvalId" placeholder="approval_id" value="approval-demo" />
+      <button id="queryApproval">查询</button>
+    </div>
+    <div id="approvalResult"></div>
+  </section>
+
+  <!-- ================= 边缘发布台账 ================= -->
+  <section class="card">
+    <h2 style="margin:0 0 4px; font-size:15px">边缘发布台账</h2>
+    <p class="hint" style="margin:0 0 10px">
+      七态发布（<code>DRAFT → SCHEMA_FROZEN → CALIBRATED → SHADOW → APPROVED → ACTIVE → REVOKED</code>）。
+      规则：<strong>只能相邻推进一格</strong>；非终态可<strong>直接撤销</strong>到 <code>REVOKED</code>；
+      <code>REVOKED</code> 是终态。界面只列出合法下一步，<strong>真正把关在后端</strong>。
+    </p>
+    <div class="row">
+      <input type="text" id="releaseId" placeholder="release_id" value="release-demo" />
+      <button id="queryRelease">查询</button>
+    </div>
+    <div id="releaseResult"></div>
+  </section>
+
+  <!-- ================= UNKNOWN 对账（收敛记录） ================= -->
+  <section class="card">
+    <h2 style="margin:0 0 4px; font-size:15px">UNKNOWN 对账（收敛记录）</h2>
+    <p class="hint" style="margin:0 0 10px">
+      UNKNOWN 的含义是<strong>结果未知，必须查状态</strong>——不能换键重发、不能直接补偿。
+      这里显示<strong>查了什么、源系统怎么说、允许做什么、禁止做什么</strong>。
+      没有收敛记录时如实说明「尚未进入对账」，而不是当成错误。
+    </p>
+    <div class="row">
+      <input type="text" id="reconCommandId" placeholder="command_id" value="command-demo" />
+      <button id="queryRecon">查询</button>
+    </div>
+    <div id="reconResult"></div>
+  </section>
+</main>
+
+<script type="module">
+/**
+ * 页面的职责**只有**两件：发起请求、把服务端算好的结论画出来。
+ *
+ * 判定逻辑（"什么能显示已过账""什么算可决定"）在 `src/status.js` 与
+ * `src/approval.js` 里、由 Node 侧计算——**页面不重复实现一份**。
+ * 两份口径必然分叉，而分叉的表现是"同一屏两个数字互相矛盾"。
+ */
+
+const $ = (id) => document.getElementById(id);
+
+/**
+ * 所有输出都走这里转义。后端字段直接内插会有注入风险，
+ * "只给内部人看"不是理由（上游也没有把"内部"当作免于转义的条件）。
+ */
+const esc = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const badge = (outcome, label) =>
+  `<span class="badge ${esc(outcome)}">${esc(label)}</span>`;
+
+async function getJson(url) {
+  const response = await fetch(url, { headers: { accept: "application/json" } });
+  const body = await response.json().catch(() => ({ code: "BAD_JSON", message: "响应不是 JSON" }));
+  if (!response.ok) {
+    throw new Error(body.message || `${response.status}`);
+  }
+  return body;
+}
+
+function renderSources(sources) {
+  const rows = sources
+    .map(
+      (s) => `<tr>
+        <td class="src">${esc(s.name)}</td>
+        <td class="src">${esc(s.status ?? "—")}</td>
+        <td class="src">${esc(s.source ?? "—")}</td>
+        <td class="src">${esc(s.updatedAt ?? "—")}</td>
+      </tr>`,
+    )
+    .join("");
+  return `<table>
+    <thead><tr><th>来源</th><th>状态</th><th>状态来源</th><th>更新时间</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderTask(data) {
+  const d = data.display;
+
+  // **查不到就说查不到**，不要落到下面那条"尚未取得权威回执"的提示上——
+  // 那会让人以为"任务在跑、只是还没回执"，而事实是这条任务不存在。
+  if (data.taskError) {
+    return void ($("taskResult").innerHTML = `
+      <div class="row" style="margin-top:12px">${badge(d.outcome, d.label)}</div>
+      <div class="errbox">
+        ${esc(d.reason)}
+        <div class="hint" style="margin-top:4px">
+          服务返回：<code>${esc(data.taskError.code ?? "")}</code>
+          ${esc(data.taskError.message ?? "")}
+        </div>
+      </div>`);
+  }
+
+  let html = `
+    <div class="row" style="margin-top:12px">
+      ${badge(d.outcome, d.label)}
+      <span class="reason">${esc(d.reason)}</span>
+      ${d.authoritative ? '<span class="hint">（权威回执判定）</span>' : '<span class="hint">（尚无权威回执）</span>'}
+    </div>`;
+
+  if (d.evidenceRef) {
+    html += `<div class="hint" style="margin-top:6px">过账证据：<code>${esc(d.evidenceRef)}</code></div>`;
+  }
+
+  html += `<div style="margin-top:10px" class="dim">结论依据（
+    上游要求「显示需带状态来源和更新时间」）：</div>`;
+  html += renderSources(d.sources);
+
+  if (data.receipt) {
+    html += `<details style="margin-top:10px"><summary class="hint">权威回执原文</summary>
+      <pre style="overflow:auto; font-size:12px">${esc(JSON.stringify(data.receipt, null, 2))}</pre></details>`;
+  } else {
+    // 这条提示是**最重要的**：不给回执就绝不能说已过账
+    html += `<div class="warnbox">
+      尚未取得<strong>权威执行回执</strong>。编排状态为
+      <code>${esc(data.task?.status ?? "—")}</code>，它只表示"编排跑到哪一步"，
+      <strong>不表示账务已过账</strong>。
+    </div>`;
+  }
+
+  $("taskResult").innerHTML = html;
+}
+
+function renderCommand(data) {
+  const d = data.display;
+  let html = `
+    <div class="row" style="margin-top:12px">
+      ${badge(d.outcome, d.label)}
+      <span class="reason">${esc(d.reason)}</span>
+    </div>`;
+
+  if (data.commandError) {
+    html += `<div class="errbox">${esc(d.reason)}
+      <div class="hint" style="margin-top:4px">服务返回：<code>${esc(data.commandError.code ?? "")}</code></div>
+    </div>`;
+    $("commandResult").innerHTML = html;
+    return;
+  }
+
+  // 把服务端给的两个事实**并排**摆出来：业务成功 ≠ 已过账。
+  // 这两个值常被混为一谈，并排显示是最直接的澄清方式。
+  html += `<table style="margin-top:10px">
+    <thead><tr><th>服务端字段</th><th>值</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td class="src">status</td><td><code>${esc(data.command?.status ?? "—")}</code></td>
+          <td class="src">执行侧状态（不是账务事实）</td></tr>
+      <tr><td class="src">business_success</td><td><code>${esc(data.businessSuccess ?? "—")}</code></td>
+          <td class="src">业务是否成功（由权威回执驱动）</td></tr>
+      <tr><td class="src">posting_status</td><td><code>${esc(data.postingStatus ?? "—")}</code></td>
+          <td class="src"><strong>账务是否已过账</strong>（界面「已过账」只认这个）</td></tr>
+    </tbody></table>`;
+
+  html += `<div style="margin-top:10px" class="dim">结论依据：</div>`;
+  html += renderSources(d.sources);
+
+  if (data.receipt) {
+    html += `<details style="margin-top:10px"><summary class="hint">权威回执原文</summary>
+      <pre style="overflow:auto; font-size:12px">${esc(JSON.stringify(data.receipt, null, 2))}</pre></details>`;
+    if (data.receipt.authority_verified !== true) {
+      html += `<div class="warnbox">
+        <strong>该回执未经权威验证</strong>，因此不构成账务事实——
+        界面据此<strong>不会</strong>显示"已过账"。
+      </div>`;
+    }
+  } else {
+    html += `<div class="warnbox">
+      这条命令<strong>尚无权威回执</strong>。无论它的 status 是什么，
+      都<strong>不表示账务已过账</strong>——这正是上游 §6 要防的
+      "UI 显示成功而 ERP 未过账"。
+    </div>`;
+  }
+
+  $("commandResult").innerHTML = html;
+}
+
+function renderApproval(data) {
+  const a = data.assessment;
+  let html = `
+    <div class="row" style="margin-top:12px">
+      ${badge(a.decidability, a.label)}
+      <span class="hint">评估时刻 ${esc(data.assessedAt)}</span>
+    </div>`;
+
+  if (data.factError) {
+    html += `<div class="errbox">批准读取失败（${esc(data.factError.status)}）：${esc(data.factError.message ?? "")}</div>`;
+  }
+
+  const rows = a.checks
+    .map(
+      (c) => `<tr>
+        <td class="src">${esc(c.name)}</td>
+        <td>${badge(c.result === "PASS" ? "POSTED" : c.result === "FAIL" ? "FAILED" : c.result === "UNKNOWN" ? "UNKNOWN" : "NOT_APPLICABLE", c.result)}</td>
+        <td class="src">${esc(c.reason)}</td>
+      </tr>`,
+    )
+    .join("");
+  html += `<table><thead><tr><th>检查项</th><th>结论</th><th>说明</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  if (a.requiresData.length) {
+    html += `<div class="warnbox">
+      <strong>以下检查因缺少数据无法完成</strong>（结论记为「待核实」，<em>不得当作可批准</em>）：
+      <ul style="margin:6px 0 0 18px">${a.requiresData.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+    </div>`;
+  }
+
+  // ── 决定区 ─────────────────────────────────────────────────────────────
+  const write = window.__WRITE__ ?? { writeEnabled: false, approverActor: null };
+  html += `<h3 style="margin:16px 0 6px; font-size:14px">作出决定</h3>`;
+
+  if (!write.writeEnabled) {
+    html += `<div class="warnbox">
+      <strong>写路径已关闭。</strong>未配置决定人 —— 授权必须记名，
+      后台不会自行借用某个身份替人做决定。<br>
+      开启方式（仅本地演示）：启动时设
+      <code>V3_ADMIN_APPROVER_ACTOR=user-approver</code>。
+    </div>`;
+  } else {
+    // **必须披露决定人是谁**：否则界面看似"我批的"，实际是某个服务身份批的
+    html += `<div class="warnbox" style="border-color:var(--bad); background:rgba(248,113,113,.08)">
+      <strong>将以 <code>${esc(write.approverActor)}</code> 的身份记录这次决定</strong>
+      （租户 <code>${esc(write.approverTenant)}</code>）。
+      这不是"你"的身份 —— 界面显示的成就等于这个账号做的，请确认后再提交。
+    </div>
+    <div class="row">
+      <textarea id="decisionComment" rows="2" placeholder="说明（可选）。注意：这里写「同意/批准」不会被当作授权，会被拒绝。"
+        style="flex:1; min-width:320px; background:var(--panel2); border:1px solid var(--line);
+               color:var(--fg); border-radius:7px; padding:8px 10px; font:inherit"></textarea>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <textarea id="decisionBinding" rows="3" placeholder='绑定 JSON（必填）。平台没有「读取待决批准绑定」的接口（/fact 对未决定的批准返回 409 且不含绑定），所以由知情操作方提供；后端会拿它与该批准已记录的绑定比对，不符即拒绝。'
+        style="flex:1; min-width:320px; background:var(--panel2); border:1px solid var(--line);
+               color:var(--fg); border-radius:7px; padding:8px 10px; font:12px ui-monospace,Consolas,monospace"></textarea>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="approveYes">通过</button>
+      <button class="ghost" id="approveNo">否决</button>
+      <span class="hint">决定一旦成立<strong>不可改判</strong>（事实追加不可变）</span>
+    </div>`;
+  }
+  html += `<div id="decisionResult"></div>`;
+
+  $("approvalResult").innerHTML = html;
+
+  if (write.writeEnabled) {
+    $("approveYes").addEventListener("click", () => submitDecision(true));
+    $("approveNo").addEventListener("click", () => submitDecision(false));
+  }
+}
+
+/**
+ * 提交决定。
+ *
+ * `approved` 是**真布尔**（不是从文字里"推断"出来的）。
+ * 说明文字原样带上，由**服务端同一份判据**（`approval.js` 的
+ * `normalizeDecision`）决定是否拒绝——界面不做第二套判断。
+ */
+async function submitDecision(approved) {
+  const approvalId = $("approvalId").value.trim();
+  const comment = $("decisionComment")?.value ?? "";
+  const bindingText = $("decisionBinding")?.value?.trim() ?? "";
+
+  // 绑定必填：平台没有"读取待决批准绑定"的接口，只有知情操作方拿得到
+  let binding = null;
+  if (bindingText) {
+    try {
+      binding = JSON.parse(bindingText);
+    } catch {
+      $("decisionResult").innerHTML =
+        '<div class="errbox">绑定不是合法 JSON，请检查后再提交。</div>';
+      return;
+    }
+  }
+
+  $("decisionResult").innerHTML = '<p class="hint">提交中…</p>';
+  try {
+    const response = await fetch("/api/v3/approval-decision", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ approval_id: approvalId, approved, comment, binding }),
+    });
+    const result = await response.json();
+    if (result.ok) {
+      $("decisionResult").innerHTML = `<div class="warnbox" style="border-color:var(--ok); background:rgba(52,211,153,.08)">
+        已记录：<strong>${result.approved === true ? "通过" : "否决"}</strong>
+        （决定人 <code>${esc(result.actorId)}</code>）。重新查询以看最新事实。
+      </div>`;
+      setTimeout(queryApproval, 800);
+    } else {
+      $("decisionResult").innerHTML = `<div class="errbox">
+        <strong>被拒绝</strong>（${esc(result.status)} <code>${esc(result.code ?? "")}</code>）：${esc(result.reason ?? "")}
+        ${result.how ? `<div class="hint" style="margin-top:4px">${esc(result.how)}</div>` : ""}
+        ${result.required ? `<div class="hint" style="margin-top:4px">必需字段：<code>${esc(result.required.join(", "))}</code></div>` : ""}
+        ${result.detail ? `<details style="margin-top:6px"><summary class="hint">后端原始响应</summary>
+          <pre style="overflow:auto; font-size:12px">${esc(JSON.stringify(result.detail, null, 2))}</pre></details>` : ""}
+      </div>`;
+    }
+  } catch (error) {
+    $("decisionResult").innerHTML = `<div class="errbox">提交失败：${esc(error.message)}</div>`;
+  }
+}
+
+function showBanner(message, kind = "errbox") {
+  $("banner").innerHTML = message ? `<div class="${kind}">${esc(message)}</div>` : "";
+}
+
+/**
+ * 渲染发布台账。
+ *
+ * 两处**恒定安全声明**必须原样显示，且界面**不得**把它们渲染成"已开启"：
+ * `ai_new_actions_enabled` 恒 false、`control_write_disabled` 恒 true ——
+ * 上游把这两个固定为 const，放开要等 P5 现场许可与互锁。
+ * 界面若把它们显示成"已放开"，就是在**替上游承诺**它没承诺的事。
+ */
+function renderRelease(data) {
+  if (data.error) {
+    $("releaseResult").innerHTML =
+      `<div class="errbox">读取失败（${esc(data.error.status)}）：${esc(data.error.message ?? "")}</div>`;
+    return;
+  }
+  const r = data.release;
+
+  const timeline = data.timeline
+    .map((step) => {
+      const cls = step.current ? "badge NOT_POSTED" : step.passed ? "badge POSTED" : "badge UNKNOWN";
+      return `<span class="${cls}" style="margin-right:4px">${step.current ? "▶ " : ""}${esc(step.state)}</span>`;
+    })
+    .join("");
+
+  let html = `
+    <div class="row" style="margin-top:12px"><span class="hint">${timeline}</span></div>
+    <table>
+      <tbody>
+        <tr><td class="src">release_id</td><td>${esc(r.release_id)}</td></tr>
+        <tr><td class="src">当前状态</td><td><strong>${esc(r.status)}</strong>${
+          data.isTerminal ? ' <span class="hint">（终态，不能再推进）</span>' : ""
+        }</td></tr>
+        <tr><td class="src">记录版本</td><td>${esc(String(r.record_version))}</td></tr>
+        <tr><td class="src">结论来源</td><td>${esc(r.status_source)} <span class="hint">${esc(r.updated_at)}</span></td></tr>
+        <tr><td class="src">批准引用</td><td>${
+          r.approval_ref ? esc(r.approval_ref) : '<span class="hint">无（只有 APPROVED 才可能带）</span>'
+        }</td></tr>
+        <tr><td class="src">批准是否仍然有效</td><td>${
+          r.approval_current ? "是" : '<span class="hint">否</span>'
+        }</td></tr>
+      </tbody>
+    </table>`;
+
+  // ── 恒定安全声明：**照实显示，并说明它不会随状态推进而放开** ──
+  html += `<div class="warnbox">
+    <strong>两项安全声明恒定不变</strong>（不随状态推进放开）：
+    <ul style="margin:6px 0 0 18px">
+      <li><code>ai_new_actions_enabled</code> = <strong>${esc(String(r.ai_new_actions_enabled))}</strong>
+          —— P4 影子阶段<strong>永不放开</strong>新动作</li>
+      <li><code>control_write_disabled</code> = <strong>${esc(String(r.control_write_disabled))}</strong>
+          —— 控制口写入始终禁用</li>
+    </ul>
+    <div class="hint" style="margin-top:4px">放开要等 P5 的现场许可与互锁；界面不会把它们显示成已放开。</div>
+  </div>`;
+
+  // ── 推进区 ──
+  if (data.legalNext.length === 0) {
+    html += `<div class="warnbox">当前状态 <strong>${esc(r.status)}</strong> 没有合法下一步（终态）。</div>`;
+  } else {
+    const buttons = data.legalNext
+      .map((state) => {
+        const terminal = state === "REVOKED";
+        return `<button class="${terminal ? "ghost" : ""}" data-release="${esc(state)}">${
+          terminal ? "撤销 → REVOKED" : `推进 → ${esc(state)}`
+        }</button>`;
+      })
+      .join(" ");
+    html += `
+      <h3 style="margin:16px 0 6px; font-size:14px">推进（只能按顺序相邻一格，或直接撤销）</h3>
+      <div class="row">${buttons}</div>
+      <div class="hint" style="margin-top:6px">
+        请求里的 <code>to</code> 可被手改，所以<strong>跳态与终态出发由后端拒绝</strong>
+        （<code>EDGE_RELEASE_TRANSITION_NOT_ALLOWED</code>）；<code>from</code> 取服务端当前状态，不采信客户端。
+      </div>`;
+  }
+  html += `<div id="releaseActionResult"></div>`;
+  $("releaseResult").innerHTML = html;
+
+  for (const button of $("releaseResult").querySelectorAll("button[data-release]")) {
+    button.addEventListener("click", () => submitRelease(button.dataset.release, button));
+  }
+}
+
+async function submitRelease(target, button) {
+  const releaseId = $("releaseId").value.trim();
+  button.disabled = true;
+  $("releaseActionResult").innerHTML = '<p class="hint">提交中…</p>';
+  try {
+    const response = await fetch("/api/v3/release-transition", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ release_id: releaseId, to: target }),
+    });
+    const result = await response.json();
+    if (result.ok) {
+      $("releaseActionResult").innerHTML =
+        `<div class="warnbox" style="border-color:var(--ok); background:rgba(52,211,153,.08)">
+          已记录：<strong>${esc(result.reason)}</strong>。重新查询以看最新状态。
+        </div>`;
+      setTimeout(queryRelease, 700);
+    } else {
+      $("releaseActionResult").innerHTML = `<div class="errbox">
+        <strong>被拒绝</strong>（${esc(result.status)} <code>${esc(result.code ?? "")}</code>）：${esc(result.reason ?? "")}
+        ${result.detail ? `<details style="margin-top:6px"><summary class="hint">后端原始响应</summary>
+          <pre style="overflow:auto; font-size:12px">${esc(JSON.stringify(result.detail, null, 2))}</pre></details>` : ""}
+      </div>`;
+    }
+  } catch (error) {
+    $("releaseActionResult").innerHTML = `<div class="errbox">提交失败：${esc(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function queryRelease() {
+  const releaseId = $("releaseId").value.trim();
+  $("releaseResult").innerHTML = '<p class="hint">查询中…</p>';
+  try {
+    $("releaseResult").innerHTML = "";
+    renderRelease(await getJson(`/api/v3/release?release_id=${encodeURIComponent(releaseId)}`));
+  } catch (error) {
+    $("releaseResult").innerHTML = `<div class="errbox">查询失败：${esc(error.message)}</div>`;
+  }
+}
+
+/**
+ * 渲染 UNKNOWN 收敛（对账）记录。
+ *
+ * ## 三个必须显眼的东西
+ *
+ * 1. **禁止动作放最前** —— 它是**防误操作的清单**（换新键重发、直接补偿…）。
+ *    上游把这几条定成恒定输出，正是为了让验收能断言「它一直在」。
+ * 2. **源系统结论**与**是否查证过** —— 没查证过的结论不能当依据。
+ * 3. **重试要用同一幂等键** + **必须重新走执行前复核**
+ *    —— 复用旧批准结论是被明确禁止的。
+ */
+function renderRecon(data) {
+  if (data.error) {
+    $("reconResult").innerHTML =
+      `<div class="errbox">读取失败（${esc(data.error.status)}）：${esc(data.error.message ?? "")}</div>`;
+    return;
+  }
+
+  // 没有收敛记录 = 一种**状态**，不是错误
+  if (data.noRecord) {
+    $("reconResult").innerHTML = `<div class="warnbox">
+      <strong>尚未进入对账。</strong>该命令没有收敛记录（后端 <code>${esc(data.code ?? "")}</code>）。
+      <div class="hint" style="margin-top:4px">
+        这说明它还<strong>没有</strong>因为超时／失联而进入 UNKNOWN 收敛。
+        一旦进入，这里会列出源系统结论与禁止动作。
+      </div>
+    </div>`;
+    return;
+  }
+
+  const r = data.record ?? {};
+  const outcomeCls =
+    data.sourceOutcome === "SUCCEEDED" ? "POSTED"
+    : data.sourceOutcome === "FAILED" ? "FAILED"
+    : data.sourceOutcome === "NOT_EXECUTED" ? "NOT_POSTED"
+    : "UNKNOWN";
+
+  let html = `
+    <div class="row" style="margin-top:12px">
+      ${badge(outcomeCls, `源系统结论：${data.sourceOutcome ?? "未知"}`)}
+      <span class="hint">查证次数 ${esc(String(data.queryAttempts ?? "—"))}</span>
+    </div>
+    <table><tbody>
+      <tr><td class="src">是否查证过源系统</td><td>${
+        data.queryVerified === true ? "是" : '<span class="hint">否（结论不可当依据）</span>'
+      }</td></tr>
+      <tr><td class="src">下一步动作</td><td><strong>${esc(data.nextAction ?? "—")}</strong></td></tr>
+      <tr><td class="src">结论来源</td><td>${esc(r.status_source ?? "—")} <span class="hint">${esc(r.recorded_at ?? "")}</span></td></tr>
+    </tbody></table>`;
+
+  // ① 禁止动作：**最显眼**
+  if (data.prohibited.length) {
+    html += `<div class="errbox">
+      <strong>禁止动作（恒定清单，不得绕过）</strong>
+      <ul style="margin:6px 0 0 18px">${data.prohibited.map((a) => `<li><code>${esc(a)}</code></li>`).join("")}</ul>
+      <div class="hint" style="margin-top:4px">
+        这些不是建议——后端对它们有恒定判定，界面也不会提供对应按钮。
+      </div>
+    </div>`;
+  }
+
+  // ② 候选动作
+  if (data.candidates.length) {
+    html += `<h3 style="margin:14px 0 6px; font-size:14px">候选动作</h3>
+      <table><thead><tr><th>动作</th><th>说明</th></tr></thead><tbody>
+      ${data.candidates
+        .map((c) => {
+          const name = typeof c === "string" ? c : c.action ?? c.action_ref ?? JSON.stringify(c);
+          const note = typeof c === "string" ? "" : c.reason ?? c.note ?? "";
+          return `<tr><td><code>${esc(name)}</code></td><td class="src">${esc(note)}</td></tr>`;
+        })
+        .join("")}
+      </tbody></table>`;
+  }
+
+  // ③ 重试约束
+  if (data.retryKey || data.retryNeedsFreshReview !== null) {
+    html += `<div class="warnbox">
+      <strong>重试约束</strong>
+      <ul style="margin:6px 0 0 18px">
+        <li>必须使用<strong>同一幂等键</strong>：<code>${esc(data.retryKey ?? "—")}</code>
+            （换新键重发被明确禁止）</li>
+        <li>必须<strong>重新走执行前复核</strong>：${
+          data.retryNeedsFreshReview === true ? "是（不得复用旧批准结论）" : "—"
+        }</li>
+      </ul>
+    </div>`;
+  }
+
+  $("reconResult").innerHTML = html;
+}
+
+async function queryRecon() {
+  const commandId = $("reconCommandId").value.trim();
+  if (!commandId) {
+    $("reconResult").innerHTML = '<div class="errbox">请先填 command_id。</div>';
+    return;
+  }
+  $("reconResult").innerHTML = '<p class="hint">查询中…</p>';
+  try {
+    renderRecon(await getJson(`/api/v3/reconciliation?command_id=${encodeURIComponent(commandId)}`));
+  } catch (error) {
+    $("reconResult").innerHTML = `<div class="errbox">查询失败：${esc(error.message)}</div>`;
+  }
+}
+
+async function loadHealth() {
+  try {
+    const data = await getJson("/api/v3/health");
+    // **写路径状态留在页面上**：决定区要据此显示"能不能批、以谁的身份批"。
+    window.__WRITE__ = data.admin ?? { writeEnabled: false };
+    const parts = Object.entries(data.backends).map(
+      ([name, info]) =>
+        `<span style="color:${info.alive ? "var(--ok)" : "var(--bad)"}">${esc(name)}${info.alive ? " ●" : " ○"}</span>`,
+    );
+    const writeState = data.admin?.writeEnabled
+      ? `<span style="color:var(--warn)">写路径：开（决定人 ${esc(data.admin.approverActor)}）</span>`
+      : `<span>写路径：关（未配置决定人）</span>`;
+    // 这两处插值**刻意不转义**，理由如下（不是遗忘）：
+    //   - `parts.join(" ")` 只含 `Object.entries(data.backends)` 的**键名**
+    //     （服务名常量）与拼接的**字面量**，不含后端可控文本；
+    //   - `writeState` 是**本函数上方构造的 HTML 片段**，其中唯一的数据插值
+    //     `data.admin.approverActor` **已在构造处 `esc(...)` 过**。
+    // 因此这里改用 `.textContent` 反而会显示标签。改动此处前请先确认这两条。
+    $("health").innerHTML = `后端 8102/8107/8105：${parts.join(" ")} · ${writeState}`;
+    const dead = Object.entries(data.backends).filter(([, i]) => !i.alive).map(([n]) => n);
+    showBanner(
+      dead.length
+        ? `后端未就绪：${dead.join("、")}。请先启动 V3 服务集群（见 README 的运行方式）。`
+        : "",
+      "warnbox",
+    );
+  } catch (error) {
+    $("health").textContent = "后端状态未知";
+    showBanner(`无法连接后台服务：${error.message}`);
+  }
+}
+
+async function queryTask() {
+  const taskId = $("taskId").value.trim();
+  if (!taskId) return;
+  $("queryTask").disabled = true;
+  $("taskResult").innerHTML = '<p class="hint" style="margin-top:12px">查询中…</p>';
+  try {
+    renderTask(await getJson(`/api/v3/task?task_id=${encodeURIComponent(taskId)}`));
+  } catch (error) {
+    $("taskResult").innerHTML = `<div class="errbox">查询失败：${esc(error.message)}</div>`;
+  } finally {
+    $("queryTask").disabled = false;
+  }
+}
+
+async function queryApproval() {
+  const approvalId = $("approvalId").value.trim();
+  if (!approvalId) return;
+  $("queryApproval").disabled = true;
+  $("approvalResult").innerHTML = '<p class="hint" style="margin-top:12px">查询中…</p>';
+  try {
+    renderApproval(await getJson(`/api/v3/approval?approval_id=${encodeURIComponent(approvalId)}`));
+  } catch (error) {
+    $("approvalResult").innerHTML = `<div class="errbox">查询失败：${esc(error.message)}</div>`;
+  } finally {
+    $("queryApproval").disabled = false;
+  }
+}
+
+async function queryCommand() {
+  const commandId = $("commandId").value.trim();
+  if (!commandId) return;
+  $("queryCommand").disabled = true;
+  $("commandResult").innerHTML = '<p class="hint" style="margin-top:12px">查询中…</p>';
+  try {
+    renderCommand(await getJson(`/api/v3/command?command_id=${encodeURIComponent(commandId)}`));
+  } catch (error) {
+    $("commandResult").innerHTML = `<div class="errbox">查询失败：${esc(error.message)}</div>`;
+  } finally {
+    $("queryCommand").disabled = false;
+  }
+}
+
+$("queryTask").addEventListener("click", queryTask);
+$("queryCommand").addEventListener("click", queryCommand);
+$("queryApproval").addEventListener("click", queryApproval);
+$("taskId").addEventListener("keydown", (e) => e.key === "Enter" && queryTask());
+$("commandId").addEventListener("keydown", (e) => e.key === "Enter" && queryCommand());
+$("approvalId").addEventListener("keydown", (e) => e.key === "Enter" && queryApproval());
+$("queryRelease").addEventListener("click", queryRelease);
+$("releaseId").addEventListener("keydown", (e) => e.key === "Enter" && queryRelease());
+$("queryRecon").addEventListener("click", queryRecon);
+$("reconCommandId").addEventListener("keydown", (e) => e.key === "Enter" && queryRecon());
+$("refresh").addEventListener("click", () => {
+  loadHealth();
+  if ($("taskId").value.trim()) queryTask();
+  if ($("commandId").value.trim()) queryCommand();
+});
+
+loadHealth();
+queryTask();
+</script>
+</body>
+</html>

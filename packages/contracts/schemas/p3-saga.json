@@ -1,0 +1,1492 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3SagaStepLedgerAndCompensation",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "CreateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "plan_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "plan_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "plan_ref",
+        "plan_hash",
+        "idempotency_key"
+      ],
+      "x-tenant-scope": "context",
+      "description": "可信预校验计划；L2 服务端展开步骤账，不由模型指定状态。"
+    },
+    "CompensationPermission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/CatalogValue"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "permission_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "policy_evaluation_ref",
+        "approval_ref",
+        "action_scope",
+        "valid_until",
+        "permission_evidence_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "保存可补偿权限引用；执行时仍重新取得当前 Policy/批准/权限/对象版本复核。"
+    },
+    "Branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/CatalogValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permission": {
+          "anyOf": [
+            {
+              "$ref": "p3-saga.json#/$defs/CompensationPermission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_required": {
+          "type": "boolean"
+        },
+        "evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "action_ref",
+        "permission",
+        "manual_required",
+        "evidence_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "manual_required": {
+                "const": false
+              }
+            },
+            "required": [
+              "manual_required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action_ref": {
+                "$ref": "common-context.json#/$defs/CatalogValue"
+              },
+              "permission": {
+                "$ref": "p3-saga.json#/$defs/CompensationPermission"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "StageBranches": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shipped": {
+          "$ref": "p3-saga.json#/$defs/Branch"
+        },
+        "not_shipped": {
+          "$ref": "p3-saga.json#/$defs/Branch"
+        },
+        "posted": {
+          "$ref": "p3-saga.json#/$defs/Branch"
+        },
+        "not_posted": {
+          "$ref": "p3-saga.json#/$defs/Branch"
+        }
+      },
+      "required": [
+        "shipped",
+        "not_shipped",
+        "posted",
+        "not_posted"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "四个阶段分支必须显式存在；action_ref 是冻结目录引用。未冻结或不适用不得编造动作，须 manual_required=true。"
+    },
+    "Compensation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "original_command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "action_ref": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "permission": {
+          "$ref": "p3-saga.json#/$defs/CompensationPermission"
+        },
+        "review_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_status": {
+          "$ref": "state-machines.json#/$defs/Command"
+        },
+        "authority_receipt": {
+          "anyOf": [
+            {
+              "$ref": "p15-receipt.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "original_command_id",
+        "command_id",
+        "idempotency_key",
+        "action_ref",
+        "permission",
+        "review_ref",
+        "command_status",
+        "authority_receipt",
+        "manual_queue_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "补偿是全新受控业务命令：自己的 command_id/幂等键/批准/复核/权威回执。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "authority_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "SUCCEEDED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "enum": [
+                  "FAILED",
+                  "MANUAL_REVIEW"
+                ]
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "UNKNOWN"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "authority_receipt": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "step_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "domain": {
+          "enum": [
+            "PHYSICAL",
+            "ACCOUNTING"
+          ]
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pre_state_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "pre_state_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_status": {
+          "$ref": "state-machines.json#/$defs/Command"
+        },
+        "started": {
+          "type": "boolean"
+        },
+        "execution_credential": {
+          "anyOf": [
+            {
+              "$ref": "p3-execution.json#/$defs/Credential"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authority_receipt": {
+          "anyOf": [
+            {
+              "$ref": "p15-receipt.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compensation_supported": {
+          "type": "boolean"
+        },
+        "compensable_action_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/CatalogValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compensation_permission": {
+          "anyOf": [
+            {
+              "$ref": "p3-saga.json#/$defs/CompensationPermission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_shipped": {
+          "type": "boolean"
+        },
+        "is_posted": {
+          "type": "boolean"
+        },
+        "stage_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "branches": {
+          "$ref": "p3-saga.json#/$defs/StageBranches"
+        },
+        "selected_branch": {
+          "enum": [
+            "shipped",
+            "not_shipped",
+            "posted",
+            "not_posted"
+          ]
+        },
+        "compensation": {
+          "anyOf": [
+            {
+              "$ref": "p3-saga.json#/$defs/Compensation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compensation_required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context",
+        "step_id",
+        "domain",
+        "object_id",
+        "expected_version",
+        "pre_state_ref",
+        "pre_state_hash",
+        "command_id",
+        "command_key",
+        "command_status",
+        "started",
+        "execution_credential",
+        "authority_receipt",
+        "compensation_supported",
+        "compensable_action_ref",
+        "compensation_permission",
+        "is_shipped",
+        "is_posted",
+        "stage_evidence_ref",
+        "branches",
+        "selected_branch",
+        "compensation",
+        "manual_queue_ref",
+        "compensation_required"
+      ],
+      "x-tenant-scope": "context",
+      "description": "domain 与 selected_branch 为分类标签，不增加 Command/Saga 状态。前置事实只保存受控引用与哈希。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "started": {
+                "const": false
+              }
+            },
+            "required": [
+              "started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "command_status": {
+                "enum": [
+                  "ACCEPTED",
+                  "AUTHORIZED"
+                ]
+              },
+              "execution_credential": {
+                "type": "null"
+              },
+              "authority_receipt": {
+                "type": "null"
+              },
+              "compensation": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "started": {
+                "const": true
+              }
+            },
+            "required": [
+              "started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "execution_credential": {
+                "$ref": "p3-execution.json#/$defs/Credential"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "UNKNOWN"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensation": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "started": {
+                "const": true
+              },
+              "authority_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "SUCCEEDED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "compensation_supported": {
+                "const": true
+              }
+            },
+            "required": [
+              "compensation_supported"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensable_action_ref": {
+                "$ref": "common-context.json#/$defs/CatalogValue"
+              },
+              "compensation_permission": {
+                "$ref": "p3-saga.json#/$defs/CompensationPermission"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "compensation_supported": {
+                "const": false
+              }
+            },
+            "required": [
+              "compensation_supported"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensable_action_ref": {
+                "type": "null"
+              },
+              "compensation_permission": {
+                "type": "null"
+              },
+              "compensation": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "PHYSICAL"
+              },
+              "is_shipped": {
+                "const": true
+              }
+            },
+            "required": [
+              "domain",
+              "is_shipped"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_branch": {
+                "const": "shipped"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "PHYSICAL"
+              },
+              "is_shipped": {
+                "const": false
+              }
+            },
+            "required": [
+              "domain",
+              "is_shipped"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_branch": {
+                "const": "not_shipped"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "ACCOUNTING"
+              },
+              "is_posted": {
+                "const": true
+              }
+            },
+            "required": [
+              "domain",
+              "is_posted"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_branch": {
+                "const": "posted"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "ACCOUNTING"
+              },
+              "is_posted": {
+                "const": false
+              }
+            },
+            "required": [
+              "domain",
+              "is_posted"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_branch": {
+                "const": "not_posted"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "compensation_required": {
+                "const": true
+              },
+              "compensation_supported": {
+                "const": false
+              }
+            },
+            "required": [
+              "compensation_required",
+              "compensation_supported"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "started": {
+                "const": false
+              }
+            },
+            "required": [
+              "started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensation_required": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "compensation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "compensation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "command_status": {
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED"
+                ]
+              },
+              "started": {
+                "const": true
+              },
+              "authority_receipt": {
+                "$ref": "p15-receipt.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selected_branch": {
+                "const": "shipped"
+              },
+              "compensation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "selected_branch",
+              "compensation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "branches": {
+                "properties": {
+                  "shipped": {
+                    "properties": {
+                      "manual_required": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "manual_required"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selected_branch": {
+                "const": "not_shipped"
+              },
+              "compensation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "selected_branch",
+              "compensation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "branches": {
+                "properties": {
+                  "not_shipped": {
+                    "properties": {
+                      "manual_required": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "manual_required"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selected_branch": {
+                "const": "posted"
+              },
+              "compensation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "selected_branch",
+              "compensation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "branches": {
+                "properties": {
+                  "posted": {
+                    "properties": {
+                      "manual_required": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "manual_required"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selected_branch": {
+                "const": "not_posted"
+              },
+              "compensation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "selected_branch",
+              "compensation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "branches": {
+                "properties": {
+                  "not_posted": {
+                    "properties": {
+                      "manual_required": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "manual_required"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "EXECUTING"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensation": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "View": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "saga_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Saga"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "p3-saga.json#/$defs/Step"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "recovery_order": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "domain": {
+                  "const": "PHYSICAL"
+                },
+                "step_refs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common-context.json#/$defs/Identifier"
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "domain",
+                "step_refs"
+              ],
+              "x-tenant-scope": "inherited"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "domain": {
+                  "const": "ACCOUNTING"
+                },
+                "step_refs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common-context.json#/$defs/Identifier"
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "domain",
+                "step_refs"
+              ],
+              "x-tenant-scope": "inherited"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "physical_verified_and_restored": {
+          "type": "boolean"
+        },
+        "physical_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "accounting_recovery_started": {
+          "type": "boolean"
+        },
+        "all_compensation_receipts_verified": {
+          "type": "boolean"
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "status_source": {
+          "const": "transaction-service"
+        }
+      },
+      "required": [
+        "context",
+        "saga_id",
+        "status",
+        "steps",
+        "recovery_order",
+        "physical_verified_and_restored",
+        "physical_evidence_refs",
+        "accounting_recovery_started",
+        "all_compensation_receipts_verified",
+        "manual_queue_ref",
+        "record_version",
+        "updated_at",
+        "status_source"
+      ],
+      "x-tenant-scope": "context",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "accounting_recovery_started": {
+                "const": true
+              }
+            },
+            "required": [
+              "accounting_recovery_started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "physical_verified_and_restored": {
+                "const": true
+              },
+              "physical_evidence_refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "common-context.json#/$defs/Identifier"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "physical_verified_and_restored": {
+                "const": true
+              }
+            },
+            "required": [
+              "physical_verified_and_restored"
+            ]
+          },
+          "then": {
+            "properties": {
+              "physical_evidence_refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "common-context.json#/$defs/Identifier"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "COMPENSATED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "all_compensation_receipts_verified": {
+                "const": true
+              },
+              "physical_verified_and_restored": {
+                "const": true
+              },
+              "physical_evidence_refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "common-context.json#/$defs/Identifier"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "manual_queue_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "MANUAL_REVIEW"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "all_compensation_receipts_verified": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "steps": {
+                "contains": {
+                  "properties": {
+                    "compensation": {
+                      "type": "object",
+                      "properties": {
+                        "command_status": {
+                          "enum": [
+                            "FAILED",
+                            "MANUAL_REVIEW"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "command_status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "compensation"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "steps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "MANUAL_REVIEW"
+              },
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "all_compensation_receipts_verified": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "COMPENSATED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "steps": {
+                "items": {
+                  "properties": {
+                    "command_status": {
+                      "enum": [
+                        "ACCEPTED",
+                        "AUTHORIZED",
+                        "SUCCEEDED",
+                        "FAILED"
+                      ]
+                    },
+                    "compensation": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "allOf": [
+                            {
+                              "$ref": "p3-saga.json#/$defs/Compensation"
+                            },
+                            {
+                              "properties": {
+                                "command_status": {
+                                  "const": "SUCCEEDED"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "steps": {
+                "items": {
+                  "properties": {
+                    "command_status": {
+                      "const": "SUCCEEDED"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "COMPENSATED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "steps": {
+                "items": {
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "compensation_required": {
+                            "const": true
+                          }
+                        },
+                        "required": [
+                          "compensation_required"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "compensation": {
+                            "allOf": [
+                              {
+                                "$ref": "p3-saga.json#/$defs/Compensation"
+                              },
+                              {
+                                "properties": {
+                                  "command_status": {
+                                    "const": "SUCCEEDED"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "steps": {
+                "contains": {
+                  "properties": {
+                    "compensation_required": {
+                      "const": true
+                    },
+                    "compensation_supported": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "compensation_required",
+                    "compensation_supported"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "steps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "MANUAL_REVIEW"
+              },
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "all_compensation_receipts_verified": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CompensationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "saga_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "step_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "context",
+        "saga_id",
+        "expected_record_version",
+        "step_id",
+        "lease_ref",
+        "fencing_token"
+      ],
+      "x-tenant-scope": "context",
+      "description": "先核实既有命令及阶段，再经规范化/策略/批准创建新补偿命令；UNKNOWN 先收敛。"
+    },
+    "Accepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "saga_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "business_success": {
+          "const": false
+        },
+        "posting_status": {
+          "const": "NOT_CONFIRMED"
+        },
+        "status_url": {
+          "type": "string",
+          "pattern": "^/internal/v1/sagas/[A-Za-z0-9._:-]+$"
+        }
+      },
+      "required": [
+        "context",
+        "saga_id",
+        "status",
+        "business_success",
+        "posting_status",
+        "status_url"
+      ],
+      "x-tenant-scope": "context"
+    }
+  },
+  "x-saga-policy": {
+    "owner": "transaction-service",
+    "states_source": "state-machines.json#/$defs/Saga",
+    "core_flow": "RUNNING → SUCCEEDED；失败后COMPENSATING → COMPENSATED或MANUAL_REVIEW",
+    "cross_system_atomicity": false,
+    "ledger_before_dispatch": true,
+    "step_required_facts": [
+      "pre_state_ref",
+      "pre_state_hash",
+      "command_key",
+      "execution_credential",
+      "compensable_action_ref",
+      "compensation_permission"
+    ],
+    "recovery_domain_order": [
+      "PHYSICAL",
+      "ACCOUNTING"
+    ],
+    "physical_systems": [
+      "MES",
+      "WMS"
+    ],
+    "accounting_system": "ERP",
+    "accounting_requires": "verify_and_restore_physical_state_with_authority_evidence",
+    "no_physical_steps_requires_verified_not_applicable_evidence": true,
+    "stage_branches": [
+      "shipped",
+      "not_shipped",
+      "posted",
+      "not_posted"
+    ],
+    "stage_source": "authority_system_not_task_projection",
+    "unknown_direct_compensation": false,
+    "unfrozen_or_unsupported_compensation": "MANUAL_REVIEW",
+    "compensation_failure": "MANUAL_REVIEW",
+    "compensation_unknown": "query_then_same_key_or_MANUAL_REVIEW",
+    "COMPENSATED_requires": "every_required_compensation_verified_SUCCEEDED_and_no_unknown",
+    "success_of_original_command_is_compensation_evidence": false,
+    "compensation_is_new_business_action": true,
+    "new_compensation_command_and_key": true,
+    "compensation_is_database_rollback": false,
+    "compensation_uses_same_controlled_pipeline": true,
+    "compensation_receipt_source": "p15-receipt.json",
+    "restore_order_and_step_refs_verified_at_runtime": true,
+    "failure_queue_persisted_same_owner_transaction": true
+  }
+}

@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15Inbox",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "context": {
+      "$ref": "common-context.json"
+    },
+    "consumer_unit": {
+      "$ref": "p15-lifecycle.json#/$defs/OwnerUnit"
+    },
+    "event": {
+      "$ref": "event-envelope.json"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "RECEIVED",
+        "APPLIED",
+        "LATE",
+        "GAP",
+        "DLQ"
+      ]
+    },
+    "applied_version_before": {
+      "type": "integer",
+      "minimum": -1
+    },
+    "applied_version_after": {
+      "type": "integer",
+      "minimum": -1
+    },
+    "projection_applied": {
+      "type": "boolean"
+    },
+    "side_effect_emitted": {
+      "const": false
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "received_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "processed_at": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pull_queue_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dlq_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "$ref": "error.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publication_evidence_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "context",
+    "consumer_unit",
+    "event",
+    "state",
+    "applied_version_before",
+    "applied_version_after",
+    "projection_applied",
+    "side_effect_emitted",
+    "attempt_count",
+    "received_at",
+    "processed_at",
+    "pull_queue_ref",
+    "dlq_ref",
+    "last_error",
+    "publication_evidence_ref"
+  ],
+  "x-tenant-scope": "context",
+  "description": "每 consumer 独立 inbox。RECEIVED/GAP/DLQ 不是已消费标记；只在 APPLIED/LATE 后终结，重复 APPLIED 仍返回 DUPLICATE。消费投影不直接执行外部业务写入。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "APPLIED"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "projection_applied": {
+            "const": true
+          },
+          "processed_at": {
+            "$ref": "common-context.json#/$defs/UtcTimestamp"
+          },
+          "pull_queue_ref": {
+            "type": "null"
+          },
+          "dlq_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "RECEIVED",
+              "LATE",
+              "GAP",
+              "DLQ"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "projection_applied": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "GAP"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "pull_queue_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "dlq_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "DLQ"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dlq_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "last_error": {
+            "$ref": "error.json"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "LATE"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "processed_at": {
+            "$ref": "common-context.json#/$defs/UtcTimestamp"
+          },
+          "pull_queue_ref": {
+            "type": "null"
+          },
+          "dlq_ref": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "x-storage-policy": {
+    "owner": "consumer_unit",
+    "unique_key": [
+      "context.tenant_id",
+      "event.event_id"
+    ],
+    "unique_scope": "per_consumer",
+    "projection_watermark_inbox_and_derived_outbox_same_transaction": true,
+    "ingress_durable_before_ack": true,
+    "cross_database_transaction": false,
+    "failed_or_gap_is_not_consumed": true,
+    "identity_conflict": "dlq",
+    "same_version_different_event": "dlq"
+  },
+  "x-version-policy": {
+    "aggregate_key": [
+      "tenant_id",
+      "aggregate_id"
+    ],
+    "initial_applied_version": -1,
+    "first_event_version": 0,
+    "comparison_rules": [
+      {
+        "relation": "lt",
+        "result": "LATE",
+        "apply": false,
+        "advance": false
+      },
+      {
+        "relation": "eq",
+        "result": "DLQ",
+        "apply": false,
+        "advance": false
+      },
+      {
+        "relation": "next",
+        "result": "APPLIED",
+        "apply": true,
+        "advance": true
+      },
+      {
+        "relation": "gap",
+        "result": "GAP",
+        "apply": false,
+        "advance": false
+      }
+    ],
+    "precedence": [
+      "identity_conflict",
+      "already_applied_event_id",
+      "version_comparison"
+    ],
+    "duplicate_event_id": "DUPLICATE",
+    "gap_action": "durable_pull_queue",
+    "late_event_overwrite": false,
+    "watermark_decrease": false,
+    "aggregate_id_namespace": "unique_across_aggregate_types_per_tenant",
+    "missing_version_field": "reject_422",
+    "unrecoverable_gap": "dlq_or_manual",
+    "opaque_noncontiguous_source_version": "待冻结",
+    "snapshot_advances_watermark": "only_verified_authority_baseline"
+  },
+  "x-required-enforcement": [
+    "context_tenant_matches_event_and_authenticated_identity",
+    "event_factory_trace_data_class_match_context",
+    "compare_versions_under_lock_or_cas",
+    "no_sensitive_body",
+    "no_direct_external_side_effect",
+    "deadline",
+    "tenant_acl",
+    "after_equals_event_version_only_on_apply_otherwise_before",
+    "no_watermark_regression"
+  ]
+}

@@ -1,0 +1,713 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1EgressDecision",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "context": {
+      "allOf": [
+        {
+          "$ref": "common-context.json"
+        },
+        {
+          "properties": {
+            "factory_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+    },
+    "classification": {
+      "$ref": "p1-classification.json"
+    },
+    "model_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "models",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "model_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "model_backend": {
+      "$ref": "api-models.json#/$defs/ModelInvocationRequest/properties/model_backend"
+    },
+    "purpose": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "policy_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "identity_verified": {
+      "type": "boolean"
+    },
+    "access_scope_verified": {
+      "type": "boolean"
+    },
+    "minimized": {
+      "type": "boolean"
+    },
+    "dlp_passed": {
+      "type": "boolean"
+    },
+    "model_allowlisted": {
+      "type": "boolean"
+    },
+    "route_policy_permits": {
+      "type": "boolean"
+    },
+    "backend_healthy": {
+      "type": "boolean"
+    },
+    "c2_transform_approved": {
+      "type": "boolean"
+    },
+    "c4_task_allowlisted": {
+      "type": "boolean"
+    },
+    "c4_approval_verified": {
+      "type": "boolean"
+    },
+    "contains_key_material": {
+      "type": "boolean"
+    },
+    "permit_invocation": {
+      "type": "boolean"
+    },
+    "public_fallback": {
+      "type": "boolean",
+      "const": false
+    },
+    "local_backend_failed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "context",
+    "classification",
+    "model_id",
+    "model_version",
+    "model_backend",
+    "purpose",
+    "policy_version",
+    "identity_verified",
+    "access_scope_verified",
+    "minimized",
+    "dlp_passed",
+    "model_allowlisted",
+    "route_policy_permits",
+    "backend_healthy",
+    "c2_transform_approved",
+    "c4_task_allowlisted",
+    "c4_approval_verified",
+    "contains_key_material",
+    "permit_invocation",
+    "public_fallback",
+    "local_backend_failed"
+  ],
+  "x-tenant-scope": "self",
+  "description": "§4.1–§4.3 治理判定，不调用模型，不产生任务新状态。permit_invocation=false 只表示不可调用；拒绝/排队由既有状态及统一 Error 表达，具体排队恢复协议待冻结。可信服务计算检查结果，布尔字段不是调用者自签许可。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "data_class": {
+                "const": "C0",
+                "enum": [
+                  "C0"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C0",
+                "enum": [
+                  "C0"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "data_class": {
+                "const": "C1",
+                "enum": [
+                  "C1"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C1",
+                "enum": [
+                  "C1"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "data_class": {
+                "const": "C2",
+                "enum": [
+                  "C2"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C2",
+                "enum": [
+                  "C2"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "data_class": {
+                "const": "C3",
+                "enum": [
+                  "C3"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C3",
+                "enum": [
+                  "C3"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "data_class": {
+                "const": "C4",
+                "enum": [
+                  "C4"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C4",
+                "enum": [
+                  "C4"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "identity_verified": {
+                "const": false
+              }
+            },
+            "required": [
+              "identity_verified"
+            ]
+          },
+          {
+            "properties": {
+              "access_scope_verified": {
+                "const": false
+              }
+            },
+            "required": [
+              "access_scope_verified"
+            ]
+          },
+          {
+            "properties": {
+              "minimized": {
+                "const": false
+              }
+            },
+            "required": [
+              "minimized"
+            ]
+          },
+          {
+            "properties": {
+              "dlp_passed": {
+                "const": false
+              }
+            },
+            "required": [
+              "dlp_passed"
+            ]
+          },
+          {
+            "properties": {
+              "model_allowlisted": {
+                "const": false
+              }
+            },
+            "required": [
+              "model_allowlisted"
+            ]
+          },
+          {
+            "properties": {
+              "route_policy_permits": {
+                "const": false
+              }
+            },
+            "required": [
+              "route_policy_permits"
+            ]
+          },
+          {
+            "properties": {
+              "backend_healthy": {
+                "const": false
+              }
+            },
+            "required": [
+              "backend_healthy"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contains_key_material": {
+            "const": true
+          }
+        },
+        "required": [
+          "contains_key_material"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C3",
+                  "C4"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          },
+          "model_backend": {
+            "enum": [
+              "enterprise_cloud",
+              "public"
+            ]
+          }
+        },
+        "required": [
+          "context",
+          "model_backend"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C2",
+                "enum": [
+                  "C2"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "context"
+        ],
+        "anyOf": [
+          {
+            "properties": {
+              "model_backend": {
+                "const": "public"
+              }
+            },
+            "required": [
+              "model_backend"
+            ]
+          },
+          {
+            "properties": {
+              "model_backend": {
+                "const": "enterprise_cloud"
+              },
+              "c2_transform_approved": {
+                "const": false
+              }
+            },
+            "required": [
+              "model_backend",
+              "c2_transform_approved"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {
+              "data_class": {
+                "const": "C4",
+                "enum": [
+                  "C4"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "required": [
+          "context"
+        ],
+        "anyOf": [
+          {
+            "properties": {
+              "c4_task_allowlisted": {
+                "const": false
+              }
+            },
+            "required": [
+              "c4_task_allowlisted"
+            ]
+          },
+          {
+            "properties": {
+              "c4_approval_verified": {
+                "const": false
+              }
+            },
+            "required": [
+              "c4_approval_verified"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "local_backend_failed": {
+            "const": true
+          }
+        },
+        "required": [
+          "local_backend_failed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permit_invocation": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "model_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "models",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "input_refs",
+        "model_id",
+        "purpose"
+      ],
+      "x-tenant-scope": "self",
+      "description": "backend/模型版本从注册表取得；不允许请求填写 URL、后端类别或治理通过标志。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    }
+  },
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "unknown_model": "reject",
+    "missing_registry": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "local_failure": "reject_or_queue",
+    "local_failure_public_fallback": false,
+    "tenant_source": "authenticated_identity",
+    "model_output_is_execution_permission": false
+  },
+  "x-governance-order": [
+    {
+      "order": 1,
+      "id": "identity_tenant",
+      "label": "身份与租户校验"
+    },
+    {
+      "order": 2,
+      "id": "access_scope",
+      "label": "工具/检索访问范围"
+    },
+    {
+      "order": 3,
+      "id": "classification",
+      "label": "输入及派生上下文分类"
+    },
+    {
+      "order": 4,
+      "id": "minimization",
+      "label": "最小化与脱敏"
+    },
+    {
+      "order": 5,
+      "id": "dlp_egress",
+      "label": "DLP/出域策略"
+    },
+    {
+      "order": 6,
+      "id": "model_allowlist",
+      "label": "模型白名单"
+    },
+    {
+      "order": 7,
+      "id": "invocation",
+      "label": "调用"
+    },
+    {
+      "order": 8,
+      "id": "output_scan",
+      "label": "输出Schema/泄露扫描"
+    },
+    {
+      "order": 9,
+      "id": "local_token_restore",
+      "label": "本地授权的 Token 恢复"
+    },
+    {
+      "order": 10,
+      "id": "consumption",
+      "label": "用户/工具消费"
+    },
+    {
+      "order": 11,
+      "id": "graded_audit",
+      "label": "分级审计"
+    }
+  ],
+  "x-required-enforcement": [
+    "recheck_before_invocation",
+    "reclassify_every_context_return",
+    "output_schema_before_restore",
+    "output_leak_scan_before_restore",
+    "restore_requires_local_authorization",
+    "restored_output_consumer_acl",
+    "consume_only_after_scan",
+    "append_graded_audit",
+    "tenant_matches_context_and_authenticated_identity"
+  ],
+  "x-rule": "C3/C4 非本地必须 permit_invocation=false；本地故障任何等级均不自动公网回退。"
+}

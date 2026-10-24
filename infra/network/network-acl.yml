@@ -1,0 +1,77 @@
+# V3 网络与访问控制（上游 §15 `infra/network/`、§14 部署边界）
+#
+# 上游 §14 的硬要求：
+# - 内外接口**不同认证受众**（`/api/v1/**` 面向用户，`/internal/v1/**` 只面向服务）；
+# - 数据进出必须有明确边界，C3/C4 不得出域；
+# - Edge 与中心之间是**受控通道**，不是普通内网直连。
+#
+# 这份文件把"谁可以访问谁"写成**可机检**的声明。
+# `tests/infra/test_infra_manifest.py` 会核对它与代码里的实际路由归属一致。
+
+version: 1
+
+# ── 三个域（与 compose 的网络一一对应）──────────────────────────────────
+domains:
+  - name: frontdoor
+    purpose: 对外（用户/后台），只接 `/api/v1/**`
+    reaches_internet: true
+  - name: internal
+    purpose: 服务间（`/internal/v1/**`）
+    # **无对外路由**：容器层面就没有默认网关
+    reaches_internet: false
+  - name: edge-uplink
+    purpose: 中心 ← Edge 的受控上行（`/edge/v1/**`）
+    # Edge 侧可能断连；本域必须容忍中断，不得假设长连接
+    reaches_internet: false
+
+# ── 接口分层的访问规则 ───────────────────────────────────────────────────
+# `audience` 是**认证受众**，不是"谁能连上"——两组人必须不同。
+interface_rules:
+  - path_prefix: /api/v1
+    domain: frontdoor
+    audience: end-user
+    note: 员工与后台用户；必须携带身份
+  - path_prefix: /internal/v1
+    domain: internal
+    audience: service-account
+    note: 只允许服务账号；**不得**从 frontdoor 域可达
+  - path_prefix: /edge/v1
+    domain: edge-uplink
+    audience: device-gateway
+    note: 现场侧；许可与互锁在 Guard 内判定，不依赖网络层
+  - path_prefix: /health
+    domain: frontdoor
+    audience: anonymous
+    note: 探活面：**不承载业务数据**，允许匿名
+
+# ── 出域（egress）规则 ───────────────────────────────────────────────────
+egress:
+  # 唯一允许出域的组件是安全网关：所有模型调用与外部请求都经它治理
+  allowed_sources:
+    - security-gateway
+  denied_by_default: true
+  # 出域判定在应用层（`services/_kernel/governance.py` + `egress_audit.py`），
+  # 网络层只是**第二道**；两道都失效才算失守，因此这里不重复实现策略。
+  note: 网络层不做数据分级判定——分级判定只在应用层，避免两处口径漂移
+
+# ── 明确禁止的连通（反例清单）───────────────────────────────────────────
+forbidden:
+  - from: frontdoor
+    to: /internal/v1
+    reason: 内部接口面向服务账号，用户域可达等于把服务接口暴露给用户
+  - from: internal
+    to: internet
+    reason: 内部服务不得直接出域；出域必须经安全网关治理
+  - from: edge-uplink
+    to: /internal/v1
+    reason: 现场侧不得直接调中心内部接口；必须先上行到 /edge/v1
+
+# ── 未冻结项 ─────────────────────────────────────────────────────────────
+frozen: false
+blocked_by:
+  - item: 本地域定义与数据清单
+    need: 哪些数据在本地域、哪些允许出域（C2 变换需批准）
+    blocks: 真实数据模型处理
+  - item: 现场网络与协议
+    need: 设备地址/协议、动作白名单、参数边界、互锁
+    blocks: Edge 控制

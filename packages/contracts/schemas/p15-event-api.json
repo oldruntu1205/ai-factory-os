@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15OwnerLocalEventAPI",
+  "x-source-version": "3.0.0",
+  "x-schema-container": true,
+  "$defs": {
+    "DeliveryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "event": {
+          "$ref": "event-envelope.json"
+        },
+        "publication_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "event",
+        "publication_evidence_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "内部 broker 到 consumer 的事实投递；publication_evidence_ref 是 producer 授权/权威凭证的受控引用，HTTP handler 不创造事实。",
+      "x-required-enforcement": [
+        "authenticated_broker_or_registered_authority",
+        "verify_publication_evidence",
+        "tenant_event_context_match",
+        "fact_publication_after_authority_evidence",
+        "no_sensitive_body"
+      ]
+    },
+    "DeliveryAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "event_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "consumer_unit": {
+          "$ref": "p15-lifecycle.json#/$defs/OwnerUnit"
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "RECEIVED",
+            "APPLIED",
+            "DUPLICATE",
+            "LATE",
+            "GAP",
+            "DLQ"
+          ]
+        },
+        "durable": {
+          "const": true
+        },
+        "business_success": {
+          "const": false
+        },
+        "pull_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dlq_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "event_id",
+        "consumer_unit",
+        "disposition",
+        "durable",
+        "business_success",
+        "pull_queue_ref",
+        "dlq_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "200 仅确认本 owner 已持久化；GAP/DLQ 有明确位置，不代表成功消费或已过账。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "GAP"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "pull_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "DLQ"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dlq_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ReplayRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "dlq_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_dlq_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason_code": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        }
+      },
+      "required": [
+        "context",
+        "dlq_id",
+        "idempotency_key",
+        "expected_dlq_version",
+        "reason_code"
+      ],
+      "x-tenant-scope": "context",
+      "description": "人工请求重放原事件，只接受本 owner DLQ；不得替换 event_id、tenant、版本或 payload。"
+    },
+    "ReplayAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "dlq_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "replay_request_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "business_success": {
+          "const": false
+        },
+        "posting_status": {
+          "const": "NOT_CONFIRMED"
+        },
+        "status_url": {
+          "type": "string",
+          "pattern": "^/internal/v1/events/dlq/[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "context",
+        "dlq_id",
+        "replay_request_id",
+        "status",
+        "business_success",
+        "posting_status",
+        "status_url"
+      ],
+      "x-tenant-scope": "context",
+      "description": "202 仅表示重放请求持久化受理。",
+      "x-idempotency": {
+        "scope": [
+          "context.tenant_id",
+          "idempotency_key"
+        ],
+        "same_key_same_payload": "same_request",
+        "same_key_different_payload": "409",
+        "request_and_replay_queue_same_transaction": true
+      }
+    }
+  },
+  "x-owner-local-policy": {
+    "new_event_service": false,
+    "owner_units": [
+      "security-gateway",
+      "control-plane",
+      "decision-service",
+      "hermes-runtime",
+      "manufacturing-core",
+      "tool-gateway",
+      "transaction-service",
+      "trajectory-eval"
+    ],
+    "each_unit_separate_route_identity_store": true,
+    "remote_owner_tables_writable": false,
+    "dlq_get_and_replay_same_owner": true,
+    "broker_receives_only_refs": true,
+    "routing_manifest_required": true,
+    "new_event_lifecycle_types": false
+  },
+  "x-event-catalog-source": "event-envelope.json#/properties/event_type/enum",
+  "x-envelope-source": "event-envelope.json",
+  "x-event-authorities": {
+    "task.accepted": {
+      "unit": "control-plane",
+      "evidence": "persisted_task"
+    },
+    "run.waiting_approval": {
+      "unit": "hermes-runtime",
+      "evidence": "persisted_run_checkpoint"
+    },
+    "approval.decided": {
+      "unit": "control-plane",
+      "evidence": "persisted_authorized_approval"
+    },
+    "command.accepted": {
+      "unit": "transaction-service",
+      "evidence": "persisted_command"
+    },
+    "command.succeeded": {
+      "unit": "transaction-service",
+      "evidence": "verified_authority_receipt"
+    },
+    "command.unknown": {
+      "unit": "transaction-service",
+      "evidence": "persisted_unknown_reconciliation"
+    },
+    "saga.compensation_required": {
+      "unit": "transaction-service",
+      "evidence": "persisted_saga"
+    },
+    "erp.demand.released": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_authority_adapter_receipt"
+    },
+    "pmc.schedule.published": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_authority_adapter_receipt"
+    },
+    "mes.operation.completed": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_authority_adapter_receipt"
+    },
+    "wms.stock.changed": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_authority_adapter_receipt"
+    },
+    "edge.decision.observed": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_edge_observation"
+    },
+    "edge.action.executed": {
+      "unit": "manufacturing-core",
+      "evidence": "verified_executed_edge_receipt"
+    },
+    "release.evaluated": {
+      "unit": "trajectory-eval",
+      "evidence": "persisted_eval_evidence"
+    }
+  }
+}

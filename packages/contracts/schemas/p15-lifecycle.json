@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15LifecycleViews",
+  "x-source-version": "3.0.0",
+  "x-schema-container": true,
+  "$defs": {
+    "OwnerUnit": {
+      "type": "string",
+      "enum": [
+        "security-gateway",
+        "control-plane",
+        "decision-service",
+        "hermes-runtime",
+        "manufacturing-core",
+        "tool-gateway",
+        "transaction-service",
+        "trajectory-eval"
+      ]
+    },
+    "TaskView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Task"
+        },
+        "status_source": {
+          "const": "control-plane"
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "command_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "business_execution_source": {
+          "const": "transaction-service"
+        },
+        "is_posting_evidence": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "status",
+        "status_source",
+        "updated_at",
+        "record_version",
+        "command_refs",
+        "business_execution_source",
+        "is_posting_evidence"
+      ],
+      "x-tenant-scope": "context",
+      "description": "Task owner 的持久化状态视图；状态来源及时间不可缺省；成功的编排或推理状态不证明外部过账。"
+    },
+    "RunView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "run_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Run"
+        },
+        "status_source": {
+          "const": "hermes-runtime"
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "command_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "uniqueItems": true
+        },
+        "business_execution_source": {
+          "const": "transaction-service"
+        },
+        "is_posting_evidence": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "run_id",
+        "status",
+        "status_source",
+        "updated_at",
+        "record_version",
+        "command_refs",
+        "business_execution_source",
+        "is_posting_evidence"
+      ],
+      "x-tenant-scope": "context",
+      "description": "Run owner 的持久化状态视图；状态来源及时间不可缺省；成功的编排或推理状态不证明外部过账。"
+    }
+  },
+  "x-ownership-policy": {
+    "Task": {
+      "owner": "control-plane",
+      "store": "control",
+      "cross_owner_read": "GET /internal/v1/tasks/{task_id}",
+      "manufacturing_journal_is_authority": false
+    },
+    "Run": {
+      "owner": "hermes-runtime",
+      "store": "runtime",
+      "cross_owner_read": "GET /internal/v1/runs/{run_id}",
+      "control_projection_is_authority": false
+    },
+    "Command": {
+      "owner": "transaction-service",
+      "store": "transaction",
+      "cross_owner_read": "GET /internal/v1/commands/{command_id}",
+      "terminal_success_source": "verified_authority_receipt"
+    },
+    "cross_owner_write": false,
+    "cross_owner_join": false,
+    "cross_owner_foreign_key": false,
+    "in_memory_is_authority": false,
+    "owner_unavailable": "fail_closed_503",
+    "restart_preserves_state": true
+  },
+  "x-recovery-policy": {
+    "checkpoint_contract": "api-models.json#/$defs/Checkpoint",
+    "resume_contract": "api-models.json#/$defs/RunResumeRequest",
+    "checkpoint_and_run_same_transaction": true,
+    "cas_required": true,
+    "lease_and_fencing_required": true,
+    "query_existing_commands_before_resume": true,
+    "successful_steps_reexecuted": false,
+    "cancel_inflight_means_rollback": false
+  }
+}

@@ -1,0 +1,470 @@
+{
+  "registry_version": "p0-mock-1",
+  "environment": "mock",
+  "note": "P0 Mock 登记表。所有未知项 fail-closed 拒绝。生产登记表由 control-plane 的 Release Registry 提供，待冻结。",
+
+  "tenants": {
+    "tenant-demo": {
+      "tenant_id": "tenant-demo",
+      "factories": ["factory-demo"],
+      "actors": ["user-demo", "user-approver"],
+      "delegated_scopes": ["pmc.read", "pmc.dispatch.publish", "erp.inventory.reserve", "kb.read", "model.invoke"],
+      "max_data_class": "C2",
+
+      "_comment_employees": "员工记录（契约 packages/contracts/schemas/p3-employee.json）。**权限挂在岗位(positions)上，不挂人**：上游三处都写「岗位批准」「岗位 ACL」，无一处写「某人可批多少」。员工的权限 = 其所任岗位的并集；改权限靠改任命，不靠逐人配额度。",
+      "employees": [
+        {
+          "employee_id": "employee-planning",
+          "executing_actor_ref": "user-demo",
+          "factory_ids": ["factory-demo"],
+          "position_refs": ["position-planner"],
+          "positions": [
+            {
+              "position_id": "position-planner",
+              "title": "计划员",
+              "delegated_scopes": ["pmc.read", "pmc.dispatch.publish", "kb.read", "model.invoke"],
+              "data_class_ceiling": "C2",
+              "limits": [
+                { "risk_class": "R0", "decision": "AUTO" },
+                { "risk_class": "R1", "decision": "AUTO" },
+                { "risk_class": "R2", "decision": "APPROVE", "max_amount": "10000.00", "requires_second_approval": false },
+                { "risk_class": "R3", "decision": "FORBIDDEN" }
+              ]
+            }
+          ],
+          "config_authority": { "may_change_config": false, "scopes": [] }
+        },
+        {
+          "employee_id": "employee-inventory",
+          "executing_actor_ref": "user-approver",
+          "factory_ids": ["factory-demo"],
+          "position_refs": ["position-inventory-owner"],
+          "positions": [
+            {
+              "position_id": "position-inventory-owner",
+              "title": "库存主管",
+              "delegated_scopes": ["erp.inventory.reserve", "pmc.read"],
+              "data_class_ceiling": "C2",
+              "limits": [
+                { "risk_class": "R0", "decision": "AUTO" },
+                { "risk_class": "R1", "decision": "APPROVE" },
+                { "risk_class": "R2", "decision": "APPROVE", "max_amount": "50000.00", "requires_second_approval": true },
+                { "risk_class": "R3", "decision": "FORBIDDEN" }
+              ]
+            }
+          ],
+          "config_authority": { "may_change_config": true, "scopes": ["erp.inventory.reserve"] }
+        }
+      ]
+    },
+    "tenant-c3": {
+      "tenant_id": "tenant-c3",
+      "factories": ["factory-demo"],
+      "actors": ["user-demo"],
+      "delegated_scopes": ["pmc.read", "pmc.dispatch.publish", "erp.inventory.reserve", "kb.read", "model.invoke"],
+      "max_data_class": "C4",
+
+      "_comment_employees": "同 tenant-demo，但**这是另一个公司的数据**——用于证明多租户隔离真实生效。\n注意：tenant-c3 有 employee-quality 而 tenant-demo 没有，反方向则两者都有 employee-planning（大批测试拿它当通用占位员工）。**任何一侧的员工都不该被另一侧看见**。",
+      "employees": [
+        {
+          "employee_id": "employee-planning",
+          "executing_actor_ref": "user-demo",
+          "factory_ids": ["factory-demo"],
+          "position_refs": ["position-quality-planner"],
+          "positions": [
+            {
+              "position_id": "position-quality-planner",
+              "title": "质检计划员",
+              "delegated_scopes": ["pmc.read"],
+              "data_class_ceiling": "C4",
+              "limits": [
+                { "risk_class": "R0", "decision": "AUTO" },
+                { "risk_class": "R1", "decision": "AUTO" },
+                { "risk_class": "R2", "decision": "FORBIDDEN" },
+                { "risk_class": "R3", "decision": "FORBIDDEN" }
+              ]
+            }
+          ],
+          "config_authority": { "may_change_config": false, "scopes": [] }
+        },
+        {
+          "employee_id": "employee-quality",
+          "executing_actor_ref": "user-demo",
+          "factory_ids": ["factory-demo"],
+          "position_refs": ["position-quality-inspector"],
+          "positions": [
+            {
+              "position_id": "position-quality-inspector",
+              "title": "质检员",
+              "delegated_scopes": ["pmc.read", "kb.read"],
+              "data_class_ceiling": "C4",
+              "limits": [
+                { "risk_class": "R0", "decision": "AUTO" },
+                { "risk_class": "R1", "decision": "AUTO" },
+                { "risk_class": "R2", "decision": "FORBIDDEN" },
+                { "risk_class": "R3", "decision": "FORBIDDEN" }
+              ]
+            }
+          ],
+          "config_authority": { "may_change_config": false, "scopes": [] }
+        }
+      ]
+    }
+  },
+
+  "tools": {
+    "pmc.dispatch.publish": {
+      "tool_id": "pmc.dispatch.publish",
+      "tool_version": "1.0.0-mock",
+      "read_write": "write",
+      "risk_class": "R2",
+      "required_scopes": ["pmc.dispatch.publish"],
+      "idempotency_support": true,
+      "status_query": true,
+      "compensation": false,
+      "adapter_owner": "manufacturing-core",
+      "source_system": "pmc-mock",
+      "timeout": "5.000",
+      "retry_policy": {"max_attempts": 1, "retry_delay_seconds": "0.000"},
+      "input_schema": {
+        "schema_ref": "command.json#/$defs/SchedulePayload",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:input-schema-demo"
+      },
+      "output_schema": {
+        "schema_ref": "command-status.json",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:output-schema-demo"
+      },
+      "data_class_rules": {"allowed_classes": ["C2"], "unknown_class": "reject", "inherit_highest_class": true}
+    },
+    "erp.stock.query": {
+      "tool_id": "erp.stock.query",
+      "tool_version": "1.0.0-mock",
+      "read_write": "read",
+      "risk_class": "R0",
+      "required_scopes": ["erp.read"],
+      "idempotency_support": false,
+      "status_query": false,
+      "compensation": false,
+      "adapter_owner": "manufacturing-core",
+      "source_system": "erp-mock",
+      "timeout": "3.000",
+      "retry_policy": {"max_attempts": 2, "retry_delay_seconds": "0.500"},
+      "input_schema": {
+        "schema_ref": "task.json",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:input-schema-demo"
+      },
+      "output_schema": {
+        "schema_ref": "command-status.json",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:output-schema-demo"
+      },
+      "data_class_rules": {"allowed_classes": ["C0", "C1", "C2"], "unknown_class": "reject", "inherit_highest_class": true}
+    },
+    "erp.inventory.reserve": {
+      "tool_id": "erp.inventory.reserve",
+      "tool_version": "1.0.0-mock",
+      "read_write": "write",
+      "risk_class": "R2",
+      "required_scopes": ["erp.inventory.reserve"],
+      "idempotency_support": true,
+      "status_query": true,
+      "compensation": true,
+      "adapter_owner": "manufacturing-core",
+      "source_system": "erp-mock",
+      "timeout": "5.000",
+      "retry_policy": {"max_attempts": 2, "retry_delay_seconds": "0.500"},
+      "input_schema": {
+        "schema_ref": "command.json#/$defs/SchedulePayload",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:input-schema-demo"
+      },
+      "output_schema": {
+        "schema_ref": "command-status.json",
+        "schema_version": "1.0.0",
+        "schema_hash": "sha256:output-schema-demo"
+      },
+      "data_class_rules": {"allowed_classes": ["C2"], "unknown_class": "reject", "inherit_highest_class": true}
+    }
+  },
+
+  "data_classes": ["C0", "C1", "C2", "C3", "C4"],
+
+  "model_backends": {
+    "local": {
+      "approved_domain": "enterprise-local",
+      "allowed_data_classes": ["C0", "C1", "C2", "C3", "C4"],
+      "reachable": true
+    },
+    "enterprise_cloud": {
+      "approved_domain": "approved-vpc",
+      "allowed_data_classes": ["C0", "C1", "C2"],
+      "reachable": true
+    },
+    "public": {
+      "approved_domain": "public-egress",
+      "allowed_data_classes": ["C0", "C1"],
+      "reachable": true
+    }
+  },
+
+  "models": {
+    "model-demo-local": {
+      "model_id": "model-demo-local",
+      "model_version": "1.0.0-mock",
+      "model_backend": "local"
+    },
+    "model-demo-cloud": {
+      "model_id": "model-demo-cloud",
+      "model_version": "1.0.0-mock",
+      "model_backend": "enterprise_cloud"
+    },
+    "model-demo-public": {
+      "model_id": "model-demo-public",
+      "model_version": "1.0.0-mock",
+      "model_backend": "public"
+    }
+  },
+
+  "policies": {
+    "policy-demo": {
+      "policy_version": "policy-demo",
+
+      "_comment_reason_codes": "策略判定自己的原因码目录。**为什么不复用 decision_catalog.reason_codes**：契约把 `reason_code` 声明为 `CatalogValue`（`x-catalog-required: true`，须取自有限目录），而策略判定与任务路由是**两类不同的决策**；共用一个目录会让'这条判定属于谁'在审计时无法区分，也会让一边扩目录时意外放宽另一边。",
+      "reason_codes": {
+        "allowed": "policy-auto-execute-allowed",
+        "approval_required": "policy-approval-required",
+        "denied": "policy-auto-execute-denied"
+      },
+
+      "risk_rules": {
+        "R0": { "requires_approval": false, "auto_execute": true },
+        "R1": { "requires_approval": false, "auto_execute": true },
+        "R2": { "requires_approval": true, "auto_execute": false },
+        "R3": { "requires_approval": true, "auto_execute": false }
+      }
+    }
+  },
+
+  "signing": {
+    "identity_ref": "svc-token-mock",
+    "note": "P0 Mock：Bearer 只校验存在 + 服务身份登记。生产签发方式与受众待冻结。"
+  },
+
+  "runtime_deployment": {
+    "note": "P0 Mock 部署映射。生产端口/身份/密钥挂载由部署 manifest 冻结，不以此为准。",
+    "frontdoor": { "host": "127.0.0.1", "port": 8100 },
+    "services": [
+      { "service_id": "security-gateway",    "port": 8101, "identity_ref": "svc-security-gateway",    "required_dependencies": ["registry-tenant-list", "model-backend-registry"] },
+      { "service_id": "control-plane",       "port": 8102, "identity_ref": "svc-control-plane",       "required_dependencies": ["policy-registry", "evidence-sink"] },
+      { "service_id": "decision-service",    "port": 8103, "identity_ref": "svc-decision-service",    "required_dependencies": ["decision-catalog", "security-gateway"] },
+      { "service_id": "hermes-runtime",      "port": 8104, "identity_ref": "svc-hermes-runtime",      "required_dependencies": ["run-store", "evidence-sink"] },
+      { "service_id": "manufacturing-core",  "port": 8105, "identity_ref": "svc-manufacturing-core",  "required_dependencies": ["adapter-erp-mock", "adapter-pmc-mock"] },
+      { "service_id": "tool-gateway",        "port": 8106, "identity_ref": "svc-tool-gateway",        "required_dependencies": ["tool-registry", "policy-evaluation-endpoint"] },
+      { "service_id": "transaction-service", "port": 8107, "identity_ref": "svc-transaction-service", "required_dependencies": ["command-store", "adapter-pmc-mock"] },
+      { "service_id": "trajectory-eval",     "port": 8108, "identity_ref": "svc-trajectory-eval",     "required_dependencies": ["evidence-store", "object-store"] }
+    ]
+  },
+
+  "dependency_probes": {
+    "registry-tenant-list":      { "probe": "file:packages/contracts/schemas/common-context.json" },
+    "model-backend-registry":    { "probe": "file:packages/contracts/schemas/common-context.json" },
+    "policy-registry":           { "probe": "file:packages/contracts/schemas/service-manifest.json" },
+    "evidence-sink":             { "probe": "file:packages/contracts/schemas/event-envelope.json" },
+    "evidence-store":            { "probe": "file:packages/contracts/schemas/event-envelope.json" },
+    "object-store":              { "probe": "file:packages/contracts/schemas/event-envelope.json" },
+    "decision-catalog":          { "probe": "file:packages/contracts/schemas/decision-result.json" },
+    "security-gateway":          { "probe": "tcp:127.0.0.1:8101" },
+    "run-store":                 { "probe": "file:packages/contracts/schemas/task.json" },
+    "adapter-erp-mock":          { "probe": "file:packages/contracts/schemas/tool-spec.json" },
+    "adapter-pmc-mock":          { "probe": "file:packages/contracts/schemas/tool-spec.json" },
+    "tool-registry":             { "probe": "file:packages/contracts/schemas/tool-spec.json" },
+    "policy-evaluation-endpoint":{ "probe": "tcp:127.0.0.1:8102" },
+    "command-store":             { "probe": "file:packages/contracts/schemas/command-status.json" }
+  },
+
+  "decision_catalog": {
+    "catalog_version": "catalog-mock-1",
+
+    "_comment_catalog_values": "有限目录。**两个适配器（mock 与 rules）都必须从这份目录取值**——目录是契约，适配器只决定「怎么选」，不决定「能用哪些值」。这样就避免了「换个适配器就冒出新取值」这种违反有限类型决策的情况。`*-demo` 是 P0 就有的占位值，保留以兼容既有用例；`route-*` 等是 rules 适配器引入的语义化取值。",
+
+    "routes": [
+      "route-demo",
+      "route-rules",
+      "route-readonly-fast",
+      "route-deep",
+      "route-human"
+    ],
+    "actions": [
+      "action-demo",
+      "action-noop",
+      "action-proceed",
+      "action-require-approval",
+      "action-escalate"
+    ],
+    "categories": [
+      "category-demo",
+      "category-readonly",
+      "category-write",
+      "category-high-risk"
+    ],
+    "reason_codes": [
+      "reason-demo",
+      "reason-rules-readonly-r0",
+      "reason-rules-readonly-supervised",
+      "reason-rules-write-needs-approval",
+      "reason-rules-write-approved",
+      "reason-rules-high-risk",
+      "reason-rules-undetermined"
+    ],
+    "fallback_routes": ["fallback-demo", "route-human"],
+
+    "_comment_catalog_source": "rules 适配器的判定依据来自登记表里**已有的**事实，不是新编的数据：`p1.classification.derived_origin_rules`（输入来源 → 数据等级）、`policies.risk_rules`（风险等级 → 是否需批准/可否自动）、`tools[*].read|write|risk_class`（工具能力与风险）。所以 rule_version 指向的是那两份规则各自的版本。",
+
+    "_comment_decision_kinds": "上游 §3 给 Jev Decision Fabric 的封闭清单是 8 种：Route/Classify/Score/Rank/Filter/Gate/Select/Escalate（注意是 8 不是 9——我此前一直在口头说「九种」，数错了）。`implemented_decision_kinds` 是**本适配器**已实现的子集；请求未实现的类型必须**显式拒绝**，不得静默按 Route 返回（那会让调用方拿到一个看起来成功的错误答案）。**为什么只 4 种**：Score/Rank/Filter/Select 需要真实打分与排序依据，而上游 §8.2 要求「置信度是经独立数据校准的任务级指标，不能取 LLM 自报数字」——Mock 给不出有意义的数字，宁可拒绝也不假装。",
+    "decision_kinds": [
+      "Route",
+      "Classify",
+      "Score",
+      "Rank",
+      "Filter",
+      "Gate",
+      "Select",
+      "Escalate"
+    ],
+    "implemented_decision_kinds": ["Route", "Classify", "Gate", "Escalate", "Score", "Filter"]
+  },
+
+  "decision_adapter": {
+    "_comment": "上游 §16.1「Hermes/OpenClaw/Jev 版本、许可证、授权与升级策略」属待填依赖；§13「实际版本与 Hermes/Jev 适配方式需 P0 冻结」——本节点即那次冻结的落点。",
+    "implementation": "mock",
+    "config": {
+      "confidence_source": "fixed-mock-constant",
+      "confidence_calibrated": false
+    },
+    "_comment_switch": "换真实 Jev 时的步骤：① 写一个满足 packages/decision/adapter.py::DecisionAdapter 的类；② 在本节把 implementation 改成它的登记 id；③ 内核一行不改。若换实现仍需改内核，说明接口抽象不成立，应先把接口改对，而不是改内核。",
+    "_registry_note": "未登记的实现 id **fail-closed 拒绝**，不退回 mock——否则生产配置写错时会静默用一个确定性 Mock 做决策，而调用方看不出区别。"
+  },
+
+  "p1": {
+    "note": "P1 Mock 登记：分类规则 / 用途 / 服务账户 / 消费者 / Vault / 知识 ACL。生产登记由 Release Registry 与身份源提供，待冻结。",
+
+    "classification": {
+      "rule_version": "classification-mock-1",
+      "derived_origin_rules": {
+        "text": "C1",
+        "image_ocr": "C2",
+        "attachment": "C2",
+        "rag_chunk": "C2",
+        "tool_return": "C2",
+        "memory": "C3",
+        "model_output": "C3",
+        "trajectory": "C3",
+        "declared_context": "C0"
+      },
+      "key_material_refs": ["ref-key-material-demo"],
+      "transformation_rules": {
+        "transform-mock-c2-to-c2": "C2",
+        "transform-mock-reject-downgrade": "C2"
+      }
+    },
+
+    "purposes": {
+      "purpose-demo": { "scopes": ["pmc.read"] },
+      "purpose-knowledge-readonly": { "scopes": ["kb.read"] },
+      "purpose-model-invoke": { "scopes": ["model.invoke"] }
+    },
+
+    "service_accounts": {
+      "svc-control-plane": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-demo", "purpose-knowledge-readonly", "purpose-model-invoke"]
+      },
+      "svc-hermes-runtime": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-knowledge-readonly", "purpose-model-invoke"]
+      },
+      "svc-security-gateway": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-model-invoke", "purpose-knowledge-readonly"]
+      },
+      "svc-transaction-service": {
+      "tenant_ids": ["tenant-demo", "tenant-c3"],
+      "purposes": ["purpose-demo", "purpose-controlled-execution"]
+    },
+    "p0-test": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-demo", "purpose-knowledge-readonly", "purpose-model-invoke"]
+      },
+      "svc-mock": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-demo", "purpose-knowledge-readonly", "purpose-model-invoke"]
+      }
+    },
+
+    "consumers": {
+      "consumer-demo": {
+        "tenant_ids": ["tenant-demo", "tenant-c3"],
+        "purposes": ["purpose-model-invoke", "purpose-knowledge-readonly"]
+      },
+      "consumer-other-tenant": {
+        "tenant_ids": ["tenant-other"],
+        "purposes": ["purpose-model-invoke"]
+      }
+    },
+
+    "vault": {
+      "vault_version": "vault-mock-1",
+      "max_ttl_seconds": 2592000
+    },
+
+    "c4": {
+      "task_allowlists": { "tenant-c3": ["task-c4-allowlisted"] },
+      "approvals": { "tenant-c3": ["task-c4-allowlisted"] }
+    },
+
+    "knowledge": {
+      "acl_version": "acl-mock-1",
+      "documents": [
+        {
+          "tenant_id": "tenant-demo",
+          "factory_id": "factory-demo",
+          "roles": ["pmc.read", "kb.read"],
+          "source_system": "erp-mock",
+          "source_id": "doc-spec-a",
+          "source_version": "3",
+          "data_class": "C1",
+          "quality_status": "quality-demo",
+          "occurred_at": "2026-10-01T00:00:00Z",
+          "valid_until": "2026-11-01T00:00:00Z"
+        },
+        {
+          "tenant_id": "tenant-demo",
+          "factory_id": "factory-demo",
+          "roles": ["pmc.read"],
+          "source_system": "pmc-mock",
+          "source_id": "doc-schedule-1",
+          "source_version": "7",
+          "data_class": "C2",
+          "quality_status": "quality-demo",
+          "occurred_at": "2026-10-03T00:00:00Z",
+          "valid_until": "2026-10-20T00:00:00Z"
+        },
+        {
+          "tenant_id": "tenant-other",
+          "factory_id": "factory-demo",
+          "roles": ["kb.read"],
+          "source_system": "erp-mock",
+          "source_id": "doc-other-tenant",
+          "source_version": "1",
+          "data_class": "C1",
+          "quality_status": "quality-demo",
+          "occurred_at": "2026-10-01T00:00:00Z",
+          "valid_until": "2026-11-01T00:00:00Z"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,490 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1Classification",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "context": {
+      "allOf": [
+        {
+          "$ref": "common-context.json"
+        },
+        {
+          "properties": {
+            "factory_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Input"
+      },
+      "minItems": 1
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "output_data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "classification_rule_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "context",
+    "inputs",
+    "data_class",
+    "output_data_class",
+    "classification_rule_version"
+  ],
+  "x-tenant-scope": "self",
+  "description": "§4.1 C0–C4 为五级。合并取最高；输出继承最高且可上调。匿名化不自动降级；P1 不开放降级入口，登记变换及可信复核只能在批准策略中改变允许路由。",
+  "$defs": {
+    "Input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "content_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "text",
+            "image_ocr",
+            "attachment",
+            "rag_chunk",
+            "tool_return",
+            "memory",
+            "model_output",
+            "trajectory",
+            "declared_context"
+          ]
+        },
+        "anonymized": {
+          "type": "boolean"
+        },
+        "transformation_rule_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/CatalogValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "content_ref",
+        "data_class",
+        "origin",
+        "anonymized",
+        "transformation_rule_ref",
+        "review_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "可信分类项；覆盖正文、OCR、附件、RAG chunks、工具返回、历史 Memory、模型输出和轨迹。原文只通过批准本地域引用读取。"
+    },
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "input_refs"
+      ],
+      "x-tenant-scope": "self",
+      "description": "只传引用；security 必须读取并重新分类正文及全部派生上下文，不能接受模型自报等级。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "inputs": {
+          "items": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C0"
+                ]
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "data_class": {
+                "const": "C0",
+                "enum": [
+                  "C0"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "data_class": {
+          "const": "C0",
+          "enum": [
+            "C0"
+          ]
+        },
+        "context": {
+          "properties": {
+            "data_class": {
+              "const": "C0",
+              "enum": [
+                "C0"
+              ]
+            }
+          }
+        },
+        "output_data_class": {
+          "enum": [
+            "C0",
+            "C1",
+            "C2",
+            "C3",
+            "C4"
+          ]
+        }
+      },
+      "required": [
+        "inputs",
+        "data_class",
+        "context",
+        "output_data_class"
+      ]
+    },
+    {
+      "properties": {
+        "inputs": {
+          "items": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C0",
+                  "C1"
+                ]
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "data_class": {
+                "const": "C1",
+                "enum": [
+                  "C1"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "data_class": {
+          "const": "C1",
+          "enum": [
+            "C1"
+          ]
+        },
+        "context": {
+          "properties": {
+            "data_class": {
+              "const": "C1",
+              "enum": [
+                "C1"
+              ]
+            }
+          }
+        },
+        "output_data_class": {
+          "enum": [
+            "C1",
+            "C2",
+            "C3",
+            "C4"
+          ]
+        }
+      },
+      "required": [
+        "inputs",
+        "data_class",
+        "context",
+        "output_data_class"
+      ]
+    },
+    {
+      "properties": {
+        "inputs": {
+          "items": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C0",
+                  "C1",
+                  "C2"
+                ]
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "data_class": {
+                "const": "C2",
+                "enum": [
+                  "C2"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "data_class": {
+          "const": "C2",
+          "enum": [
+            "C2"
+          ]
+        },
+        "context": {
+          "properties": {
+            "data_class": {
+              "const": "C2",
+              "enum": [
+                "C2"
+              ]
+            }
+          }
+        },
+        "output_data_class": {
+          "enum": [
+            "C2",
+            "C3",
+            "C4"
+          ]
+        }
+      },
+      "required": [
+        "inputs",
+        "data_class",
+        "context",
+        "output_data_class"
+      ]
+    },
+    {
+      "properties": {
+        "inputs": {
+          "items": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C0",
+                  "C1",
+                  "C2",
+                  "C3"
+                ]
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "data_class": {
+                "const": "C3",
+                "enum": [
+                  "C3"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "data_class": {
+          "const": "C3",
+          "enum": [
+            "C3"
+          ]
+        },
+        "context": {
+          "properties": {
+            "data_class": {
+              "const": "C3",
+              "enum": [
+                "C3"
+              ]
+            }
+          }
+        },
+        "output_data_class": {
+          "enum": [
+            "C3",
+            "C4"
+          ]
+        }
+      },
+      "required": [
+        "inputs",
+        "data_class",
+        "context",
+        "output_data_class"
+      ]
+    },
+    {
+      "properties": {
+        "inputs": {
+          "items": {
+            "properties": {
+              "data_class": {
+                "enum": [
+                  "C0",
+                  "C1",
+                  "C2",
+                  "C3",
+                  "C4"
+                ]
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "data_class": {
+                "const": "C4",
+                "enum": [
+                  "C4"
+                ]
+              }
+            },
+            "required": [
+              "data_class"
+            ]
+          }
+        },
+        "data_class": {
+          "const": "C4",
+          "enum": [
+            "C4"
+          ]
+        },
+        "context": {
+          "properties": {
+            "data_class": {
+              "const": "C4",
+              "enum": [
+                "C4"
+              ]
+            }
+          }
+        },
+        "output_data_class": {
+          "enum": [
+            "C4"
+          ]
+        }
+      },
+      "required": [
+        "inputs",
+        "data_class",
+        "context",
+        "output_data_class"
+      ]
+    }
+  ],
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "unknown_model": "reject",
+    "missing_registry": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "local_failure": "reject_or_queue",
+    "local_failure_public_fallback": false,
+    "tenant_source": "authenticated_identity",
+    "model_output_is_execution_permission": false
+  },
+  "x-classification-rules": {
+    "merge": "maximum",
+    "output": "inherit_maximum_or_raise",
+    "anonymization_auto_downgrade": false,
+    "downgrade": "待冻结：登记变换规则与可信复核；P1 不开放降级",
+    "input_authority": "trusted_classifier"
+  },
+  "x-required-enforcement": [
+    "tenant_matches_context_and_authenticated_identity"
+  ]
+}

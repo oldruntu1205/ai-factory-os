@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommandStatus",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "employee_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "没有 AI 员工绑定时显式 null。"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "deadline_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "command_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "status": {
+      "$ref": "state-machines.json#/$defs/Command"
+    },
+    "status_source": {
+      "const": "transaction-service"
+    },
+    "updated_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "source_system": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "receipt_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      }
+    },
+    "reconciliation_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "employee_id",
+    "task_id",
+    "trace_id",
+    "data_class",
+    "schema_version",
+    "deadline_at",
+    "command_id",
+    "status",
+    "status_source",
+    "updated_at",
+    "source_system",
+    "receipt_refs",
+    "reconciliation_ref"
+  ],
+  "x-tenant-scope": "self",
+  "description": "UNKNOWN 必须查询源系统凭证；不能换新幂等键重发或直接补偿。SUCCEEDED 由权威系统回执确定。",
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "actor_id": "user-demo",
+      "employee_id": "employee-planning",
+      "task_id": "task-demo",
+      "trace_id": "trace-demo",
+      "data_class": "C2",
+      "schema_version": "1.0.0",
+      "deadline_at": "2026-10-05T00:00:00Z",
+      "command_id": "command-demo",
+      "status": "UNKNOWN",
+      "status_source": "transaction-service",
+      "updated_at": "2026-10-05T00:00:00Z",
+      "source_system": null,
+      "receipt_refs": [],
+      "reconciliation_ref": null
+    }
+  ]
+}

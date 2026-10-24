@@ -1,0 +1,577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ServiceManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "service_id": {
+      "type": "string",
+      "enum": [
+        "security-gateway",
+        "control-plane",
+        "decision-service",
+        "hermes-runtime",
+        "manufacturing-core",
+        "tool-gateway",
+        "transaction-service",
+        "trajectory-eval"
+      ]
+    },
+    "owned_schema": {
+      "type": "string",
+      "enum": [
+        "security",
+        "control",
+        "decision",
+        "runtime",
+        "manufacturing",
+        "tools",
+        "transaction",
+        "evidence"
+      ]
+    },
+    "identity_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "independent_process": {
+      "const": true
+    },
+    "migration_directory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "owner 独立迁移目录，必须符合 migrations/{owner}/。"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "mock",
+        "sandbox",
+        "production"
+      ]
+    },
+    "required_dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      },
+      "uniqueItems": true
+    },
+    "authentication_required": {
+      "const": true
+    },
+    "unknown_tenant": {
+      "const": "reject"
+    },
+    "unknown_tool": {
+      "const": "reject"
+    },
+    "cross_owner_database_write": {
+      "const": false
+    },
+    "cross_owner_join": {
+      "const": false
+    },
+    "cross_owner_foreign_key": {
+      "const": false
+    },
+    "liveness_path": {
+      "const": "/health/live"
+    },
+    "readiness_path": {
+      "const": "/health/ready"
+    },
+    "availability_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deadline_seconds": {
+          "$ref": "common-context.json#/$defs/DurationSeconds"
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "production_slo_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "deadline_seconds",
+        "max_attempts",
+        "production_slo_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "全局服务配置；生产 SLO 未冻结时不能生产发布。"
+    },
+    "ready_includes_dependencies": {
+      "const": true
+    },
+    "ready_includes_policy_version": {
+      "const": true
+    },
+    "ready_includes_backlog": {
+      "const": true
+    }
+  },
+  "required": [
+    "service_id",
+    "owned_schema",
+    "identity_ref",
+    "independent_process",
+    "migration_directory",
+    "environment",
+    "required_dependencies",
+    "authentication_required",
+    "unknown_tenant",
+    "unknown_tool",
+    "cross_owner_database_write",
+    "cross_owner_join",
+    "cross_owner_foreign_key",
+    "liveness_path",
+    "readiness_path",
+    "availability_profile",
+    "ready_includes_dependencies",
+    "ready_includes_policy_version",
+    "ready_includes_backlog"
+  ],
+  "x-tenant-scope": "global",
+  "description": "8 个核心运行单元的服务 manifest 契约；非租户业务对象，身份值必须是密钥管理引用。部署实现由 L2 提供。",
+  "x-global-reason": "运行单元、owner 和服务可用性配置是全局部署元数据；不包含租户业务数据。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "security-gateway"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "security"
+          },
+          "migration_directory": {
+            "const": "migrations/security/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "control-plane"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "control"
+          },
+          "migration_directory": {
+            "const": "migrations/control/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "decision-service"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "decision"
+          },
+          "migration_directory": {
+            "const": "migrations/decision/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "hermes-runtime"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "runtime"
+          },
+          "migration_directory": {
+            "const": "migrations/runtime/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "manufacturing-core"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "manufacturing"
+          },
+          "migration_directory": {
+            "const": "migrations/manufacturing/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "tool-gateway"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "tools"
+          },
+          "migration_directory": {
+            "const": "migrations/tools/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "transaction-service"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "transaction"
+          },
+          "migration_directory": {
+            "const": "migrations/transaction/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service_id": {
+            "const": "trajectory-eval"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owned_schema": {
+            "const": "evidence"
+          },
+          "migration_directory": {
+            "const": "migrations/evidence/"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "environment": {
+            "const": "production"
+          }
+        },
+        "required": [
+          "environment"
+        ]
+      },
+      "then": {
+        "properties": {
+          "availability_profile": {
+            "properties": {
+              "production_slo_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "service_id": "security-gateway",
+      "owned_schema": "security",
+      "identity_ref": "identity-security-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/security/",
+      "environment": "mock",
+      "required_dependencies": [
+        "identity-source-demo",
+        "control-plane"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "control-plane",
+      "owned_schema": "control",
+      "identity_ref": "identity-control-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/control/",
+      "environment": "mock",
+      "required_dependencies": [
+        "hermes-runtime",
+        "decision-service",
+        "security-gateway",
+        "transaction-service"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "decision-service",
+      "owned_schema": "decision",
+      "identity_ref": "identity-decision-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/decision/",
+      "environment": "mock",
+      "required_dependencies": [
+        "security-gateway"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "hermes-runtime",
+      "owned_schema": "runtime",
+      "identity_ref": "identity-runtime-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/runtime/",
+      "environment": "mock",
+      "required_dependencies": [
+        "decision-service",
+        "security-gateway",
+        "manufacturing-core",
+        "tool-gateway"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "manufacturing-core",
+      "owned_schema": "manufacturing",
+      "identity_ref": "identity-manufacturing-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/manufacturing/",
+      "environment": "mock",
+      "required_dependencies": [
+        "adapter-demo"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "tool-gateway",
+      "owned_schema": "tools",
+      "identity_ref": "identity-tools-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/tools/",
+      "environment": "mock",
+      "required_dependencies": [
+        "control-plane",
+        "transaction-service",
+        "manufacturing-core"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "transaction-service",
+      "owned_schema": "transaction",
+      "identity_ref": "identity-transaction-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/transaction/",
+      "environment": "mock",
+      "required_dependencies": [
+        "tool-gateway",
+        "control-plane"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    },
+    {
+      "service_id": "trajectory-eval",
+      "owned_schema": "evidence",
+      "identity_ref": "identity-evidence-demo",
+      "independent_process": true,
+      "migration_directory": "migrations/evidence/",
+      "environment": "mock",
+      "required_dependencies": [
+        "broker-demo",
+        "storage-demo"
+      ],
+      "authentication_required": true,
+      "unknown_tenant": "reject",
+      "unknown_tool": "reject",
+      "cross_owner_database_write": false,
+      "cross_owner_join": false,
+      "cross_owner_foreign_key": false,
+      "liveness_path": "/health/live",
+      "readiness_path": "/health/ready",
+      "availability_profile": {
+        "deadline_seconds": "5.000",
+        "max_attempts": 1,
+        "production_slo_ref": null
+      },
+      "ready_includes_dependencies": true,
+      "ready_includes_policy_version": true,
+      "ready_includes_backlog": true
+    }
+  ]
+}

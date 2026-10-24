@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Command",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "employee_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "task_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "deadline_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "command_type": {
+      "const": "pmc.dispatch.publish",
+      "type": "string",
+      "description": "§10.2 示例；P0 仅 Mock。生产动作和 payload 目录待冻结。"
+    },
+    "tool_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tools",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "tool_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "object_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "payload_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "payload": {
+      "$ref": "command.json#/$defs/SchedulePayload"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "幂等域包含 tenant；同键同规范化 payload 返回原命令和当前结果，不同 payload 为409。"
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "policy_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "policy_evaluation_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "approval_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "无须审批可显式 null，但必须有权威策略判定凭证；缺批准不自动放行。"
+    },
+    "payload_hash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "必须由可信服务对 canonical payload 计算并复核，绑定工具版本、对象、tenant/actor、approval 与动作；不得信任 Agent 提供的哈希。输入哈希不匹配时拒绝。"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "employee_id",
+    "task_id",
+    "trace_id",
+    "data_class",
+    "schema_version",
+    "deadline_at",
+    "command_type",
+    "tool_id",
+    "tool_version",
+    "object_id",
+    "payload_version",
+    "payload",
+    "idempotency_key",
+    "expected_version",
+    "policy_version",
+    "policy_evaluation_ref",
+    "approval_ref",
+    "payload_hash"
+  ],
+  "x-tenant-scope": "self",
+  "description": "副作用命令必须先持久化再202。附加绑定字段来自 §6.2/§10.2；不宣称示例具有生产执行许可。",
+  "$defs": {
+    "SchedulePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schedule_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "schedule_version"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "§10.2 的示例 payload；版本序号不是浮点业务数量。"
+    }
+  },
+  "x-execution-constraints": {
+    "trusted_payload_hash": true,
+    "reauthorize_before_execution": true,
+    "approval_binds_payload": true,
+    "persist_before_accepted": true,
+    "same_key_different_payload_http_status": 409,
+    "unknown_query_before_retry": true,
+    "unknown_new_key_resend": false
+  },
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "actor_id": "user-demo",
+      "employee_id": "employee-planning",
+      "task_id": "task-demo",
+      "trace_id": "trace-demo",
+      "data_class": "C2",
+      "schema_version": "1.0.0",
+      "deadline_at": "2026-10-05T00:00:00Z",
+      "command_type": "pmc.dispatch.publish",
+      "tool_id": "tool-demo",
+      "tool_version": "1.0.0",
+      "object_id": "schedule-demo",
+      "payload_version": "1.0.0",
+      "payload": {
+        "schedule_version": 7
+      },
+      "idempotency_key": "tenant-demo:task-demo:publish:1",
+      "expected_version": 6,
+      "policy_version": "policy-demo",
+      "policy_evaluation_ref": "policy-demo",
+      "approval_ref": "approval-demo",
+      "payload_hash": "hash-demo"
+    }
+  ]
+}

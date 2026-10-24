@@ -1,0 +1,46 @@
+# 8 个 V3 运行单元共用的镜像（上游 §15 `infra/compose/`）
+#
+# ## 为什么一个 Dockerfile 服务 8 个单元
+#
+# 上游 §9 把"逻辑服务"与"物理运行单元"分开：本地开发时 8 个单元共享同一份
+# `services` 包与同一套依赖，差异只在**启动参数**（`-m services.<name>`）。
+# 为每个单元复制一份 Dockerfile 只会让依赖版本分叉——
+# 而"依赖版本归部署 manifest 管理"是上游明文要求。
+#
+# ## 为什么用 exec 形式而不是 shell 形式
+#
+# `command: ["-m", "services.security-gateway"]` 由 compose 直接给出，
+# ENTRYPOINT 只负责指定解释器：**不给 shell 插入机会**，
+# 避免 `$VAR` 在容器里被意外展开成空值。
+
+# 与仓库 `backend/.venv` 的 Python 版本保持一致（3.13）
+FROM python:3.13-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# 依赖清单放最前：改代码不触发依赖层重建
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+
+# 只拷运行时需要的东西：服务包与契约
+COPY services/ /app/services/
+COPY packages/ /app/packages/
+
+# 非 root 运行：**容器内不跑 root**
+RUN useradd --create-home --uid 10001 v3 \
+    && mkdir -p /var/lib/v3/state /var/lib/v3/evidence \
+    && chown -R v3:v3 /var/lib/v3 /app
+USER v3
+
+# 健康检查打的是契约里登记的探活路径（`packages/contracts/openapi`）
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
+    CMD python -c "import urllib.request,os,sys; \
+port=os.environ.get('V3_PORT_'+os.environ['V3_SERVICE_ID'].upper().replace('-','_'),'0'); \
+sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{port}/health/live',timeout=2).status==200 else 1)"
+
+ENTRYPOINT ["python"]
+CMD ["-m", "services.security-gateway"]

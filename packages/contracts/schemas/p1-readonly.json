@@ -1,0 +1,877 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1ReadOnlyContracts",
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "QueryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "query_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "query_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "queries",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "query_ref",
+        "purpose",
+        "query_id"
+      ],
+      "x-tenant-scope": "self",
+      "description": "已绑定任务的只读检索；tenant/工厂/岗位权限必须从可信身份和任务取得，不能接受用户自报 ACL；只允许已登记的只读查询目录。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    },
+    "QueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "p1-knowledge-source.json"
+          },
+          "minItems": 0
+        },
+        "classification": {
+          "$ref": "p1-classification.json"
+        },
+        "retrieval_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "acl_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "acl_ref": {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            "acl_version": {
+              "$ref": "common-context.json#/$defs/Version"
+            },
+            "pre_retrieval_tenant_filter": {
+              "type": "boolean",
+              "const": true
+            },
+            "pre_retrieval_factory_filter": {
+              "type": "boolean",
+              "const": true
+            },
+            "pre_retrieval_role_filter": {
+              "type": "boolean",
+              "const": true
+            },
+            "post_return_acl_recheck": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "acl_ref",
+            "acl_version",
+            "pre_retrieval_tenant_filter",
+            "pre_retrieval_factory_filter",
+            "pre_retrieval_role_filter",
+            "post_return_acl_recheck"
+          ],
+          "x-tenant-scope": "inherited",
+          "description": "ACL 必须在候选召回前作用于 tenant/工厂/岗位，返回后再校验当前权限；标志来自可信检索器，不由 LLM 生成。"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "sources",
+        "classification",
+        "retrieval_version",
+        "acl_check"
+      ],
+      "x-tenant-scope": "self",
+      "description": "受 ACL 过滤的来源集合。空结果表示无可见来源，不是跨租户存在性证据；每次返回重新分级。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C0",
+                    "enum": [
+                      "C0"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C0",
+                    "enum": [
+                      "C0"
+                    ]
+                  }
+                }
+              },
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C1",
+                    "enum": [
+                      "C1"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C1",
+                    "enum": [
+                      "C1"
+                    ]
+                  }
+                }
+              },
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C2",
+                    "enum": [
+                      "C2"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C2",
+                    "enum": [
+                      "C2"
+                    ]
+                  }
+                }
+              },
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C3",
+                    "enum": [
+                      "C3"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C3",
+                    "enum": [
+                      "C3"
+                    ]
+                  }
+                }
+              },
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2",
+                        "C3"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C4",
+                    "enum": [
+                      "C4"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C4",
+                    "enum": [
+                      "C4"
+                    ]
+                  }
+                }
+              },
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2",
+                        "C3",
+                        "C4"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity",
+        "source_tenant_factory_task_trace_match",
+        "source_complete_in_classification",
+        "source_reference_acl_and_version_verified"
+      ]
+    },
+    "Answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "answer_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "p1-knowledge-source.json"
+          },
+          "minItems": 1
+        },
+        "classification": {
+          "$ref": "p1-classification.json"
+        },
+        "model_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "policy_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "output_schema_passed": {
+          "type": "boolean",
+          "const": true
+        },
+        "output_leak_scan_passed": {
+          "type": "boolean",
+          "const": true
+        },
+        "consumer_acl_verified": {
+          "type": "boolean",
+          "const": true
+        },
+        "audit_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "answer_ref",
+        "sources",
+        "classification",
+        "model_version",
+        "policy_version",
+        "output_schema_passed",
+        "output_leak_scan_passed",
+        "consumer_acl_verified",
+        "audit_refs"
+      ],
+      "x-tenant-scope": "self",
+      "description": "§6.1 已完成只读任务的回答引用。无可追溯来源不得返回此成功形状；未完成任务仍查询 P0 task 投影，不创建回答状态。无来源/未完成读取的 HTTP 细分语义待冻结，默认拒绝或依赖不可用。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C0",
+                    "enum": [
+                      "C0"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C1",
+                    "enum": [
+                      "C1"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C2",
+                    "enum": [
+                      "C2"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C3",
+                    "enum": [
+                      "C3"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2",
+                        "C3"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "data_class": {
+                    "const": "C4",
+                    "enum": [
+                      "C4"
+                    ]
+                  }
+                },
+                "required": [
+                  "data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "items": {
+                  "properties": {
+                    "data_class": {
+                      "enum": [
+                        "C0",
+                        "C1",
+                        "C2",
+                        "C3",
+                        "C4"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "output_data_class": {
+                    "const": "C0"
+                  }
+                },
+                "required": [
+                  "output_data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C0",
+                    "enum": [
+                      "C0"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "output_data_class": {
+                    "const": "C1"
+                  }
+                },
+                "required": [
+                  "output_data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C1",
+                    "enum": [
+                      "C1"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "output_data_class": {
+                    "const": "C2"
+                  }
+                },
+                "required": [
+                  "output_data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C2",
+                    "enum": [
+                      "C2"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "output_data_class": {
+                    "const": "C3"
+                  }
+                },
+                "required": [
+                  "output_data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C3",
+                    "enum": [
+                      "C3"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "properties": {
+                  "output_data_class": {
+                    "const": "C4"
+                  }
+                },
+                "required": [
+                  "output_data_class"
+                ]
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "context": {
+                "properties": {
+                  "data_class": {
+                    "const": "C4",
+                    "enum": [
+                      "C4"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity",
+        "source_tenant_factory_task_trace_match",
+        "source_complete_in_classification",
+        "source_reference_acl_and_version_verified",
+        "answer_class_matches_classification_output",
+        "sensitive_answer_same_domain_only"
+      ]
+    }
+  },
+  "x-readonly-policy": {
+    "business_side_effects": false,
+    "arbitrary_sql": false,
+    "arbitrary_url": false,
+    "unknown_tool": "reject",
+    "acl_authority": "trusted_identity_and_registry",
+    "memory_copy": false,
+    "source_tenant_task_trace_match": true,
+    "source_snapshot_hash_and_version_verified": true,
+    "source_complete_in_classification": true,
+    "answer_delivery": "authorized_same_domain_consumer",
+    "sensitive_answer_via_dmz": false
+  }
+}

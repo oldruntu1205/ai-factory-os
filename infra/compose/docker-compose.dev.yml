@@ -1,0 +1,135 @@
+# V3.0 开发环境编排（上游 §15 `infra/compose/`）
+#
+# 目的：**本地能起一整套 V3 运行时**。与 V2.1 的根 `docker-compose.yml` 并存——
+# 那个是单体全栈编排（postgres/redis/前端），本文件只编 **8 个 V3 运行单元**。
+#
+# ## 三条纪律
+#
+# 1. **端口不写死**：一律 `${V3_PORT_XXX:-8101}`，与代码里的默认端口一致
+#    （代码侧读同名环境变量，见 `services/_kernel/registry.py`）。
+# 2. **不硬编码凭据**：全部走环境变量，且**无默认值**——
+#    缺变量时 compose 直接报错，而不是悄悄用一个弱默认值跑起来。
+# 3. **网络按上游的域边界切**：`frontdoor`（对外）/`internal`（服务间）/
+#    `egress`（出域）。`internal` 标 `internal: true`，容器**没有**对外路由。
+#
+# 运行：`docker compose -f infra/compose/docker-compose.dev.yml up -d`
+
+name: v3-dev
+
+x-service-common: &service-common
+  build:
+    # 构建上下文是**仓库根**：8 个服务共用同一个 `services` 包
+    context: ../..
+    dockerfile: infra/compose/Dockerfile.service
+  restart: unless-stopped
+  environment: &common-env
+    # 状态目录与证据目录挂到卷上，容器重建不丢事实
+    V3_STATE_DIR: /var/lib/v3/state
+    V3_EVIDENCE_DIR: /var/lib/v3/evidence
+    # 服务发现：各单元按 service_id 互相寻址
+    V3_REGISTRY_PATH: /app/services/_kernel/registry.mock.json
+    V3_ENVIRONMENT: development
+  volumes:
+    - v3-state:/var/lib/v3/state
+    - v3-evidence:/var/lib/v3/evidence
+  networks:
+    - internal
+
+services:
+  security-gateway:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: security-gateway
+      V3_PORT_SECURITY_GATEWAY: ${V3_PORT_SECURITY_GATEWAY:-8101}
+    command: ["-m", "services.security-gateway"]
+    ports:
+      # 只有安全网关对外暴露；其余单元只在 internal 网络上可被寻址
+      - "${V3_PORT_SECURITY_GATEWAY:-8101}:${V3_PORT_SECURITY_GATEWAY:-8101}"
+    networks:
+      - internal
+      - frontdoor
+
+  control-plane:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: control-plane
+      V3_PORT_CONTROL_PLANE: ${V3_PORT_CONTROL_PLANE:-8102}
+    command: ["-m", "services.control-plane"]
+    expose: ["${V3_PORT_CONTROL_PLANE:-8102}"]
+
+  decision-service:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: decision-service
+      V3_PORT_DECISION_SERVICE: ${V3_PORT_DECISION_SERVICE:-8103}
+    command: ["-m", "services.decision-service"]
+    expose: ["${V3_PORT_DECISION_SERVICE:-8103}"]
+
+  hermes-runtime:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: hermes-runtime
+      V3_PORT_HERMES_RUNTIME: ${V3_PORT_HERMES_RUNTIME:-8104}
+    command: ["-m", "services.hermes-runtime"]
+    expose: ["${V3_PORT_HERMES_RUNTIME:-8104}"]
+
+  manufacturing-core:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: manufacturing-core
+      V3_PORT_MANUFACTURING_CORE: ${V3_PORT_MANUFACTURING_CORE:-8105}
+    command: ["-m", "services.manufacturing-core"]
+    expose: ["${V3_PORT_MANUFACTURING_CORE:-8105}"]
+    # Edge 的 `/edge/v1/**` 在本地由本单元承载（生产是 Edge Gateway）
+    networks:
+      - internal
+
+  tool-gateway:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: tool-gateway
+      V3_PORT_TOOL_GATEWAY: ${V3_PORT_TOOL_GATEWAY:-8106}
+    command: ["-m", "services.tool-gateway"]
+    expose: ["${V3_PORT_TOOL_GATEWAY:-8106}"]
+
+  transaction-service:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: transaction-service
+      V3_PORT_TRANSACTION_SERVICE: ${V3_PORT_TRANSACTION_SERVICE:-8107}
+    command: ["-m", "services.transaction-service"]
+    expose: ["${V3_PORT_TRANSACTION_SERVICE:-8107}"]
+
+  trajectory-eval:
+    <<: *service-common
+    environment:
+      <<: *common-env
+      V3_SERVICE_ID: trajectory-eval
+      V3_PORT_TRAJECTORY_EVAL: ${V3_PORT_TRAJECTORY_EVAL:-8108}
+    command: ["-m", "services.trajectory-eval"]
+    expose: ["${V3_PORT_TRAJECTORY_EVAL:-8108}"]
+
+networks:
+  # 对外层：只有明确需要被外部调用时才接入
+  frontdoor:
+    driver: bridge
+  # 服务间层：**没有对外路由**（上游要求内外接口不同认证受众）
+  internal:
+    driver: bridge
+    internal: true
+  # 中心 ← Edge 的受控上行。独立成一个域，因为它的**容忍中断**特性与内网不同：
+  # Edge 会断连，恢复后补报事实（上游 §8.3），不能假设长连接。
+  edge-uplink:
+    driver: bridge
+    internal: true
+
+volumes:
+  v3-state:
+  v3-evidence:

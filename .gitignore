@@ -47,6 +47,8 @@ _manual_*.txt
 _manual_*.json
 
 # ===== 前端（前端独立构建发布，不进自动同步范围） =====
+**/node_modules/
+**/dist/
 frontend/node_modules/
 frontend/dist/
 
@@ -62,3 +64,18 @@ frontend/dist/
 
 # ===== 工作台内部目录（非项目代码，含本地记忆） =====
 .workbuddy/
+
+# ===== V3 本地开发运行时（含 JWT token / pid / 日志 / 证据快照） =====
+.v3-dev/
+
+# ===== pytest 临时目录 =====
+pytest-of-*/
+.pytest_cache/
+
+# ===== 视频素材工程中间产物（体积大，可由源码重生成） =====
+videos/ai-factory-promo/node_modules/
+videos/ai-factory-promo/out/
+videos/ai-factory-promo/tmp/
+videos/ai-factory-promo/analysis/*.wav
+videos/ai-factory-promo/analysis/*.raw
+

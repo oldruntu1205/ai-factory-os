@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Error",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "description": "业务错误码标识待冻结；上位文档只定义 HTTP 错误分类，禁止凭空设定生产业务错误码。"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "description": "可展示的脱敏说明；不得包含密钥或敏感正文。"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "details": {
+      "$ref": "error.json#/$defs/Details"
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "trace_id",
+    "retryable",
+    "details"
+  ],
+  "x-tenant-scope": "global",
+  "description": "统一错误体；身份拒绝时可能没有已验证 tenant，因此是显式全局对象。",
+  "x-global-reason": "认证失败可能尚无可信 tenant；仅 trace_id 与脱敏诊断。",
+  "$defs": {
+    "Details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "denied_field": {
+          "type": "string",
+          "enum": [
+            "tenant_id",
+            "tool_id",
+            "data_class",
+            "model_backend"
+          ]
+        },
+        "object_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason_ref": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        }
+      },
+      "required": [],
+      "x-tenant-scope": "global",
+      "description": "脱敏诊断结构；可为空，禁止任意键或原始 payload。",
+      "x-global-reason": "从统一错误体继承 trace_id，仅容纳脱敏诊断。"
+    }
+  }
+}

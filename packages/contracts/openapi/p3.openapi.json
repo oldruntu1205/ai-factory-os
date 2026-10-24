@@ -1,0 +1,1454 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "AI Factory P3 受控写入契约扩展",
+    "version": "3.0.0",
+    "description": "唯一上位依据：AI Factory V3.0 §2/§3/§5/§6/§10/§12/§16/§17。仅新增接口；不承诺跨系统原子事务；超时不能证明外部未执行。"
+  },
+  "paths": {
+    "/internal/v1/tool-requests/normalize": {
+      "post": {
+        "operationId": "p3__tool__post___internal_v1_tool_requests_normalize",
+        "summary": "可信服务读取受控输入、规范化并计算绑定哈希",
+        "x-owner": "tool",
+        "x-runtime-unit": "tool-gateway",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "trusted_normalization_and_hash",
+          "no_business_side_effect"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Normalized"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NormalizeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/tools/{tool_id}/write-admission": {
+      "get": {
+        "operationId": "p3__tool__get___internal_v1_tools_tool_id_write_admission",
+        "summary": "读取 ToolSpec 能力位与无人值守高风险准入约束",
+        "x-owner": "tool",
+        "x-runtime-unit": "tool-gateway",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "trusted_tool_registry",
+          "any_false_capability_denies_unattended_high_risk",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Admission"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "tool_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/approvals/bindings": {
+      "post": {
+        "operationId": "p3__control__post___internal_v1_approvals_bindings",
+        "summary": "建立可信批准绑定；批准仍使用 P0 decisions 接口",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "trusted_binding_lookup",
+          "approval_binding_and_audit_durable"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalBinding"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/{approval_id}/fact": {
+      "get": {
+        "operationId": "p3__control__get___api_v1_approvals_approval_id_fact",
+        "summary": "读取独立批准事实与绑定/有效期",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L0",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "business_approval_acl",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalFact"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/approvals/pre-execution-review": {
+      "post": {
+        "operationId": "p3__control__post___internal_v1_approvals_pre_execution_review",
+        "summary": "执行前再验证批准/哈希/策略/版本/权限/租约",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L1",
+        "x-operation-kind": "fact",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "current_authority_review",
+          "dependency_unavailable_fail_closed"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/commands/controlled": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_commands_controlled",
+        "summary": "持久化 P3 命令；同键同绑定返回同命令，异 payload 为 409",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "durable_command_before_202",
+          "canonical_binding_idempotency",
+          "no_bypass_via_p0_write_routes"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/commands/{command_id}/execution-record": {
+      "get": {
+        "operationId": "p3__transaction__get___internal_v1_commands_command_id_execution_record",
+        "summary": "读取 Command 权威状态、执行凭证及分离的业务/过账结果",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "authority_receipt_only_success",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/commands/{command_id}/leases": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_commands_command_id_leases",
+        "summary": "CAS 取得或续租当前 worker 租约与串行对象锁",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "lease_and_object_fencing_cas",
+          "only_current_holder_can_renew",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lease"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/commands/{command_id}/execute": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_commands_command_id_execute",
+        "summary": "持久化执行意图，EXECUTING 前复核；响应仅受理",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "fresh_review_before_EXECUTING",
+          "current_fencing_and_cancel_cas",
+          "query_existing_command_before_resume",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/tool-executions/controlled": {
+      "post": {
+        "operationId": "p3__tool__post___internal_v1_tool_executions_controlled",
+        "summary": "仅 Transaction 身份；再核授权并受控派发 adapter",
+        "x-owner": "tool",
+        "x-runtime-unit": "tool-gateway",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "transaction_restricted_identity_only",
+          "current_review_at_tool_entry",
+          "adapter_expected_version_and_object_lock"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolExecuteRequest"
+              }
+            }
+          }
+        },
+        "x-required-caller": "transaction-service"
+      }
+    },
+    "/internal/v1/commands/{command_id}/reconcile": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_commands_command_id_reconcile",
+        "summary": "查询源系统，记录权威结果/同键重试候选/人工收敛",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "fact",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "query_authority_before_retry",
+          "no_new_key_no_direct_compensation",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvergenceRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/commands/{command_id}/reconciliation": {
+      "get": {
+        "operationId": "p3__transaction__get___internal_v1_commands_command_id_reconciliation",
+        "summary": "读取 UNKNOWN 收敛记录、候选与禁止动作",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "no_success_without_verified_receipt",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvergenceRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/sagas": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_sagas",
+        "summary": "持久化 Saga 计划与步骤账，后续执行逐步批准",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "durable_plan_and_steps_before_dispatch"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SagaAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SagaCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/sagas/{saga_id}": {
+      "get": {
+        "operationId": "p3__transaction__get___internal_v1_sagas_saga_id_",
+        "summary": "读取步骤账、阶段分支及补偿/人工状态",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "no_COMPENSATED_without_verified_compensation_receipts",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SagaView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "saga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    },
+    "/internal/v1/sagas/{saga_id}/compensations": {
+      "post": {
+        "operationId": "p3__transaction__post___internal_v1_sagas_saga_id_compensations",
+        "summary": "核实阶段及恢复顺序，创建新的受控补偿命令",
+        "x-owner": "transaction",
+        "x-runtime-unit": "transaction-service",
+        "x-interface-layer": "L3",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "no_UNKNOWN_compensation",
+          "physical_before_accounting",
+          "new_command_key_and_receipt",
+          "fresh_compensation_permission",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "saga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompensationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/cancellation-requests": {
+      "post": {
+        "operationId": "p3__control__post___api_v1_tasks_task_id_cancellation_requests",
+        "summary": "记录取消意图并停止未开始步骤，已开始由 Transaction 确认",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L0",
+        "x-operation-kind": "command",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "cancel_intent_durable",
+          "stop_start_race_cas",
+          "do_not_erase_started_side_effects",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "202": {
+            "description": "仅持久化受理；不证明执行成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancellationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/cancellation-requests/{request_id}": {
+      "get": {
+        "operationId": "p3__control__get___api_v1_tasks_task_id_cancellation_requests_request_id_",
+        "summary": "读取按步骤分解的取消结果与确认/补偿进度",
+        "x-owner": "control",
+        "x-runtime-unit": "control-plane",
+        "x-interface-layer": "L0",
+        "x-operation-kind": "query",
+        "x-source": "§5/§6, §10, §12, §16, §17",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "tenant_matches_context_and_authenticated_identity",
+          "registered_tenant_tool_action",
+          "delegated_actor_scope",
+          "deadline",
+          "reference_tenant_acl",
+          "no_sensitive_content_in_logs",
+          "transaction_is_execution_authority",
+          "CANCELLED_is_not_reversal",
+          "path_ids_equal_body_and_persisted_record"
+        ],
+        "responses": {
+          "200": {
+            "description": "可信记录；HTTP 200 不代表业务成功或过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommonContext": {
+        "$ref": "p0.openapi.json#/components/schemas/CommonContext"
+      },
+      "Error": {
+        "$ref": "p0.openapi.json#/components/schemas/Error"
+      },
+      "ToolSpec": {
+        "$ref": "p0.openapi.json#/components/schemas/ToolSpec"
+      },
+      "AuthorityReceipt": {
+        "$ref": "../schemas/p15-receipt.json"
+      },
+      "NormalizeRequest": {
+        "$ref": "../schemas/p3-approval.json#/$defs/NormalizeRequest"
+      },
+      "Normalized": {
+        "$ref": "../schemas/p3-approval.json#/$defs/Normalized"
+      },
+      "BindingRequest": {
+        "$ref": "../schemas/p3-approval.json#/$defs/BindingRequest"
+      },
+      "ApprovalBinding": {
+        "$ref": "../schemas/p3-approval.json#/$defs/ApprovalBinding"
+      },
+      "ApprovalFact": {
+        "$ref": "../schemas/p3-approval.json#/$defs/Fact"
+      },
+      "ReviewRequest": {
+        "$ref": "../schemas/p3-approval.json#/$defs/ReviewRequest"
+      },
+      "Review": {
+        "$ref": "../schemas/p3-approval.json#/$defs/Review"
+      },
+      "Admission": {
+        "$ref": "../schemas/p3-tool-admission.json#/$defs/Admission"
+      },
+      "SubmitRequest": {
+        "$ref": "../schemas/p3-command.json#/$defs/SubmitRequest"
+      },
+      "CommandAccepted": {
+        "$ref": "../schemas/p3-command.json#/$defs/Accepted"
+      },
+      "CommandView": {
+        "$ref": "../schemas/p3-command.json#/$defs/View"
+      },
+      "LeaseRequest": {
+        "$ref": "../schemas/p3-execution.json#/$defs/LeaseRequest"
+      },
+      "Lease": {
+        "$ref": "../schemas/p3-execution.json#/$defs/Lease"
+      },
+      "ExecuteRequest": {
+        "$ref": "../schemas/p3-execution.json#/$defs/ExecuteRequest"
+      },
+      "ToolExecuteRequest": {
+        "$ref": "../schemas/p3-execution.json#/$defs/ToolExecuteRequest"
+      },
+      "ReconcileRequest": {
+        "$ref": "../schemas/p3-unknown.json#/$defs/Request"
+      },
+      "ConvergenceRecord": {
+        "$ref": "../schemas/p3-unknown.json#/$defs/Record"
+      },
+      "SagaCreateRequest": {
+        "$ref": "../schemas/p3-saga.json#/$defs/CreateRequest"
+      },
+      "SagaAccepted": {
+        "$ref": "../schemas/p3-saga.json#/$defs/Accepted"
+      },
+      "SagaView": {
+        "$ref": "../schemas/p3-saga.json#/$defs/View"
+      },
+      "CompensationRequest": {
+        "$ref": "../schemas/p3-saga.json#/$defs/CompensationRequest"
+      },
+      "CancellationRequest": {
+        "$ref": "../schemas/p3-cancellation.json#/$defs/Request"
+      },
+      "CancellationAccepted": {
+        "$ref": "../schemas/p3-cancellation.json#/$defs/Accepted"
+      },
+      "CancellationResult": {
+        "$ref": "../schemas/p3-cancellation.json#/$defs/Result"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "$ref": "p0.openapi.json#/components/responses/Error400"
+      },
+      "Error401": {
+        "$ref": "p0.openapi.json#/components/responses/Error401"
+      },
+      "Error403": {
+        "$ref": "p0.openapi.json#/components/responses/Error403"
+      },
+      "Error409": {
+        "$ref": "p0.openapi.json#/components/responses/Error409"
+      },
+      "Error422": {
+        "$ref": "p0.openapi.json#/components/responses/Error422"
+      },
+      "Error429": {
+        "$ref": "p0.openapi.json#/components/responses/Error429"
+      },
+      "Error503": {
+        "$ref": "p0.openapi.json#/components/responses/Error503"
+      }
+    },
+    "parameters": {
+      "Context": {
+        "$ref": "p0.openapi.json#/components/parameters/Context"
+      }
+    },
+    "securitySchemes": {
+      "ExternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/ExternalIdentity"
+      },
+      "InternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/InternalIdentity"
+      }
+    }
+  },
+  "x-contract-extension": {
+    "stage": "p3",
+    "new_interface_layer": false,
+    "upstream_version": "3.0.0",
+    "immutable_baselines": [
+      "p0",
+      "p1",
+      "p15"
+    ],
+    "existing_decision_endpoint": "POST /api/v1/approvals/{approval_id}/decisions",
+    "existing_receipt_endpoint": "POST /internal/v1/commands/{command_id}/receipts"
+  },
+  "x-execution-constraints": {
+    "cross_system_atomicity": false,
+    "timeout_means_failed": false,
+    "UNKNOWN_is_success": false,
+    "accepted_is_posted": false,
+    "AUTHORIZED_is_posted": false,
+    "p0_write_route_bypass": false,
+    "mock_before_sandbox": true,
+    "contract_gate_is_runtime_acceptance": false
+  },
+  "x-audit-policy": {
+    "controlled_refs_and_hashes_only": true,
+    "sensitive_payload_in_examples_or_audit": false
+  },
+  "x-upstream-alignment": {
+    "§2 原则5": [
+      "p3-command.json",
+      "p3-execution.json",
+      "p3-unknown.json",
+      "p3-saga.json"
+    ],
+    "§3": [
+      "p3-approval.json",
+      "p3-command.json"
+    ],
+    "§5/§6.2/§6.3": [
+      "p3-approval.json",
+      "p3-unknown.json",
+      "p3-saga.json"
+    ],
+    "§10 ToolSpec": [
+      "p3-tool-admission.json"
+    ],
+    "§12": [
+      "p3-command.json",
+      "p3-execution.json",
+      "p3-cancellation.json",
+      "p3-saga.json"
+    ],
+    "§16": "timeout/重启/并发批准/补偿失败可收敛；Mock通过再sandbox",
+    "A05": "p3-unknown.json",
+    "A06": "p3-approval.json",
+    "A08": "p3-saga.json",
+    "A14": "p3-command.json"
+  }
+}

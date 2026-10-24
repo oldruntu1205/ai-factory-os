@@ -1,0 +1,781 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 frozen thresholds and shadow measurements",
+  "x-schema-container": true,
+  "$defs": {
+    "Threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "threshold_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "behavior_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "frozen": {
+          "const": true
+        },
+        "frozen_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "frozen_by_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "threshold_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "coverage_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "coverage_spec_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "metrics_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "metrics_spec_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "minimum_continuous_seconds": {
+          "type": "integer",
+          "minimum": 1209600
+        },
+        "required_conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "condition_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "minimum_samples": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "condition_ref",
+              "minimum_samples"
+            ],
+            "x-tenant-scope": "inherited"
+          },
+          "minItems": 1
+        },
+        "minimum_coverage_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_deviation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deviation_unit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "maximum_latency_ms": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p50": {
+              "type": "number",
+              "minimum": 0
+            },
+            "p95": {
+              "type": "number",
+              "minimum": 0
+            },
+            "p99": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "p50",
+            "p95",
+            "p99"
+          ],
+          "x-tenant-scope": "inherited"
+        },
+        "maximum_timeout_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_false_positive_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_false_negative_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_rejection_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibration_package_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "calibration_package_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "hardware_manifest_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "hardware_manifest_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "approval_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "threshold_id",
+        "scenario_ref",
+        "behavior_hash",
+        "frozen",
+        "frozen_at",
+        "frozen_by_ref",
+        "threshold_hash",
+        "coverage_spec_ref",
+        "coverage_spec_hash",
+        "metrics_spec_ref",
+        "metrics_spec_hash",
+        "minimum_continuous_seconds",
+        "required_conditions",
+        "minimum_coverage_ratio",
+        "maximum_deviation",
+        "deviation_unit_ref",
+        "maximum_latency_ms",
+        "maximum_timeout_rate",
+        "maximum_false_positive_rate",
+        "maximum_false_negative_rate",
+        "maximum_rejection_rate",
+        "calibration_package_ref",
+        "calibration_package_hash",
+        "hardware_manifest_ref",
+        "hardware_manifest_hash",
+        "approval_evidence_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "数值均由场景冻结记录提供；本契约不填生产阈值。冻结记录必须早于对应影子观察开始且不可原位修改。"
+    },
+    "Report": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "report_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "threshold_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "threshold_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "behavior_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "started_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "ended_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "continuous_observation_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "production_comparison": {
+          "const": true
+        },
+        "condition_measurements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "condition_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "observed_samples": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observation_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "observation_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "condition_ref",
+              "observed_samples",
+              "observation_ref",
+              "observation_hash"
+            ],
+            "x-tenant-scope": "inherited"
+          },
+          "minItems": 1
+        },
+        "measured_coverage_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "measured_deviation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deviation_unit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "latency_ms": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p50": {
+              "type": "number",
+              "minimum": 0
+            },
+            "p95": {
+              "type": "number",
+              "minimum": 0
+            },
+            "p99": {
+              "type": "number",
+              "minimum": 0
+            },
+            "feature_extraction": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p50": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p95": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p99": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "p50",
+                "p95",
+                "p99"
+              ],
+              "x-tenant-scope": "inherited"
+            },
+            "queue": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p50": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p95": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p99": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "p50",
+                "p95",
+                "p99"
+              ],
+              "x-tenant-scope": "inherited"
+            },
+            "inference": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p50": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p95": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p99": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "p50",
+                "p95",
+                "p99"
+              ],
+              "x-tenant-scope": "inherited"
+            },
+            "validation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p50": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p95": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "p99": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "p50",
+                "p95",
+                "p99"
+              ],
+              "x-tenant-scope": "inherited"
+            },
+            "protocol_round_trip": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p50": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "p95": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "p99": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "read_only": {
+                  "const": true
+                },
+                "applicable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "p50",
+                "p95",
+                "p99",
+                "read_only",
+                "applicable"
+              ],
+              "x-tenant-scope": "inherited"
+            }
+          },
+          "required": [
+            "p50",
+            "p95",
+            "p99",
+            "feature_extraction",
+            "queue",
+            "inference",
+            "validation",
+            "protocol_round_trip"
+          ],
+          "x-tenant-scope": "inherited",
+          "description": "端到端包含特征、排队、推理、校验与只读协议往返；P4 禁止借测量之名写控制口；不适用项显式记录，不伪造零延迟。"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "false_positive_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_negative_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_positive_denominator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "false_negative_denominator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "false_positive_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_negative_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rejection_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "timeout_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "coverage_gaps_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 0
+        },
+        "measurement_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "measurement_spec_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "hardware_manifest_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "hardware_manifest_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "control_write_disabled": {
+          "const": true
+        },
+        "write_disable_mechanism": {
+          "enum": [
+            "physical",
+            "network",
+            "physical_and_network"
+          ]
+        },
+        "write_disable_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "real_side_effect_count": {
+          "const": 0
+        },
+        "comparison_records_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "comparison_records_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "created_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "context",
+        "report_id",
+        "release_id",
+        "edge_id",
+        "scenario_ref",
+        "threshold_ref",
+        "threshold_hash",
+        "behavior_hash",
+        "started_at",
+        "ended_at",
+        "continuous_observation_seconds",
+        "production_comparison",
+        "condition_measurements",
+        "measured_coverage_ratio",
+        "measured_deviation",
+        "deviation_unit_ref",
+        "latency_ms",
+        "sample_count",
+        "false_positive_count",
+        "false_negative_count",
+        "false_positive_denominator",
+        "false_negative_denominator",
+        "false_positive_rate",
+        "false_negative_rate",
+        "rejection_rate",
+        "timeout_rate",
+        "coverage_gaps_refs",
+        "measurement_spec_ref",
+        "measurement_spec_hash",
+        "hardware_manifest_ref",
+        "hardware_manifest_hash",
+        "control_write_disabled",
+        "write_disable_mechanism",
+        "write_disable_evidence_ref",
+        "real_side_effect_count",
+        "comparison_records_ref",
+        "comparison_records_hash",
+        "created_at"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "只提交实测和已冻结门槛的引用/hash；不接受嵌入或修改门槛。少于14天或工况不足的报告仍可持久化，不能晋级。"
+    },
+    "Evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "report_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "threshold_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "checked_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "threshold_frozen_before_start": {
+              "type": "boolean"
+            },
+            "threshold_hash_matches": {
+              "type": "boolean"
+            },
+            "behavior_unchanged": {
+              "type": "boolean"
+            },
+            "continuous_14_days": {
+              "type": "boolean"
+            },
+            "production_conditions_covered": {
+              "type": "boolean"
+            },
+            "deviation_within_threshold": {
+              "type": "boolean"
+            },
+            "latency_within_threshold": {
+              "type": "boolean"
+            },
+            "errors_within_threshold": {
+              "type": "boolean"
+            },
+            "hardware_matches": {
+              "type": "boolean"
+            },
+            "no_real_side_effects": {
+              "type": "boolean"
+            },
+            "control_write_physically_or_network_disabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "threshold_frozen_before_start",
+            "threshold_hash_matches",
+            "behavior_unchanged",
+            "continuous_14_days",
+            "production_conditions_covered",
+            "deviation_within_threshold",
+            "latency_within_threshold",
+            "errors_within_threshold",
+            "hardware_matches",
+            "no_real_side_effects",
+            "control_write_physically_or_network_disabled"
+          ],
+          "x-tenant-scope": "inherited"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "automatic_approval": {
+          "const": false
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "context",
+        "report_ref",
+        "threshold_ref",
+        "checked_at",
+        "checks",
+        "passed",
+        "automatic_approval",
+        "evidence_refs"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "passed": {
+                "const": true
+              }
+            },
+            "required": [
+              "passed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "checks": {
+                "properties": {
+                  "threshold_frozen_before_start": {
+                    "const": true
+                  },
+                  "threshold_hash_matches": {
+                    "const": true
+                  },
+                  "behavior_unchanged": {
+                    "const": true
+                  },
+                  "continuous_14_days": {
+                    "const": true
+                  },
+                  "production_conditions_covered": {
+                    "const": true
+                  },
+                  "deviation_within_threshold": {
+                    "const": true
+                  },
+                  "latency_within_threshold": {
+                    "const": true
+                  },
+                  "errors_within_threshold": {
+                    "const": true
+                  },
+                  "hardware_matches": {
+                    "const": true
+                  },
+                  "no_real_side_effects": {
+                    "const": true
+                  },
+                  "control_write_physically_or_network_disabled": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "EvaluateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "report_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "threshold_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_threshold_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "context",
+        "report_ref",
+        "threshold_ref",
+        "expected_threshold_hash"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-shadow-policy": {
+    "minimum_continuous_seconds": 1209600,
+    "threshold_frozen_before": "report.started_at",
+    "threshold_and_measurement_separate": true,
+    "threshold_mutable_after_start": false,
+    "report_can_define_threshold": false,
+    "insufficient_conditions": "extend_observation",
+    "fourteen_days_automatically_approve": false,
+    "threshold_comparison_owner": "trajectory-eval",
+    "cross_record_checks": [
+      "threshold_frozen_before_start",
+      "threshold_hash_matches",
+      "behavior_unchanged",
+      "continuous_14_days",
+      "production_conditions_covered",
+      "deviation_within_threshold",
+      "latency_within_threshold",
+      "errors_within_threshold",
+      "hardware_matches",
+      "no_real_side_effects",
+      "control_write_physically_or_network_disabled"
+    ],
+    "ratio_denominator_and_units_frozen": true,
+    "physical_or_network_write_disable_required": true,
+    "observed_write_attempt_is_not_success": true
+  }
+}

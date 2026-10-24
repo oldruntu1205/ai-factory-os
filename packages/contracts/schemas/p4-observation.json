@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 features and inference evidence",
+  "x-schema-container": true,
+  "$defs": {
+    "FeatureRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "source_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sampled_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "deadline_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "mode": {
+          "const": "shadow"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "scenario_ref",
+        "source_ref",
+        "source_hash",
+        "sampled_at",
+        "deadline_at",
+        "mode"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "FeatureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_artifact": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "sampled_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "received_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "feature_payload_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "input_classification_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "unit_and_range_validation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "validation_passed": {
+          "type": "boolean"
+        },
+        "mode": {
+          "const": "shadow"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "feature_record_ref",
+        "release_id",
+        "feature_artifact",
+        "input_schema",
+        "sampled_at",
+        "received_at",
+        "feature_payload_ref",
+        "feature_payload_hash",
+        "input_classification_ref",
+        "unit_and_range_validation_ref",
+        "validation_passed",
+        "mode"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "InferenceRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "model_backend": {
+          "const": "local"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "feature_record_ref",
+        "scenario_ref",
+        "mode",
+        "model_backend"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "InferenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "inference_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "artifacts": {
+          "$ref": "p4-release.json#/$defs/BehaviorBindings"
+        },
+        "output_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "output_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "schema_valid": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "$ref": "p4-guard.json#/$defs/Confidence"
+        },
+        "started_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "ended_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "comparison_only": {
+          "const": true
+        },
+        "execution_allowed": {
+          "const": false
+        },
+        "model_backend": {
+          "const": "local"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "inference_record_ref",
+        "feature_record_ref",
+        "artifacts",
+        "output_ref",
+        "output_hash",
+        "schema_valid",
+        "confidence",
+        "started_at",
+        "ended_at",
+        "mode",
+        "comparison_only",
+        "execution_allowed",
+        "model_backend"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-observation-policy": {
+    "payload": "controlled_reference_and_hash_only",
+    "model_admission_and_input_classification_local_equivalent_to_gateway": true,
+    "cloud_fallback": false,
+    "model_output_is_permission": false,
+    "invalid_output": "durable_rejection_and_baseline",
+    "no_device_command_fields": true
+  }
+}

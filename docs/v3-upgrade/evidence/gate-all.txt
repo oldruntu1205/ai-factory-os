@@ -1,0 +1,260 @@
+# 阶段门禁 p0,p1,p15,p2,p3,p4,assertions,web  2026-10-06T17:14:20+0800
+# python: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe
+
+===== 阶段 P0 =====
+## P0 契约静态门禁
+# 覆盖: 只读 P0 契约集合：接口目录、引用闭合、状态机、枚举封闭性、fail-closed 声明
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p0_contracts.py -q --no-header
+#   ...................                                                      [100%]
+#   19 passed in 0.33s
+# 退出码: 0  (耗时 1.2s)
+
+## 契约元模式校验
+# 覆盖: 用 $schema 声明的元模式校验契约本身；拒绝 $ref 同级关键字这类静默失效
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_contract_meta_validation.py -q --no-header
+#   .......................................sssss............................ [ 80%]
+#   ..................                                                       [100%]
+#   85 passed, 5 skipped in 0.83s
+# 退出码: 0  (耗时 1.7s)
+
+## P0 运行验收
+# 覆盖: 八个真实进程：可启动、拒绝未知 tenant/工具、Mock 闭环可追踪、敏感数据不出域
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p0_runtime -q --no-header
+#   ...................                                                      [100%]
+#   19 passed in 9.33s
+# 退出码: 0  (耗时 10.1s)
+
+## V2.1 回归基线
+# 覆盖: 既有在产能力的 64 项脚本式用例，防止 V3.0 改动破坏旧系统
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe backend/tests/test_hermes_mcp_scheduler_audit.py
+#     [PASS] 统计含 Top 工具
+#     [PASS] 跨租户查询被拒（403）
+#   
+#   ============================================================
+#   通过 64 项，失败 0 项
+#   ============================================================
+#   [stderr] INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+#   [stderr] INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade  -> 219285869b5f, baseline
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade 219285869b5f -> b7d41c9a2e13, tool_call_audits：AI 员工工具调用审计台账
+# 退出码: 0  (耗时 17.5s)
+
+## 跨租户隔离（§15 tests/isolation）
+# 覆盖: A01：别租户的 task 读不到（且先证明本租户读得到，避免假绿）；不存在的 command 在两个租户下回答同构（不泄露存在性）；未登记租户在控制面与决策面都 fail-closed
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/isolation -q --no-header
+#   ...                                                                      [100%]
+#   3 passed in 6.74s
+# 退出码: 0  (耗时 7.6s)
+
+
+===== 阶段 P1 =====
+## P1 契约静态门禁
+# 覆盖: P1 新增 6 接口 + 分级/治理/审计/Vault/来源契约；并锁定 P0 原字节 SHA-256
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p1_contracts.py -q --no-header
+#     Please convert to a list or tuple.
+#     See https://docs.pytest.org/en/stable/deprecations.html#parametrize-iterators
+#       metafunc.parametrize(*marker.args, **marker.kwargs, _param_mark=marker)
+#   
+#   -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+#   188 passed, 3 warnings in 2.95s
+# 退出码: 0  (耗时 3.8s)
+
+## P1 运行验收
+# 覆盖: C3/C4 无出域路径、跨租户检索隔离、只读问答来源可追溯、Vault 授权恢复
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p1_runtime -q --no-header
+#   ...............................................                          [100%]
+#   47 passed in 9.72s
+# 退出码: 0  (耗时 11.0s)
+
+
+===== 阶段 P15 =====
+## P1.5 契约静态门禁
+# 覆盖: P1.5 新增 6 接口 + outbox/inbox/dlq/receipt/lifecycle 契约；锁定 P0+P1 原字节
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p15_contracts.py -q --no-header
+#   ...............................................................          [100%]
+#   63 passed in 0.44s
+# 退出码: 0  (耗时 1.3s)
+
+## 事件一致性语义
+# 覆盖: outbox 原子提交、inbox 去重与版本收敛、迟到保护、DLQ 重放不走旁路
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p15_events -q --no-header
+#   ...............                                                          [100%]
+#   15 passed in 1.41s
+# 退出码: 0  (耗时 2.3s)
+
+## P1.5 运行验收
+# 覆盖: 跨 owner 权威读、事件投递去重/缺版本/迟到、DLQ 处置、权威回执驱动成功
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p15_runtime -q --no-header
+#   ..................                                                       [100%]
+#   18 passed in 8.61s
+# 退出码: 0  (耗时 9.4s)
+
+
+===== 阶段 P2 =====
+## 存储所有权与隔离
+# 覆盖: §13 硬不变量：每 owner 独立 schema/role、无跨 owner 授权与外键、tenant 进隔离域、RLS FORCE
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p2_storage -q --no-header
+#   ............                                                             [100%]
+#   12 passed in 0.03s
+# 退出码: 0  (耗时 0.8s)
+
+## P2 迁移台账与冻结
+# 覆盖: 每 owner 独立迁移 + 内容哈希冻结（防手改已发布迁移）、owner 目录边界、租户表强制 RLS 落在 SQL 文本上、执行器（顺序/幂等/失败即停）
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p2_migrations -q --no-header
+#   ............................................sssssss.............         [100%]
+#   57 passed, 7 skipped in 0.15s
+# 退出码: 0  (耗时 0.9s)
+
+## 运维指标（§14）
+# 覆盖: §14 点名指标全部有定义；标签值取封闭集合（客户名称/Prompt/密钥在格式与取值上双重进不来）；缺数据如实标 NO_DATA 不用 0 冒充
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p2_observability -q --no-header
+#   ....................................                                     [100%]
+#   36 passed in 1.90s
+# 退出码: 0  (耗时 2.8s)
+
+## P2 运行期验收
+# 覆盖: 真实进程：请求必须落指标事实（否则指标永远空）、运维端点可读出、就绪 backlog 反映真实积压、缺必填字段报 400 而非 503
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p2_runtime -q --no-header
+#   ..................................................................       [100%]
+#   66 passed in 8.78s
+# 退出码: 0  (耗时 9.6s)
+
+## 外部系统接入层（§15）
+# 覆盖: ERP/PMC/MES/WMS 原生记录 → V3 事件：产出的信封必须通过 kernel 契约校验；缺字段/单位不符/时区不明一律拒绝而非编造；版本原样取自权威系统
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p2_integrations -q --no-header
+#   .....................................                                    [100%]
+#   37 passed in 0.07s
+# 退出码: 0  (耗时 0.9s)
+
+## 共享领域包（§15）
+# 覆盖: 纯领域约束：阶段名与契约逐字对齐、阶段表由原因码派生、观测侧与现场侧共用同一份词表（漂移探针）、本包不依赖文件/网络/服务
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/domain -q --no-header
+#   ...................................                                      [100%]
+#   35 passed in 0.06s
+# 退出码: 0  (耗时 0.9s)
+
+## Jev 适配层（§3/§13）
+# 覆盖: 决策类型与上游 §3 的封闭清单逐字一致且三处同源（契约/登记表/实现）；8 种类型逐个有明确归宿（实现或显式拒绝，不许静默返回）；内核不再残留决策逻辑；适配器解析对每种坏输入 fail-closed（不退回 mock）；无校准时置信度为 null 且 Mock 不落在自动候选区间（>0.92）
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/decision -q --no-header
+#   .......................................                                  [100%]
+#   39 passed in 5.78s
+# 退出码: 0  (耗时 6.6s)
+
+## 基础设施清单（§15）
+# 覆盖: 部署清单与代码不漂移（服务 id/owner/端口/端口变量名逐项核对）；编排与清单一致；凭据只允许变量引用且默认值为空；内部接口不得从对外域可达
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/infra -q --no-header
+#   ........................................................................ [ 50%]
+#   .......................................................................  [100%]
+#   143 passed in 5.97s
+# 退出码: 0  (耗时 6.8s)
+
+## 管理后台状态契约（§6/A14）
+# 覆盖: 后台显示契约：只有权威回执能说已过账；编排成功但无回执不得显示成功；UNKNOWN 单独显示需对账；结论必带来源与更新时间；汇总与逐行同源
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/web_admin -q --no-header
+#   .............................                                            [100%]
+#   29 passed in 17.99s
+# 退出码: 0  (耗时 18.8s)
+
+## 端到端路由面（§15 tests/e2e）
+# 覆盖: 每条注册路由都真的可达（不得 404/方法不匹配）；探针自身覆盖全部注册路由；影子报告读写往返一致、缺失明确 404、跨租户不可见
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/e2e -q --no-header
+#   ........................................................................ [ 94%]
+#   ....                                                                     [100%]
+#   76 passed in 8.82s
+# 退出码: 0  (耗时 9.6s)
+
+
+===== 阶段 P3 =====
+## P3 契约静态门禁
+# 覆盖: P3 新增 17 接口 + 批准/命令/执行/UNKNOWN/Saga/取消/准入契约；锁定 P0+P1+P1.5 原字节
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p3_contracts.py -q --no-header
+#   ........................................................................ [ 75%]
+#   ........................                                                 [100%]
+#   96 passed in 1.13s
+# 退出码: 0  (耗时 1.9s)
+
+## 受控写入语义
+# 覆盖: 批准绑定与 TOCTOU、UNKNOWN 收敛（禁换键/禁直接补偿）、Saga 实物先于账务、取消、fencing、无人值守准入
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p3_transactions -q --no-header
+#   ................................................                         [100%]
+#   48 passed in 0.14s
+# 退出码: 0  (耗时 0.9s)
+
+## P3 运行验收
+# 覆盖: 受控规范化与绑定哈希（可信服务计算、可重算）、只读/未知工具拒绝、无人值守写入准入
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p3_runtime -q --no-header
+#   ..........................................................               [100%]
+#   58 passed in 16.00s
+# 退出码: 0  (耗时 16.8s)
+
+## 事务边界（§15 tests/transactions）
+# 覆盖: A05/A06 纯函数判据：基线放行（其余拒绝才可归因）、旧审批/payload 变更/权限撤销/对象版本变动、风险等级不得自报、R2 无状态查询不得无人值守写入、已过账须分支处置；UNKNOWN 收敛遍历全部源状态：换新键重发与直接补偿恒定禁止、动作恒在白名单、两表不相交、词表以契约为准
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/transactions -q --no-header
+#   ....................                                                     [100%]
+#   20 passed in 6.67s
+# 退出码: 0  (耗时 7.5s)
+
+
+===== 阶段 P4 =====
+## P4 契约静态门禁
+# 覆盖: P4 新增 17 接口 + 七态发布/冻结门槛/Guard 判定顺序/spool/自治/逐设备回退契约；锁定既有契约原字节
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p4_contracts.py -q --no-header
+#   ........................................................................ [ 63%]
+#   ..........................................                               [100%]
+#   114 passed in 0.88s
+# 退出码: 0  (耗时 1.7s)
+
+## Edge 现场判定语义
+# 覆盖: Guard 判定优先级（置信度最后、硬互锁不可被批准覆盖）、发布状态机与行为性变化重开门禁、spool 去重/TTL/只补报事实、断连自治、逐设备回退、影子禁写
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p4_edge -q --no-header
+#   ..........................................................               [100%]
+#   58 passed in 0.07s
+# 退出码: 0  (耗时 0.9s)
+
+## P4 运行验收
+# 覆盖: 真实进程：七态相邻推进、行为性变化使旧批准失效、影子推理与 Guard **永不产生动作**、spool 只补报事实、断连自治 fail-closed；并自检契约路径可达性
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p4_runtime -q --no-header
+#   ...................                                                      [100%]
+#   19 passed in 8.06s
+# 退出码: 0  (耗时 8.9s)
+
+
+===== 阶段 ASSERTIONS =====
+## A01–A14 断言覆盖门禁
+# 覆盖: 每条上游断言必须指向真实存在的测试；关键套件每个用例必须声明所支撑的断言；partial/未覆盖必须写明缺口
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/assertions -q --no-header
+#   ............                                                             [100%]
+#   12 passed in 1.62s
+# 退出码: 0  (耗时 2.4s)
+
+## 契约未引用测试：tests/contracts/test_contract_inventory_gates.py
+# 覆盖: 反向覆盖：目录里存在但未被任何步骤引用的契约测试，防止「写了却永不执行」
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_contract_inventory_gates.py -q --no-header
+#   ............................                                             [100%]
+#   28 passed in 0.79s
+# 退出码: 0  (耗时 1.6s)
+
+
+===== 阶段 WEB =====
+## 前端 JS/JSX 未定义调用检查
+# 覆盖: JSX 里调用了但没定义也没导入的标识符——`vite build` 查不出这类错（它只转译不解析标识符），而它会让页面整页崩掉。先剥字符串与注释，再收集定义/解构/函数参数/import，报出其余；对项目自身工具函数（v3Terms 等）额外标注「未导入」
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe tools/check_jsx_undefined.py
+#   扫描 44 个 JS/JSX 文件
+#   未发现未定义调用
+# 退出码: 0  (耗时 0.2s)
+
+## BFF 判定与回执取值守卫
+# 覆盖: BFF 的判定逻辑与字段取值：结论推导（只有权威回执能说已过账）、批准可决定性、以及**回执必须从 `authority_receipt` 取**——读错键不会报错，只会让「已过账」永远显示不出来（实测踩过：命令已 SUCCEEDED 且 posting_status=POSTED，任务结论页仍报「未过账」）
+# 命令: node --test
+#   # pass 78
+#   # fail 0
+#   # cancelled 0
+#   # skipped 0
+#   # todo 0
+#   # duration_ms 155.0137
+#   [stderr] (node:41176) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+#   [stderr] (Use `node --trace-warnings ...` to show where the warning was created)
+# 退出码: 0  (耗时 0.2s)
+
+
+结论: 全部通过（exit 0）

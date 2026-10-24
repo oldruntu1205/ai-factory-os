@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 frozen scenario specification",
+  "x-schema-container": true,
+  "$defs": {
+    "Aggregation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "algorithm_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "algorithm_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "field_order": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "missing_field_rule_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "field_dependency_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "independent_calibration_dataset_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "independent_calibration_dataset_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_metric_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "frozen": {
+          "const": true
+        },
+        "frozen_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "approved_by_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "algorithm_ref",
+        "algorithm_version",
+        "algorithm_hash",
+        "field_order",
+        "missing_field_rule_ref",
+        "field_dependency_spec_ref",
+        "independent_calibration_dataset_ref",
+        "independent_calibration_dataset_hash",
+        "task_metric_spec_ref",
+        "frozen",
+        "frozen_at",
+        "approved_by_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "算法是经审定有限目录中的引用；禁止开放文本算法、模型自报概率、默认平均或默认取最小值。多字段相关性与聚合任务指标须独立校准。"
+    },
+    "Specification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "schema_frozen_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "output_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "feature_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "feature_spec_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "condition_domain_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "condition_domain_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "units_and_ranges_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "missing_input_policy_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "action_mapping_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "action_mapping_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "aggregation": {
+          "$ref": "p4-scenario.json#/$defs/Aggregation"
+        },
+        "calibration_package_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "calibration_package_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "confidence_thresholds_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "confidence_thresholds_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "permit_scope_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "interlock_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_fallback_table_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "hardware_manifest_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "timing_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "shadow_threshold_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "frozen": {
+          "const": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "context",
+        "scenario_ref",
+        "scenario_hash",
+        "schema_frozen_at",
+        "input_schema",
+        "output_schema",
+        "feature_spec_ref",
+        "feature_spec_hash",
+        "condition_domain_ref",
+        "condition_domain_hash",
+        "units_and_ranges_ref",
+        "missing_input_policy_ref",
+        "action_mapping_ref",
+        "action_mapping_hash",
+        "aggregation",
+        "calibration_package_ref",
+        "calibration_package_hash",
+        "confidence_thresholds_ref",
+        "confidence_thresholds_hash",
+        "permit_scope_ref",
+        "interlock_spec_ref",
+        "device_fallback_table_ref",
+        "hardware_manifest_ref",
+        "timing_spec_ref",
+        "shadow_threshold_ref",
+        "frozen",
+        "evidence_refs"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-scenario-policy": {
+    "confidence_source": "independent_data_calibrated_task_metric",
+    "llm_self_report_accepted": false,
+    "multi_field_aggregation_frozen": true,
+    "unknown_catalog_or_missing_dependency": "reject",
+    "production_dependency_values": "pending_freeze"
+  }
+}

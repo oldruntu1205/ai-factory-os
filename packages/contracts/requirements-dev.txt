@@ -1,0 +1,13 @@
+# V3.0 契约与骨架 · 开发/门禁依赖
+#
+# 与 backend/requirements.txt 分开维护：backend 是 V2.1 在产运行依赖，
+# 本文件只服务 V3.0 的契约门禁（tests/contracts/）与后续服务骨架的本地验证。
+#
+# 安装（用仓库既有 venv，避免污染系统 Python）：
+#   backend\.venv\Scripts\python.exe -m pip install -r packages\contracts\requirements-dev.txt
+#
+# 运行门禁：
+#   backend\.venv\Scripts\python.exe -m pytest tests\contracts -q
+
+pytest>=8.0.0
+jsonschema>=4.21.0

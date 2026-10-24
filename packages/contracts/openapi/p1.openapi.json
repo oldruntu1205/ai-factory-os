@@ -1,0 +1,710 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "AI Factory V3.0 P1 安全与只读闭环扩展契约",
+    "version": "3.0.0",
+    "description": "v3.0.0 §4.1–§4.3/§6.1/§10/§13/§16。仅新增 P1 接口；P0 不覆盖。HTTP 分类复用 §10.2；业务错误码与排队协议待冻结。"
+  },
+  "paths": {
+    "/internal/v1/classifications/evaluate": {
+      "post": {
+        "operationId": "p1__security___internal_v1_classifications_evaluate_post",
+        "summary": "分类及派生上下文重分级",
+        "x-owner": "security",
+        "x-source": "§4.1",
+        "x-interface-layer": "L2",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Classification"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/egress/evaluate": {
+      "post": {
+        "operationId": "p1__security___internal_v1_egress_evaluate_post",
+        "summary": "可信出域判定，不调用模型",
+        "x-owner": "security",
+        "x-source": "§4.1–§4.3",
+        "x-interface-layer": "L2",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EgressDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EgressEvaluateRequest"
+              }
+            }
+          }
+        },
+        "description": "判定由 security 计算并绑定可信内容/策略/模型版本。允许判定不作为可复用授权票据；P0 model-invocations 必须在实际调用前重新治理，防止判定与调用间内容或权限变更。"
+      }
+    },
+    "/internal/v1/token-vault/tokenize": {
+      "post": {
+        "operationId": "p1__security___internal_v1_token_vault_tokenize_post",
+        "summary": "本地建立按租户/用途/有效期隔离的令牌映射",
+        "x-owner": "security",
+        "x-source": "§4.3",
+        "x-interface-layer": "L2",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokenization"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenizeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/token-vault/restore": {
+      "post": {
+        "operationId": "p1__security___internal_v1_token_vault_restore_post",
+        "summary": "输出扫描后本地授权恢复",
+        "x-owner": "security",
+        "x-source": "§4.3",
+        "x-interface-layer": "L2",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/query": {
+      "post": {
+        "operationId": "p1__manufacturing___internal_v1_knowledge_query_post",
+        "summary": "检索前 ACL 过滤、返回再校验的只读来源检索",
+        "x-owner": "manufacturing",
+        "x-source": "§6.1",
+        "x-interface-layer": "L3",
+        "security": [
+          {
+            "InternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeQueryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeQueryRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/knowledge-answer": {
+      "get": {
+        "operationId": "p1__control___api_v1_tasks_task_id_knowledge_answer_get",
+        "summary": "取得已绑定任务的可追溯只读回答引用",
+        "x-owner": "control",
+        "x-source": "§6.1",
+        "x-interface-layer": "L0",
+        "security": [
+          {
+            "ExternalIdentity": []
+          }
+        ],
+        "x-required-enforcement": [
+          "authenticated_tenant",
+          "registered_tenant",
+          "deny_unknown_tenant",
+          "deny_unknown_tool",
+          "deny_unknown_data_class",
+          "match_nested_tenant",
+          "deadline",
+          "registry_unavailable_reject",
+          "inherit_highest_data_class",
+          "no_public_fallback_on_local_failure",
+          "trusted_acl_before_retrieval",
+          "acl_recheck_on_return",
+          "no_sensitive_content_in_logs",
+          "tenant_matches_context_and_authenticated_identity"
+        ],
+        "x-admission-policy": {
+          "unknown_tenant": "reject",
+          "unknown_tool": "reject",
+          "unknown_data_class": "reject",
+          "unknown_model": "reject",
+          "missing_registry": "reject",
+          "sensitive_nonlocal_model": "reject",
+          "local_failure": "reject_or_queue",
+          "local_failure_public_fallback": false,
+          "tenant_source": "authenticated_identity",
+          "model_output_is_execution_permission": false
+        },
+        "responses": {
+          "200": {
+            "description": "仅表示本次同步受控读取或治理操作完成，不授权业务副作用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Context"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/common-context.json#/$defs/Identifier"
+            }
+          }
+        ],
+        "description": "验证路径 task_id=context.task_id，可信 tenant/工厂/岗位与来源逐一一致；敏感回答引用只由同批准本地域的授权消费者解析，DMZ 不能中转 C3/C4 正文。"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommonContext": {
+        "$ref": "p0.openapi.json#/components/schemas/CommonContext"
+      },
+      "Error": {
+        "$ref": "p0.openapi.json#/components/schemas/Error"
+      },
+      "ClassificationRequest": {
+        "$ref": "../schemas/p1-classification.json#/$defs/Request"
+      },
+      "Classification": {
+        "$ref": "../schemas/p1-classification.json"
+      },
+      "EgressEvaluateRequest": {
+        "$ref": "../schemas/p1-governance.json#/$defs/Request"
+      },
+      "EgressDecision": {
+        "$ref": "../schemas/p1-governance.json"
+      },
+      "EgressAudit": {
+        "$ref": "../schemas/p1-egress-audit.json"
+      },
+      "TokenizeRequest": {
+        "$ref": "../schemas/p1-token-vault.json#/$defs/TokenizeRequest"
+      },
+      "Tokenization": {
+        "$ref": "../schemas/p1-token-vault.json"
+      },
+      "RestoreRequest": {
+        "$ref": "../schemas/p1-token-vault.json#/$defs/RestoreRequest"
+      },
+      "RestoreResult": {
+        "$ref": "../schemas/p1-token-vault.json#/$defs/RestoreResult"
+      },
+      "KnowledgeQueryRequest": {
+        "$ref": "../schemas/p1-readonly.json#/$defs/QueryRequest"
+      },
+      "KnowledgeQueryResult": {
+        "$ref": "../schemas/p1-readonly.json#/$defs/QueryResult"
+      },
+      "KnowledgeAnswer": {
+        "$ref": "../schemas/p1-readonly.json#/$defs/Answer"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "$ref": "p0.openapi.json#/components/responses/Error400"
+      },
+      "Error401": {
+        "$ref": "p0.openapi.json#/components/responses/Error401"
+      },
+      "Error403": {
+        "$ref": "p0.openapi.json#/components/responses/Error403"
+      },
+      "Error404": {
+        "$ref": "p0.openapi.json#/components/responses/Error404",
+        "description": "保留标准响应；上位文档未定义404业务语义，待冻结，不用于泄露跨租户对象存在性。"
+      },
+      "Error409": {
+        "$ref": "p0.openapi.json#/components/responses/Error409"
+      },
+      "Error422": {
+        "$ref": "p0.openapi.json#/components/responses/Error422"
+      },
+      "Error429": {
+        "$ref": "p0.openapi.json#/components/responses/Error429"
+      },
+      "Error503": {
+        "$ref": "p0.openapi.json#/components/responses/Error503"
+      }
+    },
+    "parameters": {
+      "Context": {
+        "$ref": "p0.openapi.json#/components/parameters/Context"
+      }
+    },
+    "securitySchemes": {
+      "ExternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/ExternalIdentity"
+      },
+      "InternalIdentity": {
+        "$ref": "p0.openapi.json#/components/securitySchemes/InternalIdentity"
+      }
+    }
+  },
+  "x-source-version": "3.0.0",
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "unknown_model": "reject",
+    "missing_registry": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "local_failure": "reject_or_queue",
+    "local_failure_public_fallback": false,
+    "tenant_source": "authenticated_identity",
+    "model_output_is_execution_permission": false
+  },
+  "x-governance-order": [
+    {
+      "order": 1,
+      "id": "identity_tenant",
+      "label": "身份与租户校验"
+    },
+    {
+      "order": 2,
+      "id": "access_scope",
+      "label": "工具/检索访问范围"
+    },
+    {
+      "order": 3,
+      "id": "classification",
+      "label": "输入及派生上下文分类"
+    },
+    {
+      "order": 4,
+      "id": "minimization",
+      "label": "最小化与脱敏"
+    },
+    {
+      "order": 5,
+      "id": "dlp_egress",
+      "label": "DLP/出域策略"
+    },
+    {
+      "order": 6,
+      "id": "model_allowlist",
+      "label": "模型白名单"
+    },
+    {
+      "order": 7,
+      "id": "invocation",
+      "label": "调用"
+    },
+    {
+      "order": 8,
+      "id": "output_scan",
+      "label": "输出Schema/泄露扫描"
+    },
+    {
+      "order": 9,
+      "id": "local_token_restore",
+      "label": "本地授权的 Token 恢复"
+    },
+    {
+      "order": 10,
+      "id": "consumption",
+      "label": "用户/工具消费"
+    },
+    {
+      "order": 11,
+      "id": "graded_audit",
+      "label": "分级审计"
+    }
+  ],
+  "x-contract-extension": "仅既有 L0–L5；新增接口名称为 P1 细化基线，不是新增接口层。治理判定不能替代 P0 模型调用入口。",
+  "x-p0-integration": [
+    "/api/v1/tasks",
+    "/internal/v1/decisions",
+    "/internal/v1/runs",
+    "/internal/v1/contexts/query",
+    "/internal/v1/tool-requests",
+    "/internal/v1/model-invocations"
+  ],
+  "x-http-code-freeze": "具体 Error.code、无来源/未完成答案的 HTTP 细分语义、排队恢复协议待冻结；禁止新造业务状态。"
+}

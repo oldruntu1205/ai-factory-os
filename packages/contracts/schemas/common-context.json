@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommonContext",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "employee_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "没有 AI 员工绑定时显式 null。"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "deadline_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "employee_id",
+    "task_id",
+    "trace_id",
+    "data_class",
+    "schema_version",
+    "deadline_at"
+  ],
+  "x-tenant-scope": "self",
+  "description": "公共 Context 的所有键必须显式提供。tenant 来自可信认证，输入值须与认证主体一致；未知 tenant 拒绝。",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "Version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "UtcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$",
+      "description": "UTC ISO8601，仅 Z；禁止本地时区时间。"
+    },
+    "Decimal": {
+      "type": "string",
+      "pattern": "^-?(?:0|[1-9][0-9]*)\\.[0-9]+$",
+      "description": "数量/金额为十进制定点字符串；精度、币种、单位及换算版本须由具体业务 Schema 冻结。"
+    },
+    "DurationSeconds": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.[0-9]+$",
+      "description": "十进制定点秒；Mock 可配置，生产时限待冻结；服务须拒绝零超时。"
+    },
+    "DataClass": {
+      "type": "string",
+      "enum": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "description": "不得缺省或降级；未知等级拒绝。合并上下文及模型输出继承最高等级。"
+    },
+    "RiskClass": {
+      "type": "string",
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "description": "由可信工具元数据与业务规则计算；模型填写值不构成授权。"
+    },
+    "CatalogValue": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "description": "有限目录中的标识，不是自由文本。具体目录待冻结；P0 只可使用显式登记的 Mock 目录，未知或缺目录拒绝。",
+      "x-catalog-required": true
+    },
+    "SchemaBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*\\.json(?:#/[A-Za-z0-9_$~/-]+)?$",
+          "description": "同一 schemas 目录内的 JSON Schema 相对引用；必须存在并校验 hash，禁止 URL。"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "schema_hash": {
+          "type": "string",
+          "minLength": 1,
+          "description": "登记的 Schema hash；由可信登记服务校验。"
+        }
+      },
+      "required": [
+        "schema_ref",
+        "schema_version",
+        "schema_hash"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "RetryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retry_delay_seconds": {
+          "$ref": "common-context.json#/$defs/DurationSeconds"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "retry_delay_seconds"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "必须有上限。UNKNOWN 不因本策略直接重试；先查询外部执行事实。"
+    },
+    "Fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "route": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "reason_code": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        }
+      },
+      "required": [
+        "route",
+        "reason_code"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "已登记安全回退或人工路径；禁止临时生成动作与公网兜底。"
+    }
+  },
+  "x-admission-policy": {
+    "unknown_tenant": "reject",
+    "unknown_tool": "reject",
+    "unknown_data_class": "reject",
+    "sensitive_nonlocal_model": "reject",
+    "tenant_source": "authenticated_identity",
+    "missing_registry": "reject",
+    "model_output_is_execution_permission": false
+  },
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "actor_id": "user-demo",
+      "employee_id": "employee-planning",
+      "task_id": "task-demo",
+      "trace_id": "trace-demo",
+      "data_class": "C2",
+      "schema_version": "1.0.0",
+      "deadline_at": "2026-10-05T00:00:00Z"
+    }
+  ]
+}

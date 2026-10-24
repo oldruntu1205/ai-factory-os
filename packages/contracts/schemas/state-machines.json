@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LifecycleStates",
+  "description": "逐项抄录上位文档 §12 核心状态；不将示意箭头扩写为完整转换矩阵。",
+  "x-schema-container": true,
+  "$defs": {
+    "Task": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED",
+        "RUNNING",
+        "WAITING_APPROVAL",
+        "WAITING_HUMAN",
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "x-source": "§12",
+      "x-core-flow": "ACCEPTED → RUNNING → WAITING_APPROVAL/WAITING_HUMAN → SUCCEEDED/FAILED/CANCELLED"
+    },
+    "Run": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "RUNNING",
+        "CHECKPOINTED",
+        "WAITING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "x-source": "§12",
+      "x-core-flow": "CREATED → RUNNING → CHECKPOINTED/WAITING → COMPLETED/FAILED/CANCELLED"
+    },
+    "Command": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED",
+        "AUTHORIZED",
+        "EXECUTING",
+        "SUCCEEDED",
+        "FAILED",
+        "UNKNOWN",
+        "MANUAL_REVIEW"
+      ],
+      "x-source": "§12",
+      "x-core-flow": "ACCEPTED → AUTHORIZED → EXECUTING → SUCCEEDED/FAILED/UNKNOWN；可进入MANUAL_REVIEW"
+    },
+    "Saga": {
+      "type": "string",
+      "enum": [
+        "RUNNING",
+        "SUCCEEDED",
+        "COMPENSATING",
+        "COMPENSATED",
+        "MANUAL_REVIEW"
+      ],
+      "x-source": "§12",
+      "x-core-flow": "RUNNING → SUCCEEDED；失败后COMPENSATING → COMPENSATED或MANUAL_REVIEW"
+    },
+    "EdgeRelease": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "SCHEMA_FROZEN",
+        "CALIBRATED",
+        "SHADOW",
+        "APPROVED",
+        "ACTIVE",
+        "REVOKED"
+      ],
+      "x-source": "§12",
+      "x-core-flow": "DRAFT → SCHEMA_FROZEN → CALIBRATED → SHADOW → APPROVED → ACTIVE → REVOKED"
+    }
+  }
+}

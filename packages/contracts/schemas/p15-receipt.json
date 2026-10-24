@@ -1,0 +1,477 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15AuthorityReceipt",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "context": {
+      "$ref": "common-context.json"
+    },
+    "command_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "idempotency_key": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "command_payload_hash": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "receipt_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "source_system": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "adapter_unit": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "UNKNOWN",
+        "SUCCEEDED",
+        "FAILED",
+        "NOT_EXECUTED"
+      ]
+    },
+    "authority_receipt_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "authority_receipt_hash": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "authority_verified": {
+      "type": "boolean"
+    },
+    "confirmed_at": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recorded_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "command_status": {
+      "$ref": "state-machines.json#/$defs/Command"
+    },
+    "business_success": {
+      "type": "boolean"
+    },
+    "posting_status": {
+      "type": "string",
+      "enum": [
+        "NOT_CONFIRMED",
+        "NOT_APPLICABLE",
+        "POSTED"
+      ]
+    },
+    "posting_evidence_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status_source": {
+      "const": "transaction-service"
+    }
+  },
+  "required": [
+    "context",
+    "command_id",
+    "idempotency_key",
+    "command_payload_hash",
+    "receipt_id",
+    "source_system",
+    "adapter_unit",
+    "outcome",
+    "authority_receipt_ref",
+    "authority_receipt_hash",
+    "authority_verified",
+    "confirmed_at",
+    "recorded_at",
+    "command_status",
+    "business_success",
+    "posting_status",
+    "posting_evidence_ref",
+    "status_source"
+  ],
+  "x-tenant-scope": "context",
+  "description": "可信 adapter 凭证由 Transaction 独立验证并绑定 tenant/command/原幂等键/canonical payload_hash/源版本；请求自报 verified 或状态不构成事实。只允许权威回执驱动业务成功。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "accepted"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "command_status": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "AUTHORIZED",
+              "EXECUTING",
+              "UNKNOWN",
+              "MANUAL_REVIEW"
+            ]
+          },
+          "business_success": {
+            "const": false
+          },
+          "posting_status": {
+            "type": "string",
+            "enum": [
+              "NOT_CONFIRMED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "posting_evidence_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "UNKNOWN"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "command_status": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "MANUAL_REVIEW"
+            ]
+          },
+          "business_success": {
+            "const": false
+          },
+          "posting_status": {
+            "type": "string",
+            "enum": [
+              "NOT_CONFIRMED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "posting_evidence_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "SUCCEEDED"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authority_receipt_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "authority_receipt_hash": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "authority_verified": {
+            "const": true
+          },
+          "confirmed_at": {
+            "$ref": "common-context.json#/$defs/UtcTimestamp"
+          },
+          "command_status": {
+            "const": "SUCCEEDED"
+          },
+          "business_success": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "FAILED",
+              "NOT_EXECUTED"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authority_receipt_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "authority_receipt_hash": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "authority_verified": {
+            "const": true
+          },
+          "confirmed_at": {
+            "$ref": "common-context.json#/$defs/UtcTimestamp"
+          },
+          "business_success": {
+            "const": false
+          },
+          "posting_status": {
+            "type": "string",
+            "enum": [
+              "NOT_CONFIRMED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "posting_evidence_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "FAILED"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "command_status": {
+            "const": "FAILED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "NOT_EXECUTED"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "command_status": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "MANUAL_REVIEW"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "posting_status": {
+            "enum": [
+              "POSTED"
+            ]
+          }
+        },
+        "required": [
+          "posting_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "SUCCEEDED"
+          },
+          "command_status": {
+            "const": "SUCCEEDED"
+          },
+          "business_success": {
+            "const": true
+          },
+          "authority_verified": {
+            "const": true
+          },
+          "posting_evidence_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "posting_status": {
+            "enum": [
+              "NOT_CONFIRMED",
+              "NOT_APPLICABLE"
+            ]
+          }
+        },
+        "required": [
+          "posting_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "posting_evidence_ref": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "x-success-policy": {
+    "only_authority_receipt": true,
+    "accepted_is_posted": false,
+    "unknown_is_success": false,
+    "success_requires_verified_binding": [
+      "tenant_id",
+      "command_id",
+      "idempotency_key",
+      "command_payload_hash",
+      "source_system",
+      "source_version"
+    ],
+    "not_executed_retry_key": "original",
+    "missing_receipt": "UNKNOWN",
+    "timeout_means_failed": false,
+    "task_run_terminal_is_posting_evidence": false,
+    "succeeded_without_posting_evidence_is_posted": false,
+    "terminal_conflicting_receipt": "manual_review_no_regression"
+  },
+  "x-storage-policy": {
+    "owner": "transaction-service",
+    "unique_key": [
+      "context.tenant_id",
+      "receipt_id"
+    ],
+    "receipt_command_status_and_outbox_same_transaction": true,
+    "append_only_receipt": true,
+    "stale_receipt_regresses_terminal": false,
+    "receipt_same_id_different_evidence": "409"
+  },
+  "x-required-enforcement": [
+    "authenticated_adapter_allowlist",
+    "authority_credential_verified_independently",
+    "receipt_ref_tenant_acl",
+    "bind_receipt_to_persisted_command",
+    "verify_source_version_from_evidence",
+    "no_client_assigned_terminal_state",
+    "no_sensitive_body"
+  ],
+  "$defs": {
+    "Submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_payload_hash": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "receipt_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "source_system": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "authority_receipt_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "authority_receipt_hash": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "idempotency_key",
+        "command_payload_hash",
+        "receipt_id",
+        "source_system",
+        "authority_receipt_ref",
+        "authority_receipt_hash"
+      ],
+      "x-tenant-scope": "context",
+      "description": "只提交受控凭证引用。Transaction 校验来源和凭证，服务端推导 outcome 与终态，重复同 receipt_id 返回既有记录，不重复推进。",
+      "x-required-enforcement": [
+        "path_command_id_equals_body",
+        "tenant_matches_authenticated_identity",
+        "authenticated_adapter_allowlist",
+        "receipt_ref_tenant_acl",
+        "same_receipt_id_different_hash_conflict"
+      ]
+    }
+  }
+}

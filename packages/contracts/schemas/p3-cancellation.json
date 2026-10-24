@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3CancellationWithoutErasingEffects",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "task_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_task_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "reason_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "task_id",
+        "expected_task_version",
+        "idempotency_key",
+        "reason_ref"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "Accepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "task_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "request_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "business_success": {
+          "const": false
+        },
+        "posting_status": {
+          "const": "NOT_CONFIRMED"
+        },
+        "status_url": {
+          "type": "string",
+          "pattern": "^/api/v1/tasks/[A-Za-z0-9._:-]+/cancellation-requests/[A-Za-z0-9._:-]+$"
+        }
+      },
+      "required": [
+        "context",
+        "task_id",
+        "request_id",
+        "status",
+        "business_success",
+        "posting_status",
+        "status_url"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "StepDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_id": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "started": {
+          "type": "boolean"
+        },
+        "stopped_before_start": {
+          "type": "boolean"
+        },
+        "command_status": {
+          "anyOf": [
+            {
+              "$ref": "state-machines.json#/$defs/Command"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirmation_required": {
+          "type": "boolean"
+        },
+        "authority_receipt_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compensation_command_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "step_id",
+        "command_id",
+        "started",
+        "stopped_before_start",
+        "command_status",
+        "confirmation_required",
+        "authority_receipt_ref",
+        "compensation_command_ref",
+        "manual_queue_ref"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "started": {
+                "const": false
+              }
+            },
+            "required": [
+              "started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stopped_before_start": {
+                "const": true
+              },
+              "confirmation_required": {
+                "const": false
+              },
+              "command_status": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "ACCEPTED",
+                      "AUTHORIZED"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authority_receipt_ref": {
+                "type": "null"
+              },
+              "compensation_command_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "started": {
+                "const": true
+              }
+            },
+            "required": [
+              "started"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stopped_before_start": {
+                "const": false
+              },
+              "confirmation_required": {
+                "const": true
+              },
+              "command_id": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "command_status": {
+                "$ref": "state-machines.json#/$defs/Command"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command_status": {
+                "const": "UNKNOWN"
+              }
+            },
+            "required": [
+              "command_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensation_command_ref": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "task_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "request_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "task_status": {
+          "$ref": "state-machines.json#/$defs/Task"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "p3-cancellation.json#/$defs/StepDisposition"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "prevents_new_steps": {
+          "const": true
+        },
+        "side_effects_reconciled": {
+          "type": "boolean"
+        },
+        "applicable_compensations_verified": {
+          "type": "boolean"
+        },
+        "task_cancelled_is_reversal": {
+          "const": false
+        },
+        "business_success": {
+          "const": false
+        },
+        "posting_status": {
+          "const": "NOT_CONFIRMED"
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "status_source": {
+          "const": "control-plane"
+        },
+        "execution_status_source": {
+          "const": "transaction-service"
+        }
+      },
+      "required": [
+        "context",
+        "task_id",
+        "request_id",
+        "task_status",
+        "steps",
+        "prevents_new_steps",
+        "side_effects_reconciled",
+        "applicable_compensations_verified",
+        "task_cancelled_is_reversal",
+        "business_success",
+        "posting_status",
+        "manual_queue_ref",
+        "record_version",
+        "updated_at",
+        "status_source",
+        "execution_status_source"
+      ],
+      "x-tenant-scope": "context",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task_status": {
+                "const": "CANCELLED"
+              }
+            },
+            "required": [
+              "task_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side_effects_reconciled": {
+                "const": true
+              },
+              "applicable_compensations_verified": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "side_effects_reconciled": {
+                "const": false
+              }
+            },
+            "required": [
+              "side_effects_reconciled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "task_status": {
+                "enum": [
+                  "RUNNING",
+                  "WAITING_HUMAN"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "manual_queue_ref": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "manual_queue_ref"
+            ]
+          },
+          "then": {
+            "properties": {
+              "task_status": {
+                "const": "WAITING_HUMAN"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_status": {
+                "const": "CANCELLED"
+              }
+            },
+            "required": [
+              "task_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "steps": {
+                "items": {
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "started": {
+                            "const": true
+                          }
+                        },
+                        "required": [
+                          "started"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "command_status": {
+                            "enum": [
+                              "SUCCEEDED",
+                              "FAILED"
+                            ]
+                          },
+                          "authority_receipt_ref": {
+                            "$ref": "common-context.json#/$defs/Identifier"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-cancellation-policy": {
+    "owner": "control-plane",
+    "execution_owner": "transaction-service",
+    "stop_only_unstarted_steps": true,
+    "compare_and_stop_start_race_via_owner_cas": true,
+    "inflight_or_completed": "confirm_then_applicable_compensation",
+    "unknown": "reconcile_first_no_direct_compensation",
+    "task_cancelled_is_reversal": false,
+    "command_cancelled_state_added": false,
+    "no_more_steps_after_cancel_intent": true,
+    "CANCELLED_requires": "all_started_effects_confirmed_and_applicable_compensations_verified",
+    "pending_or_manual_task_state": "WAITING_HUMAN",
+    "side_effects_reconciled_requires_authority_evidence": true,
+    "cancel_intent_and_outbox_same_transaction": true,
+    "cross_owner_database_transaction": false,
+    "idempotency_scope": [
+      "context.tenant_id",
+      "idempotency_key"
+    ],
+    "same_key_different_payload": "409",
+    "no_applicable_compensation_requires_evidence": true
+  }
+}

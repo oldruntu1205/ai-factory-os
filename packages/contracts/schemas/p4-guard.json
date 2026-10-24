@@ -1,0 +1,1443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 ordered fail-closed Guard",
+  "x-schema-container": true,
+  "$defs": {
+    "Check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "enum": [
+            "structure",
+            "freshness_timeout",
+            "ood_drift",
+            "version",
+            "permit_policy",
+            "device_parameter_allowlist",
+            "interlock",
+            "budget",
+            "confidence"
+          ]
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "evidence_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "stage",
+        "passed",
+        "evidence_ref",
+        "evidence_hash"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "Confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "enum": [
+            "independent_data_calibrated_task_metric",
+            "unavailable"
+          ]
+        },
+        "calibration_package_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "calibration_package_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aggregation_spec_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "independent_dataset_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "llm_self_report_used": {
+          "const": false
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "calibration_package_ref",
+        "calibration_package_hash",
+        "aggregation_spec_ref",
+        "independent_dataset_ref",
+        "llm_self_report_used"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "unavailable"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "calibration_package_ref": {
+                "type": "null"
+              },
+              "calibration_package_hash": {
+                "type": "null"
+              },
+              "aggregation_spec_ref": {
+                "type": "null"
+              },
+              "independent_dataset_ref": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "calibration_package_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "calibration_package_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "aggregation_spec_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "independent_dataset_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "feature_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "inference_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "scenario_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "local_policy_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "local_permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "human_approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "device_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "mode",
+        "feature_record_ref",
+        "inference_record_ref",
+        "scenario_ref",
+        "local_policy_ref",
+        "local_permit_ref",
+        "human_approval_ref",
+        "device_ref"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "Result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "decision_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "release_status": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "evaluated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "checks": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "structure"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "freshness_timeout"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "ood_drift"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "version"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "permit_policy"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "device_parameter_allowlist"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "interlock"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "budget"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "p4-guard.json#/$defs/Check"
+                },
+                {
+                  "properties": {
+                    "stage": {
+                      "const": "confidence"
+                    }
+                  },
+                  "required": [
+                    "stage"
+                  ]
+                }
+              ]
+            }
+          ],
+          "items": false,
+          "minItems": 9,
+          "maxItems": 9
+        },
+        "first_rejection": {
+          "anyOf": [
+            {
+              "enum": [
+                "structure",
+                "freshness_timeout",
+                "ood_drift",
+                "version",
+                "permit_policy",
+                "device_parameter_allowlist",
+                "interlock",
+                "budget",
+                "confidence"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_eligible": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "$ref": "p4-guard.json#/$defs/Confidence"
+        },
+        "human_approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "human_approval_overrides_hard_checks": {
+          "const": false
+        },
+        "confidence_overrides_hard_checks": {
+          "const": false
+        },
+        "control_write_disabled": {
+          "const": true
+        },
+        "write_disable_mechanism": {
+          "enum": [
+            "physical",
+            "network",
+            "physical_and_network"
+          ]
+        },
+        "write_disable_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "execution_allowed": {
+          "const": false
+        },
+        "comparison_only": {
+          "const": true
+        },
+        "comparison_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fallback_definition_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fallback_required": {
+          "type": "boolean"
+        },
+        "manual_queue_required": {
+          "type": "boolean"
+        },
+        "ai_new_actions_enabled": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "decision_ref",
+        "mode",
+        "release_status",
+        "evaluated_at",
+        "checks",
+        "first_rejection",
+        "candidate_eligible",
+        "confidence",
+        "human_approval_ref",
+        "human_approval_overrides_hard_checks",
+        "confidence_overrides_hard_checks",
+        "control_write_disabled",
+        "write_disable_mechanism",
+        "write_disable_evidence_ref",
+        "execution_allowed",
+        "comparison_only",
+        "comparison_record_ref",
+        "fallback_definition_ref",
+        "fallback_required",
+        "manual_queue_required",
+        "ai_new_actions_enabled"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "P4 完整 Guard 诊断结果；candidate_eligible 仅为影子比对资格，绝非执行许可。结构失败用受控引用记录异常，不接收 NaN/raw payload。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "structure"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "freshness_timeout"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "ood_drift"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "version"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "permit_policy"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "device_parameter_allowlist"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "interlock"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "budget"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "const": "confidence"
+              },
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "candidate_eligible": {
+                "const": true
+              }
+            },
+            "required": [
+              "candidate_eligible"
+            ]
+          },
+          "then": {
+            "properties": {
+              "checks": {
+                "items": {
+                  "properties": {
+                    "passed": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "passed"
+                  ]
+                }
+              },
+              "first_rejection": {
+                "type": "null"
+              },
+              "confidence": {
+                "properties": {
+                  "source": {
+                    "const": "independent_data_calibrated_task_metric"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "checks": {
+                "items": {
+                  "properties": {
+                    "passed": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "passed"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "checks"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_rejection": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "confidence": {
+                "properties": {
+                  "source": {
+                    "const": "unavailable"
+                  }
+                },
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            "required": [
+              "confidence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "candidate_eligible": {
+                "const": false
+              },
+              "checks": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {},
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "passed": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "passed"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "release_status": {
+                "const": "REVOKED"
+              }
+            },
+            "required": [
+              "release_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "candidate_eligible": {
+                "const": false
+              },
+              "fallback_required": {
+                "const": true
+              },
+              "manual_queue_required": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-guard-policy": {
+    "order": [
+      "structure",
+      "freshness_timeout",
+      "ood_drift",
+      "version",
+      "permit_policy",
+      "device_parameter_allowlist",
+      "interlock",
+      "budget",
+      "confidence"
+    ],
+    "diagnostics_are_not_error_codes": true,
+    "hard_checks": [
+      "structure",
+      "freshness_timeout",
+      "ood_drift",
+      "version",
+      "permit_policy",
+      "device_parameter_allowlist",
+      "interlock",
+      "budget"
+    ],
+    "structural_failures": [
+      "missing_field",
+      "nan",
+      "out_of_range",
+      "unknown_unit"
+    ],
+    "higher_priority_than_confidence": [
+      "structure",
+      "freshness_timeout",
+      "ood_drift",
+      "version",
+      "permit_policy",
+      "device_parameter_allowlist",
+      "interlock",
+      "budget"
+    ],
+    "confidence_overrides_interlock": false,
+    "human_approval_overrides_interlock": false,
+    "human_approval_overrides_structure": false,
+    "device_permissions_safety_plc_estop_priority": "above_ai_and_human_approval",
+    "automatic_candidate_requires": [
+      "closed_loop_mode",
+      "calibration_valid",
+      "schema_valid",
+      "in_domain",
+      "fresh_input",
+      "no_drift",
+      "signed_policy_valid",
+      "permit_valid",
+      "device_and_parameters_permitted",
+      "interlock_passed",
+      "budget_available"
+    ],
+    "p4_closed_loop_enabled": false,
+    "first_rejection": "first_failed_stage_in_order",
+    "unknown_or_unavailable_check": "failed",
+    "failed_check": "disable_ai_new_actions_device_baseline_and_durable_manual_queue",
+    "confidence_source": "independent_data_calibrated_task_metric",
+    "execution_authority": "none"
+  }
+}

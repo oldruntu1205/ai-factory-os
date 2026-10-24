@@ -1,0 +1,62 @@
+# 阶段门禁 p0,p1  2026-10-04T23:07:03+0800
+# python: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe
+
+===== 阶段 P0 =====
+## P0 契约静态门禁
+# 覆盖: 只读 P0 契约集合：接口目录、引用闭合、状态机、枚举封闭性、fail-closed 声明
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p0_contracts.py -q --no-header
+#   ..................                                                       [100%]
+#   18 passed in 0.29s
+# 退出码: 0  (耗时 1.0s)
+
+## 契约元模式校验
+# 覆盖: 用 $schema 声明的元模式校验契约本身；拒绝 $ref 同级关键字这类静默失效
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_contract_meta_validation.py -q --no-header
+#   .................ss.....................                                 [100%]
+#   38 passed, 2 skipped in 0.34s
+# 退出码: 0  (耗时 1.1s)
+
+## P0 运行验收
+# 覆盖: 八个真实进程：可启动、拒绝未知 tenant/工具、Mock 闭环可追踪、敏感数据不出域
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p0_runtime -q --no-header
+#   ...................                                                      [100%]
+#   19 passed in 8.61s
+# 退出码: 0  (耗时 9.4s)
+
+## V2.1 回归基线
+# 覆盖: 既有在产能力的 64 项脚本式用例，防止 V3.0 改动破坏旧系统
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe backend/tests/test_hermes_mcp_scheduler_audit.py
+#     [PASS] 统计含 Top 工具
+#     [PASS] 跨租户查询被拒（403）
+#   
+#   ============================================================
+#   通过 64 项，失败 0 项
+#   ============================================================
+#   [stderr] INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+#   [stderr] INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade  -> 219285869b5f, baseline
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade 219285869b5f -> b7d41c9a2e13, tool_call_audits：AI 员工工具调用审计台账
+# 退出码: 0  (耗时 16.5s)
+
+
+===== 阶段 P1 =====
+## P1 契约静态门禁
+# 覆盖: P1 新增 6 接口 + 分级/治理/审计/Vault/来源契约；并锁定 P0 原字节 SHA-256
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts/test_p1_contracts.py -q --no-header
+#     Please convert to a list or tuple.
+#     See https://docs.pytest.org/en/stable/deprecations.html#parametrize-iterators
+#       metafunc.parametrize(*marker.args, **marker.kwargs, _param_mark=marker)
+#   
+#   -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+#   188 passed, 3 warnings in 2.68s
+# 退出码: 0  (耗时 3.5s)
+
+## P1 运行验收
+# 覆盖: C3/C4 无出域路径、跨租户检索隔离、只读问答来源可追溯、Vault 授权恢复
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p1_runtime -q --no-header
+#   ..........................                                               [100%]
+#   26 passed in 8.94s
+# 退出码: 0  (耗时 9.7s)
+
+
+结论: 全部通过（exit 0）

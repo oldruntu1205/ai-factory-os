@@ -1,0 +1,658 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3ApprovalAndTOCTOU",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "Binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "command_type": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "action_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/CatalogValue"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "payload_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "payload_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        },
+        "normalization_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "policy_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        }
+      },
+      "required": [
+        "context",
+        "object_id",
+        "expected_version",
+        "tool_id",
+        "tool_version",
+        "command_type",
+        "action_scope",
+        "payload_ref",
+        "payload_hash",
+        "payload_schema",
+        "normalization_ref",
+        "policy_version"
+      ],
+      "x-tenant-scope": "context",
+      "description": "绑定执行委托 actor 与 tenant/factory/task；受控 payload 引用与 SHA256 来自 Tool Gateway，引用内容不可原地替换。"
+    },
+    "NormalizeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "tool_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "command_type": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "input_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "input_schema": {
+          "$ref": "common-context.json#/$defs/SchemaBinding"
+        }
+      },
+      "required": [
+        "context",
+        "object_id",
+        "expected_version",
+        "tool_id",
+        "tool_version",
+        "command_type",
+        "input_ref",
+        "input_schema"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "Normalized": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "normalization_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "normalized_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "normalizer_unit": {
+          "const": "tool-gateway"
+        }
+      },
+      "required": [
+        "context",
+        "normalization_ref",
+        "binding",
+        "normalized_at",
+        "normalizer_unit"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "BindingRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "normalization_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "context",
+        "normalization_ref",
+        "policy_evaluation_ref",
+        "idempotency_key",
+        "valid_until"
+      ],
+      "x-tenant-scope": "context",
+      "description": "服务端查可信规范化与权威策略；不接受 Agent 自报绑定或 approved。"
+    },
+    "ApprovalBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "approval_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "created_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "valid_from": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "context",
+        "approval_id",
+        "binding",
+        "policy_evaluation_ref",
+        "record_version",
+        "created_at",
+        "valid_from",
+        "valid_until"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "Fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "approval_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "approver_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "decided_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "valid_from": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "audit_intent_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status_source": {
+          "const": "control-plane"
+        }
+      },
+      "required": [
+        "context",
+        "approval_id",
+        "binding",
+        "approved",
+        "approver_ref",
+        "decided_at",
+        "valid_from",
+        "valid_until",
+        "record_version",
+        "decision_ref",
+        "policy_evaluation_ref",
+        "audit_intent_ref",
+        "status_source"
+      ],
+      "x-tenant-scope": "context",
+      "description": "独立批准/拒绝事实；没有自然语言批准、模型置信度或自报角色字段。批准人由可信身份取得，与 binding.context.actor_id 的委托执行人分别记录。"
+    },
+    "ReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "command_record_version",
+        "lease_ref",
+        "fencing_token"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "Review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "review_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approval_record_version": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approval_required": {
+          "type": "boolean"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "checked_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "valid_until": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "command_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_object_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "permission_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "reason_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status_source": {
+          "const": "control-plane"
+        },
+        "approval_valid": {
+          "type": "boolean"
+        },
+        "payload_hash_matches": {
+          "type": "boolean"
+        },
+        "policy_version_matches": {
+          "type": "boolean"
+        },
+        "action_scope_matches": {
+          "type": "boolean"
+        },
+        "object_version_matches": {
+          "type": "boolean"
+        },
+        "current_permission_valid": {
+          "type": "boolean"
+        },
+        "delegation_valid": {
+          "type": "boolean"
+        },
+        "duties_separated": {
+          "type": "boolean"
+        },
+        "capabilities_admitted": {
+          "type": "boolean"
+        },
+        "lease_current": {
+          "type": "boolean"
+        },
+        "fencing_current": {
+          "type": "boolean"
+        },
+        "object_lock_held": {
+          "type": "boolean"
+        },
+        "not_cancelled_before_start": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context",
+        "review_ref",
+        "command_id",
+        "binding",
+        "approval_ref",
+        "approval_record_version",
+        "approval_required",
+        "policy_evaluation_ref",
+        "checked_at",
+        "valid_until",
+        "command_record_version",
+        "actual_object_version",
+        "permission_evidence_ref",
+        "lease_ref",
+        "fencing_token",
+        "allowed",
+        "reason_ref",
+        "status_source",
+        "approval_valid",
+        "payload_hash_matches",
+        "policy_version_matches",
+        "action_scope_matches",
+        "object_version_matches",
+        "current_permission_valid",
+        "delegation_valid",
+        "duties_separated",
+        "capabilities_admitted",
+        "lease_current",
+        "fencing_current",
+        "object_lock_held",
+        "not_cancelled_before_start"
+      ],
+      "x-tenant-scope": "context",
+      "description": "可信复核事实，不是可长期缓存的执行许可；比较值/时间先后/跨对象绑定由执行点强制校验。失败原因只用受控 reason_ref，HTTP 错误复用 Error。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "allowed": {
+                "const": true
+              }
+            },
+            "required": [
+              "allowed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_valid": {
+                "const": true
+              },
+              "payload_hash_matches": {
+                "const": true
+              },
+              "policy_version_matches": {
+                "const": true
+              },
+              "action_scope_matches": {
+                "const": true
+              },
+              "object_version_matches": {
+                "const": true
+              },
+              "current_permission_valid": {
+                "const": true
+              },
+              "delegation_valid": {
+                "const": true
+              },
+              "duties_separated": {
+                "const": true
+              },
+              "capabilities_admitted": {
+                "const": true
+              },
+              "lease_current": {
+                "const": true
+              },
+              "fencing_current": {
+                "const": true
+              },
+              "object_lock_held": {
+                "const": true
+              },
+              "not_cancelled_before_start": {
+                "const": true
+              },
+              "reason_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowed": {
+                "const": false
+              }
+            },
+            "required": [
+              "allowed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "approval_required": {
+                "const": true
+              }
+            },
+            "required": [
+              "approval_required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "approval_record_version": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "approval_required": {
+                "const": false
+              }
+            },
+            "required": [
+              "approval_required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_ref": {
+                "type": "null"
+              },
+              "approval_record_version": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-approval-policy": {
+    "owner": "control-plane",
+    "decision_endpoint": "POST /api/v1/approvals/{approval_id}/decisions",
+    "decision_request_schema": "api-models.json#/$defs/ApprovalDecisionRequest",
+    "trusted_normalizer": "tool-gateway",
+    "trusted_hash_recomputed": true,
+    "agent_hash_is_authority": false,
+    "natural_language_is_authorization": false,
+    "model_confidence_is_authorization": false,
+    "binding_fields": [
+      "context.tenant_id",
+      "context.factory_id",
+      "context.actor_id",
+      "context.task_id",
+      "object_id",
+      "expected_version",
+      "payload_hash",
+      "payload_schema",
+      "tool_id",
+      "tool_version",
+      "command_type",
+      "action_scope",
+      "policy_version"
+    ],
+    "payload_change_requires_new_approval": true,
+    "approval_unique_key": [
+      "context.tenant_id",
+      "approval_id"
+    ],
+    "concurrent_decision": "one_effective_decision_via_cas",
+    "identical_decision_replay": "same_fact",
+    "different_decision_or_binding": "409",
+    "decision_audit_and_fact_same_transaction": true,
+    "append_only_fact": true,
+    "expiry_checked_at_decision_and_execution": true,
+    "authorized_is_perpetual": false
+  },
+  "x-review-policy": {
+    "checks": [
+      "approval_valid",
+      "payload_hash_matches",
+      "policy_version_matches",
+      "action_scope_matches",
+      "object_version_matches",
+      "current_permission_valid",
+      "delegation_valid",
+      "duties_separated",
+      "capabilities_admitted",
+      "lease_current",
+      "fencing_current",
+      "object_lock_held",
+      "not_cancelled_before_start"
+    ],
+    "compare_binding_to_persisted_command": true,
+    "check_at": [
+      "before_EXECUTING",
+      "tool_execution_entry",
+      "adapter_expected_version"
+    ],
+    "failed_review": "fail_closed",
+    "dependency_unavailable": "503",
+    "cached_review_is_perpetual": false,
+    "no_approval_requires_current_authority_policy": true,
+    "compare_times_and_versions_at_runtime": true
+  }
+}

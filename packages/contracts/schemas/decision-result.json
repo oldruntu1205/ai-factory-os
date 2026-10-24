@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DecisionResult",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "employee_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "没有 AI 员工绑定时显式 null。"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "受理前或非任务请求显式 null；已绑定任务时必须非空。"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "deadline_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "decision_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "decision_kind": {
+      "type": "string",
+      "enum": [
+        "Route",
+        "Classify",
+        "Score",
+        "Rank",
+        "Filter",
+        "Gate",
+        "Select",
+        "Escalate"
+      ],
+      "description": "上游 §3 给 Jev Decision Fabric 的**封闭清单**（Route/Classify/Score/Rank/Filter/Gate/Select/Escalate）。显式回显请求的类型，调用方才不必猜「这次的 route 是哪一类决策的结果」。"
+    },
+    "route": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "action": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "category": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "经独立数据校准的无量纲指标；无有效校准时必须 null，不能使用 LLM 自报值。"
+    },
+    "model_version": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "calibration_version": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rule_version": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason_code": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      }
+    },
+    "fallback": {
+      "$ref": "common-context.json#/$defs/Fallback"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "employee_id",
+    "task_id",
+    "trace_id",
+    "data_class",
+    "schema_version",
+    "deadline_at",
+    "decision_id",
+    "decision_kind",
+    "route",
+    "action",
+    "category",
+    "confidence",
+    "model_version",
+    "calibration_version",
+    "rule_version",
+    "reason_code",
+    "evidence_refs",
+    "fallback"
+  ],
+  "x-tenant-scope": "self",
+  "description": "route/action/category/reason_code/fallback 必须在版本目录内；目录待冻结，未知拒绝。自然语言说明不得成为执行参数。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "calibration_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "calibration_version"
+        ]
+      },
+      "then": {
+        "properties": {
+          "confidence": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "x-decision-authority": "suggestion_only",
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "actor_id": "user-demo",
+      "employee_id": "employee-planning",
+      "task_id": "task-demo",
+      "trace_id": "trace-demo",
+      "data_class": "C2",
+      "schema_version": "1.0.0",
+      "deadline_at": "2026-10-05T00:00:00Z",
+      "decision_id": "decision-demo",
+      "decision_kind": "Route",
+      "route": "route-demo",
+      "action": "action-demo",
+      "category": "category-demo",
+      "confidence": null,
+      "model_version": null,
+      "calibration_version": null,
+      "rule_version": "rule-demo",
+      "reason_code": "reason-demo",
+      "evidence_refs": [
+        "evidence-demo"
+      ],
+      "fallback": {
+        "route": "route-demo",
+        "reason_code": "reason-demo"
+      }
+    }
+  ]
+}

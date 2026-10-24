@@ -1,0 +1,29 @@
+{
+  "name": "v3-web-admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "V3 管理后台：员工/任务/批准/运行/发布/对账。当前交付**状态显示契约**与视图模型（零依赖，node --test 可跑）。",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:status": "node --test test/status.test.mjs",
+    "test:view": "node --test test/view.test.mjs"
+  },
+  "//": [
+    "## 为什么没有依赖",
+    "",
+    "上游 §15 建议 Web 用 TypeScript。本机 **npm registry 连通性未确认**（探测无返回），",
+    "而'装不上依赖的工程'比'零依赖的可用模块'更糟：前者会被当成已完成，",
+    "实际连构建都跑不起来。",
+    "",
+    "所以当前交付的是**判定与视图模型**这两层纯 JavaScript 模块（JSDoc 标注类型），",
+    "用 Node 内置的 node:test 做门禁——**不依赖任何外部包**。",
+    "渲染层若改用 React/TypeScript，替换的只是渲染；status.js 与 view.js 原样复用。",
+    "",
+    "待 npm 可用后需要补的：typescript / vite / react / @types/*，",
+    "以及 tsconfig 的 strict 配置与 CI 里的 tsc --noEmit。"
+  ]
+}

@@ -1,0 +1,33 @@
+# P0 门禁  2026-10-04T22:26:29+0800
+# python: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe
+
+## 契约静态门禁
+# 覆盖: 只读 packages/contracts：接口目录、引用闭合、状态机、枚举封闭性、fail-closed 声明
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/contracts -q --no-header
+#   ..................                                                       [100%]
+#   18 passed in 0.28s
+# 退出码: 0  (耗时 1.0s)
+
+## P0 运行验收
+# 覆盖: 八个真实进程：可启动、拒绝未知 tenant/工具、Mock 闭环可追踪、敏感数据不出域
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe -m pytest tests/p0_runtime -q --no-header
+#   ...................                                                      [100%]
+#   19 passed in 8.61s
+# 退出码: 0  (耗时 9.4s)
+
+## V2.1 回归基线
+# 覆盖: 既有在产能力的 64 项脚本式用例，防止 P0 改动破坏旧系统
+# 命令: H:\制造业 AI 员工平台全量开发\backend\.venv\Scripts\python.exe backend/tests/test_hermes_mcp_scheduler_audit.py
+#     [PASS] 统计含 Top 工具
+#     [PASS] 跨租户查询被拒（403）
+#   
+#   ============================================================
+#   通过 64 项，失败 0 项
+#   ============================================================
+#   [stderr] INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+#   [stderr] INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade  -> 219285869b5f, baseline
+#   [stderr] INFO  [alembic.runtime.migration] Running upgrade 219285869b5f -> b7d41c9a2e13, tool_call_audits：AI 员工工具调用审计台账
+# 退出码: 0  (耗时 16.8s)
+
+结论: 全部通过（exit 0）

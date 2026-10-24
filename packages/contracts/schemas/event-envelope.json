@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "task.accepted",
+        "run.waiting_approval",
+        "approval.decided",
+        "command.accepted",
+        "command.succeeded",
+        "command.unknown",
+        "saga.compensation_required",
+        "erp.demand.released",
+        "pmc.schedule.published",
+        "mes.operation.completed",
+        "wms.stock.changed",
+        "edge.decision.observed",
+        "edge.action.executed",
+        "release.evaluated"
+      ]
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source_system": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "aggregate_type": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "aggregate_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "aggregate_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "occurred_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "received_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "causation_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "correlation_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "payload": {
+      "$ref": "event-envelope.json#/$defs/MinimalPayload"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "tenant_id",
+    "factory_id",
+    "source_system",
+    "aggregate_type",
+    "aggregate_id",
+    "aggregate_version",
+    "occurred_at",
+    "received_at",
+    "trace_id",
+    "causation_id",
+    "correlation_id",
+    "data_class",
+    "payload"
+  ],
+  "x-tenant-scope": "self",
+  "description": "事件是事实；仅权威 adapter 持有凭证后发布。payload 在 P0 使用受控证据引用，不接受任意事实对象。",
+  "$defs": {
+    "MinimalPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "payload_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "payload_hash": {
+          "type": "string",
+          "minLength": 1,
+          "description": "分级最小化内容的可信 hash；原文保存在同等级批准域。"
+        }
+      },
+      "required": [
+        "payload_ref",
+        "payload_hash"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-delivery": {
+    "semantics": "at_least_once",
+    "outbox": true,
+    "inbox": true,
+    "aggregate_key": [
+      "tenant_id",
+      "aggregate_id"
+    ],
+    "late_event_overwrite": false,
+    "executed_edge_action_replay": false
+  },
+  "examples": [
+    {
+      "event_id": "event-demo",
+      "event_type": "command.accepted",
+      "schema_version": "1.0.0",
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "source_system": "source-demo",
+      "aggregate_type": "aggregate-demo",
+      "aggregate_id": "command-demo",
+      "aggregate_version": 1,
+      "occurred_at": "2026-10-05T00:00:00Z",
+      "received_at": "2026-10-05T00:00:00Z",
+      "trace_id": "trace-demo",
+      "causation_id": "task-demo",
+      "correlation_id": "task-demo",
+      "data_class": "C2",
+      "payload": {
+        "payload_ref": "payload-demo",
+        "payload_hash": "hash-demo"
+      }
+    }
+  ]
+}

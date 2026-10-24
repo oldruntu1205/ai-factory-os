@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "tool_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tools",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "input_schema": {
+      "$ref": "common-context.json#/$defs/SchemaBinding"
+    },
+    "output_schema": {
+      "$ref": "common-context.json#/$defs/SchemaBinding"
+    },
+    "read_write": {
+      "type": "string",
+      "enum": [
+        "read",
+        "write"
+      ]
+    },
+    "risk_class": {
+      "$ref": "common-context.json#/$defs/RiskClass"
+    },
+    "required_scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      }
+    },
+    "timeout": {
+      "$ref": "common-context.json#/$defs/DurationSeconds"
+    },
+    "retry_policy": {
+      "$ref": "common-context.json#/$defs/RetryPolicy"
+    },
+    "idempotency_support": {
+      "type": "boolean"
+    },
+    "status_query": {
+      "type": "boolean"
+    },
+    "compensation": {
+      "type": "boolean"
+    },
+    "data_class_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/DataClass"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "unknown_class": {
+          "const": "reject"
+        },
+        "inherit_highest_class": {
+          "const": true
+        }
+      },
+      "required": [
+        "allowed_classes",
+        "unknown_class",
+        "inherit_highest_class"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "adapter_owner": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "tool_id",
+    "version",
+    "input_schema",
+    "output_schema",
+    "read_write",
+    "risk_class",
+    "required_scopes",
+    "timeout",
+    "retry_policy",
+    "idempotency_support",
+    "status_query",
+    "compensation",
+    "data_class_rules",
+    "adapter_owner"
+  ],
+  "x-tenant-scope": "self",
+  "description": "登记工具白名单；未知工具/动作拒绝。三个能力布尔字段必须显式提供，不支持时 false。无查询/幂等能力禁止无人值守高风险写入。",
+  "x-admission-policy": {
+    "unknown_tool": "reject",
+    "unknown_action": "reject",
+    "caller_may_set_risk": false,
+    "arbitrary_sql": false,
+    "arbitrary_url": false,
+    "arbitrary_shell": false
+  },
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "tool_id": "tool-demo",
+      "version": "1.0.0",
+      "input_schema": {
+        "schema_ref": "command.json#/$defs/SchedulePayload",
+        "schema_version": "1.0.0",
+        "schema_hash": "hash-demo"
+      },
+      "output_schema": {
+        "schema_ref": "command-status.json",
+        "schema_version": "1.0.0",
+        "schema_hash": "hash-demo"
+      },
+      "read_write": "write",
+      "risk_class": "R2",
+      "required_scopes": [
+        "scope-demo"
+      ],
+      "timeout": "5.000",
+      "retry_policy": {
+        "max_attempts": 1,
+        "retry_delay_seconds": "0.000"
+      },
+      "idempotency_support": true,
+      "status_query": false,
+      "compensation": false,
+      "data_class_rules": {
+        "allowed_classes": [
+          "C2"
+        ],
+        "unknown_class": "reject",
+        "inherit_highest_class": true
+      },
+      "adapter_owner": "adapter-demo"
+    }
+  ]
+}

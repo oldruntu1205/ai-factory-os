@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3EmployeeAndPositionAuthority",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "description": "AI 员工的登记与**岗位授权**模型。上游把平台定位为「AI 员工运行与业务协同平台」，并明确员工控制面要「定义员工能力与风险范围，管理任务及批准权」。本契约把那句话落成可校验的形状。\n\n## 为什么需要它（2026-10-05 的实测结论）\n\n登记的 `registry.mock.json` 里每个租户只有 `employees: [\"employee-planning\"]`——**裸 ID**。全仓搜 `employee_actor` / `actor_ref` / `assignments`：**0 次**。所以：\n\n- 员工页（上游布局章节要求 `apps/web-admin` 有员工页）**做不出来**：加了路由也只能显示一个裸 ID；\n- 批准的 `position_authorized`（岗位授权）与 `within_limit`（限额）两项检查**只能记 `UNKNOWN`**。\n\n**这不是「缺个路由」，是缺数据模型。** 本契约就是那个模型。\n\n## 三处上游依据（逐条对应）\n\n| 上游原话 | 落到本契约的哪个字段 |\n| --- | --- |\n| 「RAG 在检索前过滤 tenant/工厂/**岗位** ACL」 | `positions[].delegated_scopes`（岗位能读/做什么） |\n| 「R1 …明确工具白名单和**限额**」；「R3 …明确**岗位批准**、职责分离」 | `positions[].limits[]`（**按风险等级**的限额） |\n| 「配置版本化，**管理权与业务批准权分开**」 | `config_authority`（谁是配置批准人） |\n\n## 限额挂在**岗位**上，不挂在人上\n\n上游三处都写「岗位批准」「岗位 ACL」，没有一处写「某人可批多少」。\n所以 `limits` 归属 `positions`，员工的权限 = 他所任岗位的并集。\n**这条是刻意的**：改一个人的权限应当靠改岗位任命，而不是逐人配额度——\n否则职责分离会退化成一份越来越难核对的个例清单。\n\n## 与运行期的关系\n\n本契约描述**登记侧**的形状；运行期 Context 里的 `employee_id` 仍只是一个标识符\n（见 `common-context.json`）。本轮**只建模、不填数据**：\n`tests/infra/test_data_gap_register.py` 继续断言登记表里「数据仍未到位」，\n数据一到位那组断言就会报红，逼出「接数据 + 补员工页 + 让两项检查从 UNKNOWN 变可判」。\n",
+  "$defs": {
+    "EmployeeRegistryExample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_version",
+        "employees"
+      ],
+      "description": "契约自带的**可校验示例**（放在 $defs 而不是根 examples：本项目契约容器约定根键只含 $schema / title / x-schema-container / x-source-version / $defs / x-*-policy）。**刻意不含 tenant_id / actor_id / trace_id** —— 那些字段属于 Context，出现这里会让读者以为归属可以随对象走；`test_meta_schema_closed_objects_nested_context_and_utc` 会拒绝这种形状。",
+      "properties": {
+        "registry_version": {
+          "const": "1.0.0"
+        },
+        "employees": {
+          "type": "array",
+          "minItems": 1
+        }
+      }
+    },
+    "RiskLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_class",
+        "decision"
+      ],
+      "description": "**按风险等级的限额**：该岗位在这个风险等级上能批到什么程度。上游 R1/R3 明确「限额」「岗位批准」，故这是「能不能批」的硬前提。",
+      "properties": {
+        "risk_class": {
+          "$ref": "common-context.json#/$defs/RiskClass"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "AUTO",
+            "APPROVE",
+            "FORBIDDEN"
+          ],
+          "description": "`AUTO` = 策略可允许自动执行（上游 R1 的说法）；`APPROVE` = 必须该岗位的人批准；`FORBIDDEN` = 该岗位**不得**批。"
+        },
+        "max_amount": {
+          "$ref": "common-context.json#/$defs/Decimal"
+        },
+        "requires_second_approval": {
+          "type": "boolean",
+          "default": false,
+          "description": "该等级是否要求双人。上游 R3 的「职责分离」落在这一项上。"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "FORBIDDEN"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_amount": false,
+              "requires_second_approval": false
+            }
+          },
+          "description": "`FORBIDDEN` 是「不得批」，再带金额或双人要求是自相矛盾的形状——契约层直接拒掉，免得下游要为它想语义。"
+        }
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_id",
+        "delegated_scopes",
+        "limits"
+      ],
+      "description": "岗位：权限的**承载单位**。员工的权限 = 其所任岗位的并集。",
+      "properties": {
+        "position_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "给人看的岗位名（如「计划员」）。界面显示用；判据不得依赖它。"
+        },
+        "delegated_scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/CatalogValue"
+          },
+          "uniqueItems": true,
+          "description": "该岗位被委派的动作/读取范围。对应上游「检索前过滤 tenant/工厂/岗位 ACL」。"
+        },
+        "limits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RiskLimit"
+          },
+          "minItems": 1,
+          "description": "**按风险等级**逐一给出结论。必须覆盖该租户出现的全部等级——`tests/contracts/test_p3_contracts.py` 会校验覆盖完整，缺等级即报红（缺等级 = 那条链路没人能判「能不能批」）。"
+        },
+        "data_class_ceiling": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        }
+      }
+    },
+    "EmployeeRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "employee_id",
+        "executing_actor_ref",
+        "positions"
+      ],
+      "description": "一个 AI 员工的登记记录。**`executing_actor_ref` 是这块缺口的核心**：它指该员工在执行链路上代表哪个已登记 actor——没有它，「这个 AI 员工是谁」在执行链路上无法落地。\n\n**刻意不带 `tenant_id`**：`EmployeeRegistry` 已是每租户文档，记录级再带一次是冗余；而且租户归属属于 Context，出现在对象内部会让人以为它能随对象走。",
+      "properties": {
+        "employee_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "factory_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "description": "该员工可操作的工厂。空数组表示**无任何工厂**（不是「全部」）——与上游「范围必须显式」一致。"
+        },
+        "position_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "description": "所任岗位标识。员工的权限 = 这些岗位的并集。"
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Position"
+          },
+          "minItems": 1,
+          "description": "岗位的**内联展开**。契约要求展开而非只给引用：审批判定要在一个对象里看全权限，不应要求调用方自己去 join。"
+        },
+        "config_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "may_change_config"
+          ],
+          "description": "**配置批准权**。上游「配置版本化，管理权与业务批准权分开」需要一个能判「谁算配置管理员」的字段——没有它，`checkAuthoritySeparation` 永远判不了。`may_change_config` 必填：允许缺省会让「没填」与「不许改」在数据上无法区分。",
+          "properties": {
+            "may_change_config": {
+              "type": "boolean",
+              "default": false
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "$ref": "common-context.json#/$defs/CatalogValue"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "executing_actor_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      }
+    },
+    "EmployeeRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_version",
+        "employees"
+      ],
+      "description": "一个租户的员工登记。**按租户分片**：跨租户的员工出现在同一份文档里，是越权的最短路径。\n\n**刻意不带 `tenant_id`**：租户归属由请求的 Context 提供（本仓一律如此——对象内部带租户字段会让人以为它能随对象走，而 `tests/contracts/test_p3_contracts.py::test_meta_schema_closed_objects_nested_context_and_utc` 明确拒绝这种形状）。本契约描述的是**一个**租户的登记内容，租户身份不在文档里。",
+      "properties": {
+        "registry_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "employees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EmployeeRecord"
+          }
+        }
+      }
+    }
+  },
+  "x-employee-policy": {
+    "upstream_basis": [
+      "岗位 ACL：RAG 在检索前过滤 tenant/工厂/岗位 ACL",
+      "限额：R1 明确工具白名单和限额",
+      "岗位批准与职责分离：R3 明确岗位批准、职责分离",
+      "管理权与业务批准权分开：配置版本化，管理权与业务批准权分开"
+    ],
+    "limits_belong_to_positions_not_people": "上游三处都写「岗位批准」「岗位 ACL」，没有一处写「某人可批多少」。故 limits 挂 positions，员工权限 = 所任岗位并集。改权限靠改任命，不靠逐人配额度——否则职责分离会退化成越来越难核对的个例清单。",
+    "risk_classes_must_be_fully_covered": "每个岗位的 limits 必须覆盖该租户出现的全部风险等级。缺等级 = 那条链路没人能判「能不能批」，只能退回 UNKNOWN。",
+    "empty_factory_ids_means_none": "factory_ids 为空数组表示无任何工厂，不是「全部」。与上游「范围必须显式」一致。",
+    "forbidden_is_terminal": "decision 为 FORBIDDEN 时不得再带 max_amount / requires_second_approval——「不得批」再要求金额或双人是自相矛盾的形状。",
+    "money_is_decimal_string": "max_amount 用 Decimal（字符串），不用浮点：金额不得有二进制浮点误差。",
+    "no_data_yet": "本契约只建模，登记表里尚无数据。数据一到位 tests/infra/test_data_gap_register.py 会报红，逼出后续动作。",
+    "executing_actor_ref_must_be_registered": "`executing_actor_ref` 必须出现在本租户已登记的 `actors` 里。指向一个不存在的 actor 比不填更糟：看着填了，实际查无此人。**字段名刻意不叫 `actor_id`**：那个名字在 Context 里已有含义，重名会让「员工是谁」与「本次调用者是谁」被混为一谈。"
+  }
+}

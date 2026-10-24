@@ -1,0 +1,472 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3ControlledCommand",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "SubmitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "normalization_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "normalization_ref",
+        "policy_evaluation_ref",
+        "approval_ref",
+        "idempotency_key"
+      ],
+      "x-tenant-scope": "context",
+      "description": "Transaction 读取可信规范化/批准/策略并持久化；调用者不得自填风险、哈希、状态或成功。"
+    },
+    "Accepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "business_success": {
+          "const": false
+        },
+        "posting_status": {
+          "const": "NOT_CONFIRMED"
+        },
+        "status_url": {
+          "type": "string",
+          "pattern": "^/internal/v1/commands/[A-Za-z0-9._:-]+/execution-record$"
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "status",
+        "business_success",
+        "posting_status",
+        "status_url"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "View": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "policy_evaluation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/Command"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status_source": {
+          "const": "transaction-service"
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "execution_credential": {
+          "anyOf": [
+            {
+              "$ref": "p3-execution.json#/$defs/Credential"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authority_receipt": {
+          "anyOf": [
+            {
+              "$ref": "p15-receipt.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "business_success": {
+          "type": "boolean"
+        },
+        "posting_status": {
+          "$ref": "p15-receipt.json#/properties/posting_status"
+        },
+        "posting_evidence_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reconciliation_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "idempotency_key",
+        "binding",
+        "policy_evaluation_ref",
+        "approval_ref",
+        "status",
+        "record_version",
+        "status_source",
+        "updated_at",
+        "execution_credential",
+        "authority_receipt",
+        "business_success",
+        "posting_status",
+        "posting_evidence_ref",
+        "reconciliation_ref",
+        "manual_queue_ref"
+      ],
+      "x-tenant-scope": "context",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ACCEPTED",
+                  "AUTHORIZED",
+                  "EXECUTING",
+                  "UNKNOWN",
+                  "MANUAL_REVIEW",
+                  "FAILED"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_success": {
+                "const": false
+              },
+              "posting_status": {
+                "enum": [
+                  "NOT_CONFIRMED",
+                  "NOT_APPLICABLE"
+                ]
+              },
+              "posting_evidence_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "UNKNOWN"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reconciliation_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "MANUAL_REVIEW"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "EXECUTING",
+                  "SUCCEEDED",
+                  "UNKNOWN"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "execution_credential": {
+                "$ref": "p3-execution.json#/$defs/Credential"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_success": {
+                "const": true
+              },
+              "authority_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "SUCCEEDED"
+                      },
+                      "command_status": {
+                        "const": "SUCCEEDED"
+                      },
+                      "authority_verified": {
+                        "const": true
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ACCEPTED",
+                  "AUTHORIZED"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "execution_credential": {
+                "type": "null"
+              },
+              "authority_receipt": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "posting_status": {
+                "const": "POSTED"
+              }
+            },
+            "required": [
+              "posting_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              },
+              "business_success": {
+                "const": true
+              },
+              "posting_evidence_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "authority_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "posting_status": {
+                        "const": "POSTED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "posting_status": {
+                "enum": [
+                  "NOT_CONFIRMED",
+                  "NOT_APPLICABLE"
+                ]
+              }
+            },
+            "required": [
+              "posting_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "posting_evidence_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "business_success": {
+                "const": true
+              }
+            },
+            "required": [
+              "business_success"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-command-policy": {
+    "owner": "transaction-service",
+    "states_source": "state-machines.json#/$defs/Command",
+    "core_flow": "ACCEPTED → AUTHORIZED → EXECUTING → SUCCEEDED/FAILED/UNKNOWN；可进入MANUAL_REVIEW",
+    "idempotency_scope": [
+      "context.tenant_id",
+      "idempotency_key"
+    ],
+    "canonical_binding_immutable": true,
+    "same_key_same_payload": "same_command_and_current_result",
+    "same_key_different_payload": "409",
+    "canonical_hash_source": "tool-gateway",
+    "hash_rechecked_by_transaction": true,
+    "persist_before_202": true,
+    "authority_receipt_source": "p15-receipt.json",
+    "only_verified_authority_receipt_drives_success": true,
+    "receipt_command_and_outbox_same_transaction": true,
+    "timeout_means_failed": false,
+    "unknown_is_success": false,
+    "accepted_is_posted": false,
+    "authorized_is_posted": false,
+    "cross_system_atomicity": false,
+    "task_state_is_execution_authority": false,
+    "view_receipt_identity_and_status_must_match": true
+  },
+  "x-posting-policy": {
+    "business_success_and_posting_status_separate": true,
+    "POSTED_requires_verified_posting_evidence": true,
+    "p15_runtime_NOT_CONFIRMED_is_not_production_posting": true,
+    "real_posting_mapping": "待冻结"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3CapabilityAdmission",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "Admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "tool_spec": {
+          "$ref": "tool-spec.json"
+        },
+        "unattended_high_risk_write_allowed": {
+          "type": "boolean"
+        },
+        "adapter_ledger_required": {
+          "type": "boolean"
+        },
+        "serial_object_lock_required": {
+          "const": true
+        },
+        "manual_reconciliation_required": {
+          "type": "boolean"
+        },
+        "reason_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "tool_spec",
+        "unattended_high_risk_write_allowed",
+        "adapter_ledger_required",
+        "serial_object_lock_required",
+        "manual_reconciliation_required",
+        "reason_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "ToolSpec 的能力位来自可信登记，不由 Agent 填写；三项支持均不是单独授权。",
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "tool_spec": {
+                    "properties": {
+                      "idempotency_support": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "idempotency_support"
+                    ]
+                  }
+                },
+                "required": [
+                  "tool_spec"
+                ]
+              },
+              {
+                "properties": {
+                  "tool_spec": {
+                    "properties": {
+                      "status_query": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "status_query"
+                    ]
+                  }
+                },
+                "required": [
+                  "tool_spec"
+                ]
+              },
+              {
+                "properties": {
+                  "tool_spec": {
+                    "properties": {
+                      "compensation": {
+                        "const": false
+                      }
+                    },
+                    "required": [
+                      "compensation"
+                    ]
+                  }
+                },
+                "required": [
+                  "tool_spec"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "unattended_high_risk_write_allowed": {
+                "const": false
+              },
+              "adapter_ledger_required": {
+                "const": true
+              },
+              "manual_reconciliation_required": {
+                "const": true
+              },
+              "reason_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-admission-policy": {
+    "trusted_catalog": "tool-spec.json",
+    "missing_or_unknown_capability": "reject",
+    "false_capability_is_not_success": true,
+    "all_false_capabilities_representable": true,
+    "unattended_high_risk_requires": [
+      "idempotency_support",
+      "status_query",
+      "compensation"
+    ],
+    "any_false": "deny_unattended_high_risk_write",
+    "fallback": [
+      "adapter_ledger",
+      "serial_object_lock",
+      "manual_reconciliation"
+    ],
+    "all_true_still_requires_policy_approval_versions": true
+  }
+}

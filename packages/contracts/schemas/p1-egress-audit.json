@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1EgressAudit",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "task_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "audit_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "occurred_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "classification_known": {
+      "type": "boolean"
+    },
+    "highest_data_class": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "classification_rule_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "model_version": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "requested_backend": {
+      "anyOf": [
+        {
+          "$ref": "api-models.json#/$defs/ModelInvocationRequest/properties/model_backend"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "invocation_performed": {
+      "type": "boolean"
+    },
+    "invocation_succeeded": {
+      "type": "boolean"
+    },
+    "output_released": {
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      },
+      "minItems": 0
+    },
+    "input_hash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "摘要算法建议 SHA-256；规范化及指纹隐私策略待冻结，禁止原文。"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "output_hash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "摘要算法建议 SHA-256；规范化及指纹隐私策略待冻结，禁止原文。"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stage_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "identity_tenant",
+              "access_scope",
+              "classification",
+              "minimization",
+              "dlp_egress",
+              "model_allowlist",
+              "invocation",
+              "output_scan",
+              "local_token_restore",
+              "consumption",
+              "graded_audit"
+            ]
+          },
+          "evidence_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          }
+        },
+        "required": [
+          "stage",
+          "evidence_ref"
+        ],
+        "x-tenant-scope": "inherited"
+      },
+      "minItems": 0
+    },
+    "summary_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "task_id",
+    "trace_id",
+    "audit_ref",
+    "occurred_at",
+    "classification_known",
+    "highest_data_class",
+    "policy_version",
+    "classification_rule_version",
+    "model_version",
+    "requested_backend",
+    "invocation_performed",
+    "invocation_succeeded",
+    "output_released",
+    "evidence_refs",
+    "input_hash",
+    "output_hash",
+    "stage_refs",
+    "summary_ref"
+  ],
+  "x-tenant-scope": "self",
+  "description": "§4.3 分级出域尝试审计：只允许安全摘要引用、元数据引用、哈希与版本；无 Prompt/响应原文、令牌值、恢复原值、自由文本 message。最高等级不明用 null，null 是失败记录的缺失分类，不是新增等级。tenant_id 为已验证审计分区；尚无可信租户的身份拒绝不能伪造 tenant，使用隔离安全审计引用，格式待冻结。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "classification_known": {
+            "const": false
+          }
+        },
+        "required": [
+          "classification_known"
+        ]
+      },
+      "then": {
+        "properties": {
+          "highest_data_class": {
+            "const": null
+          },
+          "invocation_performed": {
+            "const": false
+          },
+          "invocation_succeeded": {
+            "const": false
+          },
+          "output_released": {
+            "const": false
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "highest_data_class": {
+            "$ref": "common-context.json#/$defs/DataClass"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "highest_data_class": {
+            "enum": [
+              "C3",
+              "C4"
+            ]
+          },
+          "requested_backend": {
+            "enum": [
+              "enterprise_cloud",
+              "public"
+            ]
+          }
+        },
+        "required": [
+          "highest_data_class",
+          "requested_backend"
+        ]
+      },
+      "then": {
+        "properties": {
+          "invocation_performed": {
+            "const": false
+          },
+          "invocation_succeeded": {
+            "const": false
+          },
+          "output_released": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "requested_backend": {
+            "const": null
+          }
+        },
+        "required": [
+          "requested_backend"
+        ]
+      },
+      "then": {
+        "properties": {
+          "invocation_performed": {
+            "const": false
+          },
+          "invocation_succeeded": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "invocation_performed": {
+            "const": false
+          }
+        },
+        "required": [
+          "invocation_performed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "invocation_succeeded": {
+            "const": false
+          },
+          "output_released": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "invocation_succeeded": {
+            "const": false
+          }
+        },
+        "required": [
+          "invocation_succeeded"
+        ]
+      },
+      "then": {
+        "properties": {
+          "output_released": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "x-audit-policy": {
+    "append_only": true,
+    "raw_content": false,
+    "token_values": false,
+    "restored_values": false,
+    "summary": "安全摘要只存引用；引用目标也不得存敏感原文",
+    "audit_failure": "本地持久化意图失败时拒绝；补送策略待冻结",
+    "unknown_identity": "隔离安全审计格式待冻结；不得借用 tenant-demo 或真实租户分区"
+  }
+}

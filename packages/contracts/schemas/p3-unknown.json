@@ -1,0 +1,731 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3UnknownConvergence",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "expected_record_version",
+        "lease_ref",
+        "fencing_token"
+      ],
+      "x-tenant-scope": "context",
+      "description": "请求查询和持久化收敛记录；不能由调用者传 next_action 或源系统查询结论。"
+    },
+    "Record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "reconciliation_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_system": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "query_attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_evidence_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query_evidence_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query_verified": {
+          "type": "boolean"
+        },
+        "source_outcome": {
+          "$ref": "p15-receipt.json#/properties/outcome"
+        },
+        "command_status": {
+          "$ref": "state-machines.json#/$defs/Command"
+        },
+        "candidate_actions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "QUERY_SOURCE",
+              "RETRY_SAME_KEY",
+              "MANUAL_REVIEW"
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "prohibited_actions": {
+          "const": [
+            "RESEND_NEW_KEY",
+            "DIRECT_COMPENSATION"
+          ]
+        },
+        "next_action": {
+          "anyOf": [
+            {
+              "enum": [
+                "QUERY_SOURCE",
+                "RETRY_SAME_KEY",
+                "MANUAL_REVIEW"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retry_idempotency_key": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retry_requires_fresh_review": {
+          "const": true
+        },
+        "recorded_receipt": {
+          "anyOf": [
+            {
+              "$ref": "p15-receipt.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manual_queue_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "$ref": "error.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recorded_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "status_source": {
+          "const": "transaction-service"
+        },
+        "business_success": {
+          "type": "boolean"
+        },
+        "posting_status": {
+          "$ref": "p15-receipt.json#/properties/posting_status"
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "reconciliation_ref",
+        "idempotency_key",
+        "command_payload_hash",
+        "source_system",
+        "query_attempt_count",
+        "query_evidence_ref",
+        "query_evidence_hash",
+        "query_verified",
+        "source_outcome",
+        "command_status",
+        "candidate_actions",
+        "prohibited_actions",
+        "next_action",
+        "retry_idempotency_key",
+        "retry_requires_fresh_review",
+        "recorded_receipt",
+        "manual_queue_ref",
+        "last_error",
+        "recorded_at",
+        "status_source",
+        "business_success",
+        "posting_status"
+      ],
+      "x-tenant-scope": "context",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_outcome": {
+                "enum": [
+                  "accepted",
+                  "UNKNOWN"
+                ]
+              }
+            },
+            "required": [
+              "source_outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "command_status": {
+                "enum": [
+                  "UNKNOWN",
+                  "MANUAL_REVIEW"
+                ]
+              },
+              "business_success": {
+                "const": false
+              },
+              "posting_status": {
+                "const": "NOT_CONFIRMED"
+              },
+              "retry_idempotency_key": {
+                "type": "null"
+              },
+              "recorded_receipt": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "query_attempt_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "query_attempt_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_outcome": {
+                "const": "UNKNOWN"
+              },
+              "query_verified": {
+                "const": false
+              },
+              "query_evidence_ref": {
+                "type": "null"
+              },
+              "query_evidence_hash": {
+                "type": "null"
+              },
+              "candidate_actions": {
+                "const": [
+                  "QUERY_SOURCE"
+                ]
+              },
+              "next_action": {
+                "const": "QUERY_SOURCE"
+              },
+              "command_status": {
+                "const": "UNKNOWN"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_outcome": {
+                "enum": [
+                  "accepted",
+                  "UNKNOWN"
+                ]
+              },
+              "query_attempt_count": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "source_outcome",
+              "query_attempt_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "candidate_actions": {
+                "const": [
+                  "MANUAL_REVIEW"
+                ]
+              },
+              "next_action": {
+                "const": "MANUAL_REVIEW"
+              },
+              "command_status": {
+                "const": "MANUAL_REVIEW"
+              },
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_outcome": {
+                "const": "NOT_EXECUTED"
+              }
+            },
+            "required": [
+              "source_outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query_attempt_count": {
+                "minimum": 1
+              },
+              "query_verified": {
+                "const": true
+              },
+              "query_evidence_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "query_evidence_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "command_status": {
+                "enum": [
+                  "UNKNOWN",
+                  "MANUAL_REVIEW"
+                ]
+              },
+              "business_success": {
+                "const": false
+              },
+              "posting_status": {
+                "const": "NOT_CONFIRMED"
+              },
+              "candidate_actions": {
+                "const": [
+                  "RETRY_SAME_KEY",
+                  "MANUAL_REVIEW"
+                ]
+              },
+              "next_action": {
+                "enum": [
+                  "RETRY_SAME_KEY",
+                  "MANUAL_REVIEW"
+                ]
+              },
+              "recorded_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "NOT_EXECUTED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "next_action": {
+                "const": "RETRY_SAME_KEY"
+              }
+            },
+            "required": [
+              "next_action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_outcome": {
+                "const": "NOT_EXECUTED"
+              },
+              "query_verified": {
+                "const": true
+              },
+              "retry_idempotency_key": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "command_status": {
+                "const": "UNKNOWN"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "next_action": {
+                "const": "MANUAL_REVIEW"
+              }
+            },
+            "required": [
+              "next_action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "command_status": {
+                "const": "MANUAL_REVIEW"
+              },
+              "manual_queue_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "retry_idempotency_key": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_outcome": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": [
+              "source_outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query_attempt_count": {
+                "minimum": 1
+              },
+              "query_verified": {
+                "const": true
+              },
+              "query_evidence_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "query_evidence_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "command_status": {
+                "const": "SUCCEEDED"
+              },
+              "business_success": {
+                "const": true
+              },
+              "candidate_actions": {
+                "const": []
+              },
+              "next_action": {
+                "type": "null"
+              },
+              "retry_idempotency_key": {
+                "type": "null"
+              },
+              "recorded_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "SUCCEEDED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_outcome": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "source_outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query_attempt_count": {
+                "minimum": 1
+              },
+              "query_verified": {
+                "const": true
+              },
+              "query_evidence_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              },
+              "query_evidence_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "command_status": {
+                "const": "FAILED"
+              },
+              "business_success": {
+                "const": false
+              },
+              "posting_status": {
+                "const": "NOT_CONFIRMED"
+              },
+              "candidate_actions": {
+                "const": []
+              },
+              "next_action": {
+                "type": "null"
+              },
+              "retry_idempotency_key": {
+                "type": "null"
+              },
+              "recorded_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "outcome": {
+                        "const": "FAILED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "business_success": {
+                "const": true
+              }
+            },
+            "required": [
+              "business_success"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_outcome": {
+                "const": "SUCCEEDED"
+              },
+              "command_status": {
+                "const": "SUCCEEDED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "posting_status": {
+                "const": "POSTED"
+              }
+            },
+            "required": [
+              "posting_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_outcome": {
+                "const": "SUCCEEDED"
+              },
+              "recorded_receipt": {
+                "allOf": [
+                  {
+                    "$ref": "p15-receipt.json"
+                  },
+                  {
+                    "properties": {
+                      "posting_status": {
+                        "const": "POSTED"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ManualReviewEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "manual_queue_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "command_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "saga_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "const": "MANUAL_REVIEW"
+        },
+        "reason_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "$ref": "error.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "created_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status_source": {
+          "const": "transaction-service"
+        }
+      },
+      "required": [
+        "context",
+        "manual_queue_ref",
+        "command_ref",
+        "saga_ref",
+        "status",
+        "reason_ref",
+        "last_error",
+        "evidence_refs",
+        "created_at",
+        "attempt_count",
+        "status_source"
+      ],
+      "x-tenant-scope": "context",
+      "description": "Transaction owner 的持久化人工队列记录；查 Command/Saga 获取 queue_ref，人工处理仍经原受控管道，不提供直接改成功接口。"
+    }
+  },
+  "x-convergence-policy": {
+    "entry": "timeout_or_missing_receipt",
+    "initial_status": "UNKNOWN",
+    "mandatory_first_action": "QUERY_SOURCE",
+    "source_query": "authority_command_or_receipt_then_adapter_ledger_if_native_unavailable",
+    "candidate_actions": [
+      "QUERY_SOURCE",
+      "RETRY_SAME_KEY",
+      "MANUAL_REVIEW"
+    ],
+    "prohibited_actions": [
+      "RESEND_NEW_KEY",
+      "DIRECT_COMPENSATION"
+    ],
+    "retry_only_after": "verified_NOT_EXECUTED",
+    "retry_key_must_equal": "idempotency_key",
+    "new_key_retry": false,
+    "direct_compensation": false,
+    "source_success": "persist_verified_receipt_then_SUCCEEDED",
+    "confirmed_failure": "persist_verified_receipt_then_FAILED",
+    "unconfirmed_after_query": "MANUAL_REVIEW",
+    "query_failure": "MANUAL_REVIEW",
+    "ledger_absence_is_not_NOT_EXECUTED": true,
+    "manual_approval_alone_is_success": false,
+    "all_record_bindings_must_match_command": true,
+    "query_backoff_and_budget": "建议基线：有界；本记录一次无法确认即人工，可在查询实现内有界重查",
+    "manual_queue_schema": "p3-unknown.json#/$defs/ManualReviewEntry"
+  }
+}

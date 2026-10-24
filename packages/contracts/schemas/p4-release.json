@@ -1,0 +1,780 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 Edge release registry",
+  "x-schema-container": true,
+  "$defs": {
+    "ArtifactBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "artifact_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "version",
+        "artifact_ref",
+        "sha256"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "BehaviorBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "schema": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "feature_extractor": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "tokenizer": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "calibration_parameters": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        },
+        "action_mapping": {
+          "$ref": "p4-release.json#/$defs/ArtifactBinding"
+        }
+      },
+      "required": [
+        "model",
+        "schema",
+        "feature_extractor",
+        "tokenizer",
+        "calibration_parameters",
+        "action_mapping"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "GateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_frozen": {
+          "type": "boolean"
+        },
+        "offline_validation_passed": {
+          "type": "boolean"
+        },
+        "shadow_passed": {
+          "type": "boolean"
+        },
+        "site_approval_valid": {
+          "type": "boolean"
+        },
+        "permit_valid": {
+          "type": "boolean"
+        },
+        "interlock_verified": {
+          "type": "boolean"
+        },
+        "rollback_drill_passed": {
+          "type": "boolean"
+        },
+        "p3_side_effect_gate_passed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_frozen",
+        "offline_validation_passed",
+        "shadow_passed",
+        "site_approval_valid",
+        "permit_valid",
+        "interlock_verified",
+        "rollback_drill_passed",
+        "p3_side_effect_gate_passed"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "Record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "artifacts": {
+          "$ref": "p4-release.json#/$defs/BehaviorBindings"
+        },
+        "gate_evidence": {
+          "$ref": "p4-release.json#/$defs/GateEvidence"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approval_current": {
+          "type": "boolean"
+        },
+        "ai_new_actions_enabled": {
+          "const": false
+        },
+        "control_write_disabled": {
+          "const": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "updated_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "status_source": {
+          "enum": [
+            "control-plane",
+            "edge"
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "record_version",
+        "status",
+        "artifacts",
+        "gate_evidence",
+        "approval_ref",
+        "approval_current",
+        "ai_new_actions_enabled",
+        "control_write_disabled",
+        "evidence_refs",
+        "updated_at",
+        "status_source"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "P4 台账证据不授予设备执行权限；即使记录后续七态，P4 控制写口仍禁用。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "DRAFT",
+                  "SCHEMA_FROZEN",
+                  "CALIBRATED",
+                  "SHADOW",
+                  "REVOKED"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_current": {
+                "const": false
+              },
+              "approval_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "approval_current": {
+                "const": true
+              }
+            },
+            "required": [
+              "approval_current"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approval_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCHEMA_FROZEN"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gate_evidence": {
+                "properties": {
+                  "schema_frozen": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "CALIBRATED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gate_evidence": {
+                "properties": {
+                  "schema_frozen": {
+                    "const": true
+                  },
+                  "offline_validation_passed": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SHADOW"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gate_evidence": {
+                "properties": {
+                  "schema_frozen": {
+                    "const": true
+                  },
+                  "offline_validation_passed": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "APPROVED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gate_evidence": {
+                "properties": {
+                  "schema_frozen": {
+                    "const": true
+                  },
+                  "offline_validation_passed": {
+                    "const": true
+                  },
+                  "shadow_passed": {
+                    "const": true
+                  },
+                  "site_approval_valid": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ACTIVE"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gate_evidence": {
+                "properties": {
+                  "schema_frozen": {
+                    "const": true
+                  },
+                  "offline_validation_passed": {
+                    "const": true
+                  },
+                  "shadow_passed": {
+                    "const": true
+                  },
+                  "site_approval_valid": {
+                    "const": true
+                  },
+                  "permit_valid": {
+                    "const": true
+                  },
+                  "interlock_verified": {
+                    "const": true
+                  },
+                  "rollback_drill_passed": {
+                    "const": true
+                  },
+                  "p3_side_effect_gate_passed": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "from": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "to": {
+          "$ref": "state-machines.json#/$defs/EdgeRelease"
+        },
+        "gate_evidence": {
+          "$ref": "p4-release.json#/$defs/GateEvidence"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "control_write_disabled": {
+          "const": true
+        },
+        "ai_new_actions_enabled": {
+          "const": false
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "expected_version",
+        "from",
+        "to",
+        "gate_evidence",
+        "evidence_refs",
+        "control_write_disabled",
+        "ai_new_actions_enabled"
+      ],
+      "x-tenant-scope": "inherited",
+      "oneOf": [
+        {
+          "properties": {
+            "from": {
+              "const": "DRAFT"
+            },
+            "to": {
+              "const": "SCHEMA_FROZEN"
+            },
+            "gate_evidence": {
+              "properties": {
+                "schema_frozen": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "properties": {
+            "from": {
+              "const": "SCHEMA_FROZEN"
+            },
+            "to": {
+              "const": "CALIBRATED"
+            },
+            "gate_evidence": {
+              "properties": {
+                "schema_frozen": {
+                  "const": true
+                },
+                "offline_validation_passed": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "properties": {
+            "from": {
+              "const": "CALIBRATED"
+            },
+            "to": {
+              "const": "SHADOW"
+            },
+            "gate_evidence": {
+              "properties": {
+                "schema_frozen": {
+                  "const": true
+                },
+                "offline_validation_passed": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "properties": {
+            "from": {
+              "const": "SHADOW"
+            },
+            "to": {
+              "const": "APPROVED"
+            },
+            "gate_evidence": {
+              "properties": {
+                "schema_frozen": {
+                  "const": true
+                },
+                "offline_validation_passed": {
+                  "const": true
+                },
+                "shadow_passed": {
+                  "const": true
+                },
+                "site_approval_valid": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "properties": {
+            "from": {
+              "const": "APPROVED"
+            },
+            "to": {
+              "const": "ACTIVE"
+            },
+            "gate_evidence": {
+              "properties": {
+                "schema_frozen": {
+                  "const": true
+                },
+                "offline_validation_passed": {
+                  "const": true
+                },
+                "shadow_passed": {
+                  "const": true
+                },
+                "site_approval_valid": {
+                  "const": true
+                },
+                "permit_valid": {
+                  "const": true
+                },
+                "interlock_verified": {
+                  "const": true
+                },
+                "rollback_drill_passed": {
+                  "const": true
+                },
+                "p3_side_effect_gate_passed": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "properties": {
+            "from": {
+              "const": "ACTIVE"
+            },
+            "to": {
+              "const": "REVOKED"
+            },
+            "gate_evidence": {
+              "properties": {}
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        }
+      ],
+      "description": "只描述相邻合法转换；from/to 必须与权威台账及 CAS 对齐。P4 不授予 ACTIVE 写权限；P0 activate 的既有门禁继续有效。"
+    },
+    "Reopen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "previous_release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "replacement_release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changed_components": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "model",
+              "schema",
+              "feature_extractor",
+              "tokenizer",
+              "calibration_parameters",
+              "action_mapping"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "old_artifacts": {
+          "$ref": "p4-release.json#/$defs/BehaviorBindings"
+        },
+        "new_artifacts": {
+          "$ref": "p4-release.json#/$defs/BehaviorBindings"
+        },
+        "behavior_affecting": {
+          "const": true
+        },
+        "replacement_status": {
+          "const": "DRAFT"
+        },
+        "previous_approval_invalidated": {
+          "const": true
+        },
+        "offline_validation_required": {
+          "const": true
+        },
+        "shadow_gate_required": {
+          "const": true
+        },
+        "schema_freeze_required": {
+          "type": "boolean"
+        },
+        "ai_new_actions_enabled": {
+          "const": false
+        },
+        "control_write_disabled": {
+          "const": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "previous_release_id",
+        "replacement_release_id",
+        "expected_version",
+        "changed_components",
+        "old_artifacts",
+        "new_artifacts",
+        "behavior_affecting",
+        "replacement_status",
+        "previous_approval_invalidated",
+        "offline_validation_required",
+        "shadow_gate_required",
+        "schema_freeze_required",
+        "ai_new_actions_enabled",
+        "control_write_disabled",
+        "evidence_refs"
+      ],
+      "x-tenant-scope": "inherited",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "changed_components": {
+                "contains": {
+                  "enum": [
+                    "schema",
+                    "feature_extractor",
+                    "tokenizer",
+                    "action_mapping"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "changed_components"
+            ]
+          },
+          "then": {
+            "properties": {
+              "schema_freeze_required": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Create": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "release_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "status": {
+          "const": "DRAFT"
+        },
+        "artifacts": {
+          "$ref": "p4-release.json#/$defs/BehaviorBindings"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "release_id",
+        "status",
+        "artifacts",
+        "evidence_refs"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-release-policy": {
+    "core_flow": "DRAFT → SCHEMA_FROZEN → CALIBRATED → SHADOW → APPROVED → ACTIVE → REVOKED",
+    "owner": [
+      "control-plane",
+      "edge"
+    ],
+    "normal_transition": "adjacent_only",
+    "revoked_executable": false,
+    "behavior_change_components": [
+      "model",
+      "schema",
+      "feature_extractor",
+      "tokenizer",
+      "calibration_parameters",
+      "action_mapping"
+    ],
+    "behavior_change": "invalidate_previous_approval_and_open_replacement_DRAFT",
+    "gate_reuse_after_behavior_change": false,
+    "reopen_identity_must_differ": true,
+    "version_and_hash_must_match_trusted_registry": true,
+    "p4_execution_permission": false
+  }
+}

@@ -1,0 +1,125 @@
+# V3 部署清单（上游 §15 `infra/deployment/`）
+#
+# > 端口、环境变量和依赖版本归部署 manifest 管理；
+# > 真实密钥只从密钥管理/受限挂载注入，仓库仅提交 `.env.example`。
+#
+# 这份文件是**给机器读的**：`tests/infra/test_infra_manifest.py` 拿它逐项对照代码，
+# 于是"清单与实现漂移"会报红，而不是等到部署时才发现端口对不上。
+#
+# ## 为什么清单要在这里，而不是散在 compose 里
+#
+# compose 是**一种**环境的具体编排；清单是**所有**环境共有的事实
+# （服务 id、模块路径、端口、必需环境变量）。把事实抽出来，
+# 才能做到"改代码后清单失配即报红"。
+
+version: 1
+environment: development
+frozen: false          # 生产冻结状态：**未冻结**（外部依赖未到位，见 blocked_by）
+
+# ── 8 个运行单元 ────────────────────────────────────────────────────────
+# `owner` 是数据主责方（上游 §5.1 一数一源），与 `services/_kernel/routes.py`
+# 的 `OWNER_BY_SERVICE` 必须一致——门禁会核对。
+services:
+  - id: security-gateway
+    owner: security
+    module: services.security-gateway
+    port: 8101
+    port_env: V3_PORT_SECURITY_GATEWAY
+    exposure: frontdoor          # 唯一对外暴露的单元
+    note: 出域治理、分类、模型调用准入、令牌保管
+
+  - id: control-plane
+    owner: control
+    module: services.control-plane
+    port: 8102
+    port_env: V3_PORT_CONTROL_PLANE
+    exposure: internal
+    note: 任务、批准、策略、发布台账
+
+  - id: decision-service
+    owner: decision
+    module: services.decision-service
+    port: 8103
+    port_env: V3_PORT_DECISION_SERVICE
+    exposure: internal
+    note: 决策目录与路由
+
+  - id: hermes-runtime
+    owner: runtime
+    module: services.hermes-runtime
+    port: 8104
+    port_env: V3_PORT_HERMES_RUNTIME
+    exposure: internal
+    note: 运行编排与断点恢复
+
+  - id: manufacturing-core
+    owner: manufacturing
+    module: services.manufacturing-core
+    port: 8105
+    port_env: V3_PORT_MANUFACTURING_CORE
+    exposure: internal
+    note: 制造领域模块；本地同时承载 /edge/v1/**（生产为 Edge Gateway）
+
+  - id: tool-gateway
+    owner: tool
+    module: services.tool-gateway
+    port: 8106
+    port_env: V3_PORT_TOOL_GATEWAY
+    exposure: internal
+    note: 工具登记、准入与执行
+
+  - id: transaction-service
+    owner: transaction
+    module: services.transaction-service
+    port: 8107
+    port_env: V3_PORT_TRANSACTION_SERVICE
+    exposure: internal
+    note: 命令、租约、回执、Saga 补偿
+
+  - id: trajectory-eval
+    owner: evidence
+    module: services.trajectory-eval
+    port: 8108
+    port_env: V3_PORT_TRAJECTORY_EVAL
+    exposure: internal
+    note: 轨迹与证据评估
+
+# ── 必需环境变量（**不给默认值**）────────────────────────────────────────
+# 缺变量时应当**启动失败**，而不是用一个弱默认值悄悄跑起来。
+# 凭据类只列名与来源，**不含任何值**。
+required_env:
+  non_secret:
+    - V3_STATE_DIR            # 事实落点（JSONL journal）
+    - V3_EVIDENCE_DIR         # 证据落点
+    - V3_REGISTRY_PATH        # 登记表路径
+  secret:
+    - SECRET_KEY              # 来源：密钥管理/受限挂载，**不入仓**
+    - LLM_API_KEY             # 同上
+  port_overrides_prefix: V3_PORT_   # 逐单元覆盖端口的变量前缀
+
+# ── 依赖版本（归本清单管理）──────────────────────────────────────────────
+runtime:
+  python: "3.13"
+  packaging: pip
+  freeze_file: backend/requirements.txt
+  container: python:3.13-slim
+  container_user: uid 10001（非 root）
+
+# ── 尚未冻结的外部依赖（上游 §16.1）─────────────────────────────────────
+# 这些不是"待办"，是**外部输入**。清单如实记录阻塞范围。
+blocked_by:
+  - item: 生产数据库
+    need: PostgreSQL 实例、凭据投放方式、备份与恢复演练
+    blocks: 迁移真正在目标库执行（当前运行期是 JSONL journal）
+  - item: 密钥管理
+    need: SECRET_KEY / LLM_API_KEY 等凭据的投放通道
+    blocks: 任何真实密钥的使用
+  - item: 身份与批准岗位
+    need: SSO、tenant/factory 边界、角色与职责分离、限额
+    blocks: 真实用户与写入
+  - item: 运维参数
+    need: 硬件容量、SLO、RPO/RTO、保留期、负责人
+    blocks: 生产发布
+  - item: 外部组件适配
+    need: 各外部系统版本、许可证、授权与升级策略
+    blocks: 真实集成（见 integrations/*/mock.py 的对接清单）

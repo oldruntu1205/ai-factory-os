@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1TokenizationResult",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "context": {
+      "allOf": [
+        {
+          "$ref": "common-context.json"
+        },
+        {
+          "properties": {
+            "factory_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+    },
+    "mapping_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "purpose": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "expires_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "vault_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "tokenized_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "context",
+    "mapping_ref",
+    "purpose",
+    "expires_at",
+    "vault_version",
+    "tokenized_ref"
+  ],
+  "x-tenant-scope": "self",
+  "description": "仅返回本域 Tokenization 内容引用；不返回映射或原值。Tokenization 不自动降低 data_class。",
+  "$defs": {
+    "Mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "factory_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "actor_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "trace_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "mapping_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "expires_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "data_class": {
+          "$ref": "common-context.json#/$defs/DataClass"
+        },
+        "schema_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "vault_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "不含原值的不可预测令牌；生成算法与格式待冻结。"
+              },
+              "original_ref": {
+                "$ref": "common-context.json#/$defs/Identifier"
+              }
+            },
+            "required": [
+              "token",
+              "original_ref"
+            ],
+            "x-tenant-scope": "inherited"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "tenant_id",
+        "factory_id",
+        "actor_id",
+        "task_id",
+        "trace_id",
+        "mapping_ref",
+        "purpose",
+        "expires_at",
+        "data_class",
+        "schema_version",
+        "vault_version",
+        "entries"
+      ],
+      "x-tenant-scope": "self",
+      "description": "本地安全服务私有映射：original_ref 指向同等级本地域原值；禁止导出/日志/审计/证据。API 不返回此结构；只复用映射身份与语义。",
+      "x-storage-policy": {
+        "domain": "approved_local",
+        "export": false,
+        "log": false,
+        "audit": false,
+        "evidence": false,
+        "isolation": [
+          "tenant",
+          "purpose",
+          "expires_at"
+        ],
+        "key_domain": "separate_from_logs"
+      }
+    },
+    "TokenizeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "expires_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "purpose",
+        "input_refs",
+        "expires_at"
+      ],
+      "x-tenant-scope": "self",
+      "description": "按租户/用途/有效期建立本地映射；有效期上限及加密/销毁策略待冻结；未知用途或无登记保留策略拒绝。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    },
+    "RestoreRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "mapping_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "consumer_ref": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "consumers",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "tokenized_output_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "mapping_ref",
+        "purpose",
+        "consumer_ref",
+        "tokenized_output_ref"
+      ],
+      "x-tenant-scope": "self",
+      "description": "恢复前检查可信身份、tenant、用途、有效期、消费者 ACL 及输出 Schema/泄露扫描；不能指定原值或恢复通过标志。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    },
+    "RestoreResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "tenants",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "context": {
+          "allOf": [
+            {
+              "$ref": "common-context.json"
+            },
+            {
+              "properties": {
+                "factory_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "P1 工厂只读链路必须绑定工厂与任务；tenant/actor/岗位来自可信身份，不能信任请求自报值。"
+        },
+        "mapping_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "purpose": {
+          "$ref": "common-context.json#/$defs/CatalogValue"
+        },
+        "consumer_ref": {
+          "$ref": "common-context.json#/$defs/Identifier",
+          "x-registry": "consumers",
+          "x-on-unknown": "reject",
+          "x-on-unavailable": "reject"
+        },
+        "restored_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "vault_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "output_schema_passed": {
+          "type": "boolean",
+          "const": true
+        },
+        "output_leak_scan_passed": {
+          "type": "boolean",
+          "const": true
+        },
+        "local_authorization_verified": {
+          "type": "boolean",
+          "const": true
+        },
+        "consumer_acl_verified": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "tenant_id",
+        "context",
+        "mapping_ref",
+        "purpose",
+        "consumer_ref",
+        "restored_ref",
+        "vault_version",
+        "output_schema_passed",
+        "output_leak_scan_passed",
+        "local_authorization_verified",
+        "consumer_acl_verified"
+      ],
+      "x-tenant-scope": "self",
+      "description": "成功形状仅返回授权消费者的本地域恢复引用；先扫描未恢复输出，再在本域授权恢复，恢复后消费复核。未授权原文或令牌必须阻断。",
+      "x-required-enforcement": [
+        "tenant_matches_context_and_authenticated_identity"
+      ]
+    }
+  },
+  "x-required-enforcement": [
+    "local_only",
+    "tenant_match",
+    "purpose_match",
+    "expiry_checked_at_restore",
+    "output_schema_before_restore",
+    "output_leak_scan_before_restore",
+    "consumer_acl_at_restore_and_consume",
+    "mapping_not_in_audit",
+    "tokenization_no_auto_downgrade",
+    "tenant_matches_context_and_authenticated_identity"
+  ],
+  "x-private-schema": "#/$defs/Mapping 只描述 security 私有持久化形状，不是 API 请求或响应；存储实现由 L2 提供。"
+}

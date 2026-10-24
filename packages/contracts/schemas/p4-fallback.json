@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P4 per-device fixed safety fallback",
+  "x-schema-container": true,
+  "$defs": {
+    "Definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "device_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "definition_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "definition_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "action": {
+          "enum": [
+            "保持基线",
+            "停止自动调参",
+            "降速",
+            "受控停机"
+          ]
+        },
+        "defined_by_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_engineer_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "trigger_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "parameter_boundary_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "baseline_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "interlock_spec_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "site_procedure_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "approved_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "model_selected": {
+          "const": false
+        },
+        "frozen": {
+          "const": true
+        }
+      },
+      "required": [
+        "context",
+        "device_ref",
+        "definition_ref",
+        "definition_hash",
+        "version",
+        "action",
+        "defined_by_ref",
+        "device_engineer_evidence_ref",
+        "trigger_spec_ref",
+        "parameter_boundary_spec_ref",
+        "baseline_spec_ref",
+        "interlock_spec_ref",
+        "site_procedure_ref",
+        "approved_at",
+        "model_selected",
+        "frozen"
+      ],
+      "x-tenant-scope": "inherited"
+    },
+    "Record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "edge_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "definition_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "definition_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "trigger_evidence_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "device_baseline_required": {
+          "const": true
+        },
+        "model_selected": {
+          "const": false
+        },
+        "ai_new_actions_enabled": {
+          "const": false
+        },
+        "mode": {
+          "const": "shadow"
+        },
+        "device_write_issued": {
+          "const": false
+        },
+        "comparison_record_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "manual_queue_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "edge_id",
+        "device_ref",
+        "definition_ref",
+        "definition_hash",
+        "trigger_evidence_ref",
+        "device_baseline_required",
+        "model_selected",
+        "ai_new_actions_enabled",
+        "mode",
+        "device_write_issued",
+        "comparison_record_ref",
+        "manual_queue_ref"
+      ],
+      "x-tenant-scope": "inherited"
+    }
+  },
+  "x-fallback-policy": {
+    "owner": "设备工程师逐设备定义",
+    "actions": [
+      "保持基线",
+      "停止自动调参",
+      "降速",
+      "受控停机"
+    ],
+    "model_may_select_or_invent_action": false,
+    "unknown_device_definition": "disable_ai_new_actions_and_durable_manual_queue",
+    "device_safety_controller_retains_priority": true,
+    "shadow_ai_may_write_fallback_command": false,
+    "safety_maintained_by": "existing_device_baseline_and_site_safety_controls",
+    "lookup_scope": [
+      "context.tenant_id",
+      "context.factory_id",
+      "device_ref"
+    ],
+    "definition_hash_verified_before_use": true
+  }
+}

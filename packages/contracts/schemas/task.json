@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "适用时必须非空；无工厂作用域须显式 null，不能从默认工厂补全。"
+    },
+    "actor_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "employee_id": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "没有 AI 员工绑定时显式 null。"
+    },
+    "task_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "schema_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "deadline_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "status": {
+      "$ref": "state-machines.json#/$defs/Task"
+    },
+    "status_url": {
+      "type": "string",
+      "pattern": "^/api/v1/tasks/[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "description": "相对状态路径，不含域名。"
+    },
+    "status_source": {
+      "const": "control-plane"
+    },
+    "updated_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "command_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      }
+    },
+    "result_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-context.json#/$defs/Identifier"
+      }
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "actor_id",
+    "employee_id",
+    "task_id",
+    "trace_id",
+    "data_class",
+    "schema_version",
+    "deadline_at",
+    "status",
+    "status_url",
+    "status_source",
+    "updated_at",
+    "command_refs",
+    "result_refs"
+  ],
+  "x-tenant-scope": "self",
+  "description": "Task 是编排投影；副作用最终成功必须来自 Transaction 的权威系统回执，202 和 UNKNOWN 不代表过账。",
+  "examples": [
+    {
+      "tenant_id": "tenant-demo",
+      "factory_id": "factory-demo",
+      "actor_id": "user-demo",
+      "employee_id": "employee-planning",
+      "task_id": "task-demo",
+      "trace_id": "trace-demo",
+      "data_class": "C2",
+      "schema_version": "1.0.0",
+      "deadline_at": "2026-10-05T00:00:00Z",
+      "status": "ACCEPTED",
+      "status_url": "/api/v1/tasks/task-demo",
+      "status_source": "control-plane",
+      "updated_at": "2026-10-05T00:00:00Z",
+      "command_refs": [],
+      "result_refs": []
+    }
+  ]
+}

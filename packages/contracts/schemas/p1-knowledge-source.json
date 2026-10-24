@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1KnowledgeSource",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "tenants",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "factory_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "task_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "trace_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "source_system": {
+      "$ref": "common-context.json#/$defs/Identifier",
+      "x-registry": "source_systems",
+      "x-on-unknown": "reject",
+      "x-on-unavailable": "reject"
+    },
+    "source_id": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "source_version": {
+      "$ref": "common-context.json#/$defs/Version"
+    },
+    "occurred_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "received_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "data_class": {
+      "$ref": "common-context.json#/$defs/DataClass"
+    },
+    "quality_status": {
+      "$ref": "common-context.json#/$defs/CatalogValue"
+    },
+    "citation_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "snapshot_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    },
+    "valid_until": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "acl_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "acl_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "acl_version": {
+          "$ref": "common-context.json#/$defs/Version"
+        },
+        "pre_retrieval_tenant_filter": {
+          "type": "boolean",
+          "const": true
+        },
+        "pre_retrieval_factory_filter": {
+          "type": "boolean",
+          "const": true
+        },
+        "pre_retrieval_role_filter": {
+          "type": "boolean",
+          "const": true
+        },
+        "post_return_acl_recheck": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "acl_ref",
+        "acl_version",
+        "pre_retrieval_tenant_filter",
+        "pre_retrieval_factory_filter",
+        "pre_retrieval_role_filter",
+        "post_return_acl_recheck"
+      ],
+      "x-tenant-scope": "inherited",
+      "description": "ACL 必须在候选召回前作用于 tenant/工厂/岗位，返回后再校验当前权限；标志来自可信检索器，不由 LLM 生成。"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "factory_id",
+    "task_id",
+    "trace_id",
+    "source_system",
+    "source_id",
+    "source_version",
+    "occurred_at",
+    "received_at",
+    "data_class",
+    "quality_status",
+    "citation_ref",
+    "snapshot_ref",
+    "valid_until",
+    "acl_check"
+  ],
+  "x-tenant-scope": "self",
+  "description": "§5.2/§6.1 来源引用：只含元数据，不包含原文/chunk。source_version 为权威源版本，occurred_at 为事实发生时间，received_at 为平台接收时间。引用解析仍核对租户、工厂、岗位、任务及有效期，来源元数据也需要 ACL。",
+  "x-retrieval-policy": {
+    "filter_before_retrieval": [
+      "tenant",
+      "factory",
+      "role_acl"
+    ],
+    "recheck_after_return": true,
+    "llm_visibility_authority": false,
+    "knowledge_memory_implicit_copy": false,
+    "reclassify_each_return": true
+  }
+}

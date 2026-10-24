@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P15Outbox",
+  "x-source-version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "context": {
+      "$ref": "common-context.json"
+    },
+    "producer_unit": {
+      "$ref": "p15-lifecycle.json#/$defs/OwnerUnit"
+    },
+    "event": {
+      "$ref": "event-envelope.json"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "SENT",
+        "DLQ"
+      ]
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "$ref": "common-context.json#/$defs/UtcTimestamp"
+    },
+    "sent_at": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "broker_ack_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "$ref": "error.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dlq_ref": {
+      "anyOf": [
+        {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publication_evidence_ref": {
+      "$ref": "common-context.json#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "context",
+    "producer_unit",
+    "event",
+    "state",
+    "attempt_count",
+    "created_at",
+    "sent_at",
+    "broker_ack_ref",
+    "last_error",
+    "dlq_ref",
+    "publication_evidence_ref"
+  ],
+  "x-tenant-scope": "context",
+  "description": "生产者自身状态与本记录同事务；同一逻辑事件只保存一条 outbox，重投递仅更新次数。SENT 仅表示持久化 broker ACK，不表示业务成功。",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "SENT"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sent_at": {
+            "$ref": "common-context.json#/$defs/UtcTimestamp"
+          },
+          "broker_ack_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dlq_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "PENDING",
+              "DLQ"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sent_at": {
+            "type": "null"
+          },
+          "broker_ack_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "DLQ"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dlq_ref": {
+            "$ref": "common-context.json#/$defs/Identifier"
+          },
+          "last_error": {
+            "$ref": "error.json"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ],
+  "x-storage-policy": {
+    "owner": "producer_unit",
+    "unique_key": [
+      "context.tenant_id",
+      "event.event_id"
+    ],
+    "state_and_outbox_same_transaction": true,
+    "mark_sent_after": "durable_broker_ack",
+    "cross_database_transaction": false,
+    "retry_creates_new_record": false,
+    "delivery_semantics": "at_least_once",
+    "event_id_reuse_payload_conflict": "reject_409_or_dlq",
+    "immutable_event": true,
+    "attempt_history_in_same_record": true
+  },
+  "x-required-enforcement": [
+    "context_tenant_matches_event_and_authenticated_identity",
+    "event_factory_trace_data_class_match_context",
+    "only_registered_authority_publishes",
+    "business_fact_requires_verified_receipt",
+    "no_sensitive_body",
+    "deadline",
+    "tenant_acl"
+  ]
+}

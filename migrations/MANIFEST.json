@@ -1,0 +1,135 @@
+{
+  "generator": "services/_kernel/storage.py",
+  "note": "由 scripts/p2_migrations.py 生成；owners[].migrations 冻结该 owner **全部已发布版本**的 sha256（§13：已应用迁移不得修改，只能新增）",
+  "ledger_table": "v3_migration.schema_migrations",
+  "owners": [
+    {
+      "owner": "control",
+      "schema": "control-plane",
+      "path": "control/0001_schema.sql",
+      "version": "0001",
+      "sha256": "2c43e000693d6d9fe001f5ec5200a034f0ed329b9d53085c196b0277fb6fd28c",
+      "statement_count": 33,
+      "table_count": 4,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "control/0001_schema.sql",
+          "sha256": "2c43e000693d6d9fe001f5ec5200a034f0ed329b9d53085c196b0277fb6fd28c"
+        }
+      ]
+    },
+    {
+      "owner": "decision",
+      "schema": "decision-service",
+      "path": "decision/0001_schema.sql",
+      "version": "0001",
+      "sha256": "d765c1359bf9f3e55be63b3abb66cfdc2a96b65414c54033c8b6f4bab28a8bc6",
+      "statement_count": 18,
+      "table_count": 1,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "decision/0001_schema.sql",
+          "sha256": "d765c1359bf9f3e55be63b3abb66cfdc2a96b65414c54033c8b6f4bab28a8bc6"
+        }
+      ]
+    },
+    {
+      "owner": "evidence",
+      "schema": "trajectory-eval",
+      "path": "evidence/0001_schema.sql",
+      "version": "0001",
+      "sha256": "d42376f6ac37b891d12af96955707213d109ae483c81e23c9ff6b3dc7044b874",
+      "statement_count": 28,
+      "table_count": 3,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "evidence/0001_schema.sql",
+          "sha256": "d42376f6ac37b891d12af96955707213d109ae483c81e23c9ff6b3dc7044b874"
+        }
+      ]
+    },
+    {
+      "owner": "manufacturing",
+      "schema": "manufacturing-core",
+      "path": "manufacturing/0001_schema.sql",
+      "version": "0001",
+      "sha256": "9618a227fab9a894b9f7941f0ced5c18e21d1f22c0f8111b1ff15dd8cc1d562b",
+      "statement_count": 23,
+      "table_count": 2,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "manufacturing/0001_schema.sql",
+          "sha256": "9618a227fab9a894b9f7941f0ced5c18e21d1f22c0f8111b1ff15dd8cc1d562b"
+        }
+      ]
+    },
+    {
+      "owner": "runtime",
+      "schema": "hermes-runtime",
+      "path": "runtime/0001_schema.sql",
+      "version": "0001",
+      "sha256": "0b09d21492cd1c1c50af1985f6d6e581838633768bf4bc392fa69325d786d513",
+      "statement_count": 23,
+      "table_count": 2,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "runtime/0001_schema.sql",
+          "sha256": "0b09d21492cd1c1c50af1985f6d6e581838633768bf4bc392fa69325d786d513"
+        }
+      ]
+    },
+    {
+      "owner": "security",
+      "schema": "security-gateway",
+      "path": "security/0001_schema.sql",
+      "version": "0001",
+      "sha256": "3f57a9b96223d89c34ad5ce15f23c4264908c4f2bcf3ffece10a0a555512a5ab",
+      "statement_count": 28,
+      "table_count": 3,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "security/0001_schema.sql",
+          "sha256": "3f57a9b96223d89c34ad5ce15f23c4264908c4f2bcf3ffece10a0a555512a5ab"
+        }
+      ]
+    },
+    {
+      "owner": "tools",
+      "schema": "tool-gateway",
+      "path": "tools/0001_schema.sql",
+      "version": "0001",
+      "sha256": "d92a6aa1854cf149e1e9475c6a56e53ad307bd4406b34ee4448621ac6103674e",
+      "statement_count": 20,
+      "table_count": 2,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "tools/0001_schema.sql",
+          "sha256": "d92a6aa1854cf149e1e9475c6a56e53ad307bd4406b34ee4448621ac6103674e"
+        }
+      ]
+    },
+    {
+      "owner": "transaction",
+      "schema": "transaction-service",
+      "path": "transaction/0001_schema.sql",
+      "version": "0001",
+      "sha256": "a7c4bcee7fcab0652f5b81a4e8226a115a8c346f5e7e2b24cfeb3834dc0a54f7",
+      "statement_count": 33,
+      "table_count": 4,
+      "migrations": [
+        {
+          "version": "0001",
+          "path": "transaction/0001_schema.sql",
+          "sha256": "a7c4bcee7fcab0652f5b81a4e8226a115a8c346f5e7e2b24cfeb3834dc0a54f7"
+        }
+      ]
+    }
+  ]
+}

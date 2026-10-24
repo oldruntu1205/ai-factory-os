@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3ExecutionCredentialLeaseAndFencing",
+  "x-schema-container": true,
+  "x-source-version": "3.0.0",
+  "$defs": {
+    "LeaseRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "worker_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_lease_ref": {
+          "anyOf": [
+            {
+              "$ref": "common-context.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "worker_ref",
+        "expected_record_version",
+        "previous_lease_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "新租约或续租均通过当前 worker 身份、CAS 与持久化 generation 校验；不能让调用者指定 token。"
+    },
+    "Lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "object_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "worker_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "issued_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "expires_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "object_lock_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "object_id",
+        "worker_ref",
+        "lease_ref",
+        "fencing_token",
+        "issued_at",
+        "expires_at",
+        "object_lock_ref",
+        "record_version"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "ExecuteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "expected_record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "expected_record_version",
+        "lease_ref",
+        "fencing_token",
+        "review_ref"
+      ],
+      "x-tenant-scope": "context",
+      "description": "引用不是授权本身；Transaction 再查当前租约、批准、CAS 与取消，先持久化执行意图。"
+    },
+    "Credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "idempotency_key": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "binding": {
+          "$ref": "p3-approval.json#/$defs/Binding"
+        },
+        "execution_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "pre_state_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "pre_state_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "review_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "lease": {
+          "$ref": "p3-execution.json#/$defs/Lease"
+        },
+        "execution_permit_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "audit_intent_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "started_at": {
+          "$ref": "common-context.json#/$defs/UtcTimestamp"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status_source": {
+          "const": "transaction-service"
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "idempotency_key",
+        "binding",
+        "execution_ref",
+        "pre_state_ref",
+        "pre_state_hash",
+        "review_ref",
+        "lease",
+        "execution_permit_ref",
+        "audit_intent_ref",
+        "started_at",
+        "record_version",
+        "status_source"
+      ],
+      "x-tenant-scope": "context"
+    },
+    "ToolExecuteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "common-context.json"
+        },
+        "command_id": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "execution_credential_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "lease_ref": {
+          "$ref": "common-context.json#/$defs/Identifier"
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "context",
+        "command_id",
+        "execution_credential_ref",
+        "lease_ref",
+        "fencing_token"
+      ],
+      "x-tenant-scope": "context",
+      "description": "仅 Transaction 受限服务身份；Tool Gateway 查持久化命令和凭证，再验当前授权，adapter 只接受 Tool 受限身份。"
+    }
+  },
+  "x-execution-policy": {
+    "owner": "transaction-service",
+    "lease_durable": true,
+    "fencing_monotonic": true,
+    "fencing_scope": [
+      "context.tenant_id",
+      "context.factory_id",
+      "object_id"
+    ],
+    "lock_scope": [
+      "context.tenant_id",
+      "context.factory_id",
+      "object_id"
+    ],
+    "lease_renewal_requires_current_holder": true,
+    "new_owner_increments_generation": true,
+    "caller_supplied_generation_is_authority": false,
+    "stale_worker_commit": "reject",
+    "check_fencing_at": [
+      "lease_acquire_or_renew",
+      "command_CAS",
+      "tool_execution_entry",
+      "adapter_dispatch",
+      "receipt_commit",
+      "saga_step_commit"
+    ],
+    "object_update": "CAS_expected_version",
+    "intent_before_external_dispatch": true,
+    "audit_intent_before_side_effect": true,
+    "execution_and_outbox_same_owner_transaction": true,
+    "expired_lease_proves_not_executed": false,
+    "lock_expiry_allows_blind_redispatch": false,
+    "unsupported_remote_fencing": "adapter_ledger_serial_lock_manual_reconciliation",
+    "late_authority_receipt": "ingest_via_authenticated_receipt_endpoint_not_stale_worker",
+    "receipt_endpoint": "POST /internal/v1/commands/{command_id}/receipts"
+  },
+  "x-checkpoint-policy": {
+    "query_existing_command_before_resume": true,
+    "reexecute_succeeded_step": false,
+    "recover_executing_without_receipt": "UNKNOWN_then_query",
+    "new_key_on_restart": false,
+    "authoritative_owner": "transaction-service"
+  }
+}
