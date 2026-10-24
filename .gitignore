@@ -93,3 +93,10 @@ services/.evidence/
 services/state/
 **/*.jsonl
 
+# ===== 含生产环境细节的部署文档（域名/路径/明文示例密码，仅保留本地） =====
+DEPLOY_CHECKLIST.md
+README_SYNC.md
+deploy/DEPLOY_GUIDE.md
+docs/BAOTA_DEPLOY.md
+docs/POSTGRES_UPGRADE_CHECKLIST.md
+
