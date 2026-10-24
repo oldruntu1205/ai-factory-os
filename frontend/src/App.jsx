@@ -1,3 +1,8 @@
+/**
+ * Copyright © 2026 宁波玄砚人工智能科技有限公司。保留所有权利。
+ * 授权：XCIUL 1.0（客户自用授权），仅限被授权方自用与二次开发；
+ * 禁止作为产品对外销售、白标贴牌、SaaS 对外服务及再分发。详见根目录 LICENSE。
+ */
 import React, { useEffect } from 'react'
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Login from './pages/Login'

@@ -4,6 +4,10 @@ main.py —— 制造业 AI 员工平台主程序（第五/十一/十三章）
 覆盖阶段：第二阶段 SaaS 基础 + 第三阶段 RAG + 第四阶段 Multi-Agent
            + 第五阶段商业化 + V2.0 工业 AI + V2.1 自主销售
            + Hermes Agent Runtime（落地手册第二篇，AI 员工操作系统内核）
+
+Copyright © 2026 宁波玄砚人工智能科技有限公司。保留所有权利。
+授权：XCIUL 1.0（客户自用授权），仅限被授权方自用与二次开发；
+禁止作为产品对外销售、白标贴牌、SaaS 对外服务及再分发。详见根目录 LICENSE。
 """
 import os
 import logging

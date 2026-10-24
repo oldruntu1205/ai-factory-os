@@ -2,6 +2,7 @@
   "name": "v3-web-admin",
   "private": true,
   "version": "0.1.0",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "description": "V3 管理后台：员工/任务/批准/运行/发布/对账。当前交付**状态显示契约**与视图模型（零依赖，node --test 可跑）。",
   "engines": {

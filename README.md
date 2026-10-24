@@ -155,3 +155,16 @@ backend/                  FastAPI 后端
 frontend/                 React + Vite 管理界面（含 Hermes Runtime / 渠道中心页）
 docker-compose.yml        基础设施 + backend + hermes-worker
 ```
+
+## 授权协议
+
+本项目采用 **XCIUL 1.0（客户自用授权协议）**，源可见但**不是开源软件**。
+
+**可以**：二次开发、修改、裁剪、与自有系统集成，用于被授权方自身生产经营。
+**不可以**：作为产品对外销售、白标贴牌、做成 SaaS 对外提供服务、再分发源码、嵌入他方产品。
+
+- 完整条款：[`LICENSE`](./LICENSE)
+- 边界速查：[`LICENSE-GUIDE.md`](./LICENSE-GUIDE.md)
+- 白标 / OEM / 转售等用途须另行签署商业授权，见 `LICENSE` 第 10 条。
+
+著作权所有 © 2026 宁波玄砚人工智能科技有限公司。保留所有权利。
