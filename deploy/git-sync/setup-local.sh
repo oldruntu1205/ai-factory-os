@@ -4,7 +4,7 @@
 #
 # 用法：
 #   bash deploy/git-sync/setup-local.sh            # 仅 init + 首次提交（不加远程）
-#   bash deploy/git-sync/setup-local.sh prod root@<PROD_DOMAIN_REMOVED>:/www/wwwroot/<站点目录>.git
+#   bash deploy/git-sync/setup-local.sh prod root@<生产主机>:/www/wwwroot/<站点目录>.git
 #
 # 说明：
 #   - 仅后端代码进入自动同步；前端不在此范围（前端走 deploy-prod.sh 独立发布）。

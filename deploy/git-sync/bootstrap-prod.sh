@@ -6,7 +6,7 @@
 #
 # 用法：
 #   bash bootstrap-prod.sh <user@host> [CODE_DIR] [BRANCH]
-#   例： bash bootstrap-prod.sh root@<PROD_DOMAIN_REMOVED> /www/wwwroot/<站点目录> main
+#   例： bash bootstrap-prod.sh root@<生产主机> /www/wwwroot/<站点目录> main
 #
 # 前置：先在服务器整盘备份生产代码（必做，见 README_SYNC.md 快速开始）：
 #   cp -a /www/wwwroot/<站点目录> /www/wwwroot/<站点目录>.bak.$(date +%s)

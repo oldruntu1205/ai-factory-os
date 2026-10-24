@@ -9,7 +9,7 @@
 本地开发机  H:\制造业 AI 员工平台全量开发
    │  git push prod
    ▼
-PROD <PROD_DOMAIN_REMOVED>
+PROD <生产主机>
    /www/wwwroot/<站点目录>.git        (bare 仓库，仅收推送)
         │  hooks/post-receive
         ▼
@@ -27,14 +27,14 @@ PROD <PROD_DOMAIN_REMOVED>
 
 ## 一、前置条件（一次性）
 
-1. **SSH 免密**：本地能直接 `ssh root@<PROD_DOMAIN_REMOVED>` 无需密码。
+1. **SSH 免密**：本地能直接 `ssh root@<生产主机>` 无需密码。
    ```bash
    ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
-   ssh-copy-id root@<PROD_DOMAIN_REMOVED>
+   ssh-copy-id root@<生产主机>
    ```
 2. **生产整盘备份**（极重要，首次推送会用本地代码覆盖 prod 工作树）：
    ```bash
-   ssh root@<PROD_DOMAIN_REMOVED> "cp -a /www/wwwroot/<站点目录> /www/wwwroot/<站点目录>.bak.\$(date +%s)"
+   ssh root@<生产主机> "cp -a /www/wwwroot/<站点目录> /www/wwwroot/<站点目录>.bak.\$(date +%s)"
    ```
 
 ---
@@ -48,14 +48,14 @@ PROD <PROD_DOMAIN_REMOVED>
 在**本地开发机**（仓库根目录）执行，脚本会自动上传 git-sync 目录并在服务器上运行 setup-prod.sh：
 
 ```bash
-bash deploy/git-sync/bootstrap-prod.sh root@<PROD_DOMAIN_REMOVED> /www/wwwroot/<站点目录> main
+bash deploy/git-sync/bootstrap-prod.sh root@<生产主机> /www/wwwroot/<站点目录> main
 ```
 
 ### 方式 B：手动上传后在服务器执行
 
 ```bash
 # 本地开发机：上传脚本目录
-scp -r deploy/git-sync root@<PROD_DOMAIN_REMOVED>:/root/git-sync
+scp -r deploy/git-sync root@<生产主机>:/root/git-sync
 
 # 服务器：执行 setup-prod.sh
 bash /root/git-sync/setup-prod.sh /www/wwwroot/<站点目录> main
@@ -77,13 +77,13 @@ bash /root/git-sync/setup-prod.sh /www/wwwroot/<站点目录> main
 bash deploy/git-sync/setup-local.sh
 
 # 确认 .gitignore 已排除敏感文件后，关联远程并首推：
-bash deploy/git-sync/setup-local.sh prod root@<PROD_DOMAIN_REMOVED>:/www/wwwroot/<站点目录>.git
+bash deploy/git-sync/setup-local.sh prod root@<生产主机>:/www/wwwroot/<站点目录>.git
 ```
 
 首推触发生产 `post-receive` → 自动 `checkout` + 重启后端。验证：
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://<PROD_DOMAIN_REMOVED>/health   # 期望 200
-ssh root@<PROD_DOMAIN_REMOVED> "tail -n 3 /www/wwwroot/<站点目录>/deploy.log"
+curl -s -o /dev/null -w "%{http_code}\n" https://<生产域名>/health   # 期望 200
+ssh root@<生产主机> "tail -n 3 /www/wwwroot/<站点目录>/deploy.log"
 ```
 
 ---
@@ -97,7 +97,7 @@ git commit -m "feat: xxx"
 git push prod main
 
 # 单文件紧急热修（不走整仓 git，可用既有脚本）：
-bash deploy/sync-rag-fixes.sh --mode remote --host root@<PROD_DOMAIN_REMOVED> --code-dir /www/wwwroot/<站点目录>
+bash deploy/sync-rag-fixes.sh --mode remote --host root@<生产主机> --code-dir /www/wwwroot/<站点目录>
 ```
 
 部署日志统一在 prod 的 `deploy.log`，每次推送一行记录。
@@ -115,7 +115,7 @@ git push prod main
 git push prod <旧commitSHA>:main
 
 # 极端情况：整盘回滚（首次推送前的备份）
-ssh root@<PROD_DOMAIN_REMOVED> "systemctl stop ai-factory-backend ai-factory-worker; \
+ssh root@<生产主机> "systemctl stop ai-factory-backend ai-factory-worker; \
   rm -rf /www/wwwroot/<站点目录>; \
   mv /www/wwwroot/<站点目录>.bak.<时间戳> /www/wwwroot/<站点目录>; \
   systemctl start ai-factory-backend ai-factory-worker"
@@ -130,7 +130,7 @@ ssh root@<PROD_DOMAIN_REMOVED> "systemctl stop ai-factory-backend ai-factory-wor
 | 推送后服务没重启 | 本次提交只动了前端/文档 | 正常，仅 backend/ 变更会重启 |
 | 推送后 `deploy.log` 记「语法检查失败」 | 本地漏跑 `py_compile` | 修语法后重新 commit+push；旧服务仍在跑 |
 | `Permission denied (publickey)` | 未配置 SSH 免密 | 回看「前置条件 1」 |
-| `Could not resolve hostname <PROD_DOMAIN_REMOVED>` | 域名未解析/未指向生产机 | 用公网 IP 替换主机名：服务器上 `curl -s ifconfig.me` 获取公网 IP |
+| `Could not resolve hostname <生产主机>` | 域名未解析/未指向生产机 | 用公网 IP 替换主机名：服务器上 `curl -s ifconfig.me` 获取公网 IP |
 | 首次推送后页面异常 | 本地与 prod 代码差异大 | 用「五、回滚」整盘回退，再比对差异 |
 | 想同步前端 | 前端不在自动同步范围 | 走 `deploy/deploy-frontend.sh` 独立发布 |
 
@@ -189,6 +189,6 @@ bash deploy/git-sync/start-watch.sh restart
 |---|---|---|
 | 保存后没上线 | 改动不在 `backend/` 范围 | 检查 `GIT_SYNC_SCOPE`；或手动 `git push prod main` |
 | 日志显示「未配置远程」 | 还没跑「三、首推」 | 先配置 `prod` 远程 |
-| 日志显示「推送失败」 | prod 不可达/SSH 失效 | 查 `ssh root@<PROD_DOMAIN_REMOVED>`；恢复后下次保存自动重试 |
+| 日志显示「推送失败」 | prod 不可达/SSH 失效 | 查 `ssh root@<生产主机>`；恢复后下次保存自动重试 |
 | CPU 占用偏高 | 回退到了轮询模式 | `pip install watchdog` 后重启守护 |
 

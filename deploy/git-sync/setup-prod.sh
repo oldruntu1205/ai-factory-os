@@ -7,7 +7,7 @@
 #   例： bash setup-prod.sh /www/wwwroot/<站点目录> main
 #
 # 前置（务必先执行，见 GIT_SYNC_GUIDE.md）：
-#   1) 本地已能 SSH 免密登录到本机（root@<PROD_DOMAIN_REMOVED>）
+#   1) 本地已能 SSH 免密登录到本机（root@<生产主机>）
 #   2) 已整盘备份现有生产代码：
 #      cp -a /www/wwwroot/<站点目录> /www/wwwroot/<站点目录>.bak.<时间戳>
 # ============================================================
@@ -40,4 +40,4 @@ EOF
 echo ""
 echo "✅ 生产 git 同步已就绪。"
 echo "   回到本地开发机执行（替换为你真实的服务器地址）："
-echo "   bash deploy/git-sync/setup-local.sh prod root@<PROD_DOMAIN_REMOVED>:$GIT_DIR"
+echo "   bash deploy/git-sync/setup-local.sh prod root@<生产主机>:$GIT_DIR"

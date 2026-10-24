@@ -17,7 +17,7 @@
 #
 # 用法（按部署拓扑选一种）：
 #
-#   A. 服务器本机 systemd（当前生产拓扑：<PROD_DOMAIN_REMOVED> / 宝塔 + systemd）
+#   A. 服务器本机 systemd（宝塔 + systemd 拓扑）
 #        bash deploy/sync-rag-fixes.sh --mode systemd \
 #            --code-dir /www/wwwroot/<站点目录> \
 #            --services "ai-factory-backend ai-factory-worker"
@@ -27,14 +27,14 @@
 #
 #   C. 开发机远程推送（rsync + ssh，服务器为 systemd 拓扑时最方便）
 #        bash deploy/sync-rag-fixes.sh --mode remote \
-#            --host root@<PROD_DOMAIN_REMOVED> \
+#            --host root@<生产主机> \
 #            --code-dir /www/wwwroot/<站点目录>
 #
 # 参数说明：
 #   --mode      docker | systemd | remote   （默认 docker）
 #   --code-dir  目标代码根目录（systemd/remote 必填）
 #   --services  要重启的 systemd 服务名，空格分隔（默认 ai-factory-backend ai-factory-worker）
-#   --host      远程 SSH 目标，如 root@<PROD_DOMAIN_REMOVED>（remote 必填）
+#   --host      远程 SSH 目标，如 root@<生产主机>（remote 必填）
 #
 # 通用说明：
 #   - 覆盖前自动备份到 <code-dir>/backups/rag-fix-<时间戳>/，可一键回滚
