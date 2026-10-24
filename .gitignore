@@ -72,10 +72,24 @@ frontend/dist/
 pytest-of-*/
 .pytest_cache/
 
-# ===== 视频素材工程中间产物（体积大，可由源码重生成） =====
+# ===== 视频素材工程（宣传片，与平台代码无关，完全不进版本库） =====
+videos/
 videos/ai-factory-promo/node_modules/
 videos/ai-factory-promo/out/
 videos/ai-factory-promo/tmp/
 videos/ai-factory-promo/analysis/*.wav
 videos/ai-factory-promo/analysis/*.raw
+
+# ===== 客户演示材料（含 PPT 生成过程截图、成品 pptx，属交付物不属源码） =====
+docs/AI员工平台客户演示/
+
+# ===== 宝塔面板生产部署配置（暴露域名/路径/证书位置，仅保留在本地） =====
+deploy/baota/*.conf
+deploy/baota/*.service
+deploy/baota/.env
+
+# ===== 运行时证据与状态文件（由测试/服务运行生成，可再生） =====
+services/.evidence/
+services/state/
+**/*.jsonl
 
